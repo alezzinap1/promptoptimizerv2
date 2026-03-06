@@ -1,0 +1,101 @@
+id: structured_output
+name: "Structured Output"
+aliases: ["структурированный вывод", "формат ответа", "output format", "json output", "xml tags"]
+
+when_to_use:
+  task_types: [extraction, classification, code, analysis, data_processing, api_response]
+  complexity: [low, medium, high]
+  not_for: [creative_freeform, conversational, emotional_support]
+
+priority: 2
+
+why_it_works: >
+  Явное указание формата вывода устраняет неоднозначность интерпретации задачи.
+  Модель понимает точно что именно нужно вернуть, в каком порядке и какой структуре.
+  Это снижает "творческую свободу" модели там, где она вредна, и исключает
+  лишний текст-обёртку. XML-теги и JSON-формат особенно эффективны — модели
+  обучены на огромном количестве структурированных данных в этих форматах.
+
+variants:
+  - name: "JSON формат"
+    pattern: |
+      Верни результат строго в формате JSON:
+      {
+        "{field_1}": "...",
+        "{field_2}": "...",
+        "{field_3}": [...]
+      }
+      Не добавляй ничего кроме JSON.
+    cost_tokens: low
+    use_when: "данные пойдут в код или API, нужна машиночитаемость"
+
+  - name: "XML-теги"
+    pattern: |
+      Оберни каждую часть ответа в соответствующий тег:
+      <{section_1}>содержимое</{section_1}>
+      <{section_2}>содержимое</{section_2}>
+    cost_tokens: low
+    use_when: "нужно чётко разграничить части ответа для последующего парсинга"
+
+  - name: "Markdown таблица"
+    pattern: |
+      Верни результат в виде markdown-таблицы с колонками:
+      | {col_1} | {col_2} | {col_3} |
+    cost_tokens: low
+    use_when: "данные сравнительные, нужна читаемая таблица"
+
+  - name: "Numbered list"
+    pattern: |
+      Верни результат в виде нумерованного списка.
+      Каждый пункт: "{element}: {description}"
+      Максимум {N} пунктов.
+    cost_tokens: low
+    use_when: "нужен перечень с ограничением количества"
+
+  - name: "Fixed sections"
+    pattern: |
+      Структура ответа (строго):
+      ## {Section 1}
+      {content}
+      ## {Section 2}
+      {content}
+      ## {Section 3}
+      {content}
+    cost_tokens: low
+    use_when: "нужно стандартизировать структуру документа или отчёта"
+
+delimiters_guide:
+  xml_tags: "лучший выбор для Claude; работает со всеми моделями"
+  triple_backticks: "хорошо для кода и текстовых блоков"
+  hash_headers: "для markdown-документов"
+  json: "когда данные уйдут в код"
+  numbered_list: "для приоритизированных перечней"
+
+anti_patterns:
+  - "Не требуй JSON если не будешь его парсить — лишняя нагрузка на модель"
+  - "Не смешивай несколько форматов в одном промпте"
+  - "Не используй формат сложнее задачи (JSON для простого вопроса)"
+
+compatibility:
+  combines_well_with: [role_prompting, chain_of_thought, few_shot, constraints_prompting]
+  often_combined_with: [role_prompting]
+
+examples:
+  good:
+    - input: "Извлеки ключевые данные из резюме"
+      output: >
+        Извлеки данные из резюме и верни строго в формате JSON:
+        {
+          "name": "полное имя",
+          "experience_years": число,
+          "skills": ["навык1", "навык2"],
+          "last_position": "последняя должность",
+          "education": "уровень образования"
+        }
+        Если поле не найдено — верни null.
+
+quality_signals:
+  - "формат явно указан с примером"
+  - "сказано что делать с отсутствующими данными"
+  - "нет лишнего текста кроме указания формата"
+  - "формат соответствует реальной нужде задачи"

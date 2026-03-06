@@ -1,0 +1,78 @@
+id: role_prompting
+name: "Role Prompting"
+aliases: ["ролевой промпт", "задать роль", "persona prompting", "act as"]
+
+when_to_use:
+  task_types: [code, analysis, creative, expert_advice, review, debugging, writing]
+  complexity: [low, medium, high]
+  not_for: [simple_facts, one_word_answers, basic_math]
+
+priority: 1  # применяется почти всегда как базовый слой
+
+why_it_works: >
+  Активирует специализированные паттерны в весах модели, связанные с конкретной
+  профессиональной ролью. Модель "переключается" в режим экспертного мышления:
+  использует профессиональный словарь, структуру ответа и стандарты качества,
+  характерные для указанной роли. Особенно эффективно для GPT-4, Claude 3+, Gemini 1.5+.
+  Улучшает качество ответов на 15-25% по точности и релевантности.
+
+core_pattern: "Ты — {expert_role}. {optional_context}. Твоя задача: {task}."
+
+variants:
+  - name: "Минимальная роль"
+    pattern: "Ты — {role}. {task}."
+    cost_tokens: low
+    use_when: "задача простая, контекст роли очевиден"
+
+  - name: "Роль с опытом"
+    pattern: "Ты — {role} с {N} годами опыта в {domain}. {task}."
+    cost_tokens: low
+    use_when: "нужно подчеркнуть глубину экспертизы"
+
+  - name: "Роль с ограничениями"
+    pattern: "Ты — {role}. Твой стиль: {style}. Твои ограничения: {constraints}. Задача: {task}."
+    cost_tokens: medium
+    use_when: "важно задать конкретное поведение, не только экспертизу"
+
+  - name: "Критик-роль"
+    pattern: "Ты — строгий {role}-критик. Твоя задача — найти слабые места в {subject} и предложить улучшения."
+    cost_tokens: medium
+    use_when: "нужен объективный критический разбор"
+
+role_examples:
+  code: ["senior Python developer", "code reviewer", "DevOps инженер", "архитектор ПО"]
+  analysis: ["data analyst", "бизнес-аналитик", "финансовый аналитик", "исследователь"]
+  creative: ["копирайтер", "сценарист", "редактор", "журналист"]
+  marketing: ["маркетолог", "growth hacker", "UX writer", "бренд-стратег"]
+  education: ["преподаватель", "ментор", "педагогический дизайнер"]
+
+anti_patterns:
+  - "Не используй расплывчатые роли: 'Ты — умный ассистент' — не даёт конкретного фрейма"
+  - "Не совмещай конфликтующие роли в одном промпте"
+  - "Избегай для простых фактических запросов — роль лишь увеличивает токены"
+
+compatibility:
+  combines_well_with: [chain_of_thought, structured_output, few_shot, constraints_prompting]
+  is_foundation_for: [meta_prompting, react_prompting]
+
+examples:
+  good:
+    - input: "Проверь мой Python код на баги"
+      output: >
+        Ты — senior Python developer с опытом code review в production-системах.
+        Задача: проверь код на баги, потенциальные ошибки и нарушения best practices.
+        Для каждой проблемы укажи: строку, тип проблемы, почему это проблема, как исправить.
+
+    - input: "Напиши email коллеге о переносе встречи"
+      output: >
+        Ты — профессиональный бизнес-коммуникатор.
+        Напиши вежливый email о переносе встречи. Тон: деловой, но тёплый. Длина: 3-4 предложения.
+
+  bad:
+    - input: "Какой год основания Apple?"
+      note: "Роль избыточна — простой факт не требует экспертного фрейма"
+
+quality_signals:
+  - "промпт начинается с 'Ты —' или 'You are'"
+  - "роль конкретна (не 'ассистент', а 'senior data scientist')"
+  - "роль релевантна задаче"

@@ -1,0 +1,14 @@
+# Web app
+streamlit>=1.35.0
+
+# LLM client (sync, replaces AsyncOpenAI for web app)
+openai>=1.57.0
+
+# Bot (legacy Telegram)
+aiogram==3.13.1
+aiohttp==3.10.11
+aiosqlite==0.19.0
+
+# Shared
+python-dotenv==1.0.1
+pyyaml>=6.0.2

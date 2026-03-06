@@ -1,0 +1,77 @@
+id: meta_prompting
+name: "Meta-Prompting"
+aliases: ["мета-промптинг", "self-reflection", "constraint articulation", "самоотражение"]
+
+when_to_use:
+  task_types: [complex_instruction_following, technical_analysis, formal_writing, code_review, planning]
+  complexity: [medium, high]
+  not_for: [simple_tasks, creative_freeform, casual_conversation]
+
+priority: 3
+
+why_it_works: >
+  Заставляет модель явно артикулировать свои ограничения и правила ДО выполнения задачи.
+  Это снижает "contextual pollution" — накопление ошибок в длинных reasoning chains.
+  Модель как бы "перечитывает инструкцию" перед началом работы и фиксирует ключевые
+  ограничения в рабочей памяти. Особенно эффективно для задач со строгими правилами
+  и технических задач с множеством constraint-ов.
+
+variants:
+  - name: "Constraint articulation"
+    pattern: |
+      Перед ответом перечисли 3-5 ключевых ограничений и правил, которым ты будешь следовать при выполнении этой задачи.
+      Затем выполни задачу, строго соблюдая эти ограничения.
+      Задача: {task}
+    cost_tokens: medium
+    use_when: "задача требует строгого соблюдения правил"
+
+  - name: "Approach planning"
+    pattern: |
+      Прежде чем начать, опиши свой план действий: что именно ты будешь делать и в каком порядке.
+      Затем выполни по плану.
+      Задача: {task}
+    cost_tokens: medium
+    use_when: "нужно убедиться что модель правильно поняла задачу до генерации"
+
+  - name: "Quality criteria"
+    pattern: |
+      Перед выполнением задачи укажи 3-5 критериев качества хорошего ответа.
+      Затем выполни задачу и в конце самооцени результат по этим критериям.
+      Задача: {task}
+    cost_tokens: high
+    use_when: "нужна верификация качества, особенно для важных документов"
+
+  - name: "Scope clarification"
+    pattern: |
+      Уточни, что ВХОДИТ в задачу и что НЕ ВХОДИТ, прежде чем начать.
+      Затем выполни только то, что входит в scope.
+      Задача: {task}
+    cost_tokens: low
+    use_when: "задача потенциально имеет неоднозначный scope"
+
+anti_patterns:
+  - "Не применяй для простых задач — добавляет verbose overhead без пользы"
+  - "Ограничения должны быть специфичны для задачи, не общими"
+  - "Не просто 'перечисли правила' — это бессмысленно без конкретики"
+
+compatibility:
+  combines_well_with: [chain_of_thought, role_prompting, structured_output, self_consistency]
+  is_meta_layer_for: [chain_of_thought, role_prompting]
+
+examples:
+  good:
+    - input: "Напиши технический spec для нового API"
+      output: >
+        Ты — senior software architect.
+
+        Перед написанием spec перечисли:
+        1. Обязательные разделы хорошего API spec
+        2. Что НЕ должно попасть в spec (implementation details)
+        3. Критерии оценки полноты
+
+        Затем напиши spec строго по этим правилам.
+
+quality_signals:
+  - "модели явно предложено 'подумать о подходе/правилах' перед ответом"
+  - "есть инструкция использовать это рассуждение при выполнении задачи"
+  - "рефлексия специфична для задачи, не общая"
