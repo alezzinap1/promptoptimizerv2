@@ -61,6 +61,7 @@ class OnboardingStates(StatesGroup):
 
 class AgentStates(StatesGroup):
     answering_questions = State()
+    awaiting_custom_answer = State()
 
 
 class SettingsStates(StatesGroup):
@@ -329,6 +330,25 @@ async def handle_prompt(
     provider = user.get("llm_provider", "trinity")
     temperature = float(user.get("temperature", 0.4))
 
+    # Свой ответ на уточняющий вопрос
+    if await state.get_state() == AgentStates.awaiting_custom_answer.state:
+        data = await state.get_data()
+        q_idx = data.get("agent_custom_q_idx", 0)
+        custom_answers: dict = data.get("agent_custom_answers", {})
+        custom_answers[q_idx] = user_input
+        await state.update_data(agent_custom_answers=custom_answers)
+        await state.set_state(AgentStates.answering_questions)
+        questions = data.get("agent_questions", [])
+        answers = data.get("agent_answers", {})
+        if q_idx < len(questions):
+            q = questions[q_idx]
+            await message.answer(
+                _html_escape(q["question"]),
+                parse_mode="HTML",
+                reply_markup=get_agent_questions_keyboard(questions, answers, q_idx, custom_answers),
+            )
+        return
+
     # Сбрасываем FSM если был в состоянии вопросов
     if await state.get_state() == AgentStates.answering_questions.state:
         await state.clear()
@@ -489,6 +509,7 @@ async def _handle_agent(
                 await state.update_data(
                     agent_questions=questions,
                     agent_answers={},
+                    agent_custom_answers={},
                     agent_provider=provider,
                     agent_technique_ids=technique_ids,
                 )
@@ -500,7 +521,7 @@ async def _handle_agent(
                     await message.answer(
                         text,
                         parse_mode="HTML",
-                        reply_markup=get_agent_questions_keyboard(questions, {}, i),
+                        reply_markup=get_agent_questions_keyboard(questions, {}, i, {}),
                     )
                 return
 

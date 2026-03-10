@@ -15,7 +15,6 @@ NAV_ITEMS: list[tuple[str, str]] = [
     ("Сравнение",  "pages/2_Compare.py"),
     ("Библиотека", "pages/3_Library.py"),
     ("Техники",    "pages/4_Techniques.py"),
-    ("Настройки",  "pages/5_Settings.py"),
 ]
 
 
@@ -37,7 +36,7 @@ def render_nav(current: str = "") -> None:
     st.session_state.setdefault("sb_theme", st.session_state["_prefs_theme"])
     st.session_state.setdefault("sb_font", st.session_state["_prefs_font"])
 
-    cols = st.columns([1, 1, 1, 1, 1, 2, 1, 1])
+    cols = st.columns([1, 1, 1, 1, 2, 1, 1])
     for i, (label, page) in enumerate(NAV_ITEMS):
         is_active = page.endswith(current)
         with cols[i]:
@@ -48,8 +47,8 @@ def render_nav(current: str = "") -> None:
                 )
             else:
                 st.page_link(page, label=label, use_container_width=True)
-    with cols[6]:
+    with cols[5]:
         _render_theme_select()
-    with cols[7]:
+    with cols[6]:
         _render_font_select()
     st.markdown('<hr class="nav-divider" />', unsafe_allow_html=True)

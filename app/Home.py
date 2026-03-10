@@ -149,16 +149,27 @@ def _run_generation(
 
     # Stream to buffer (clean UX: no raw tags shown to user)
     full_text = ""
-    with st.spinner("Генерирую промпт..."):
-        for chunk in llm.stream(
-            system_prompt, user_content, gen_model, temperature,
-            top_p=top_p, top_k=top_k,
-        ):
-            full_text += chunk
+    try:
+        with st.spinner("Генерирую промпт..."):
+            for chunk in llm.stream(
+                system_prompt, user_content, gen_model, temperature,
+                top_p=top_p, top_k=top_k,
+            ):
+                full_text += chunk
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "not a valid model id" in err_msg or "invalid model" in err_msg:
+            st.session_state["model_error"] = (
+                "**ID модели устарел.** Выбранная модель больше не поддерживается API. "
+                "Выбери другую модель в выпадающем меню слева (например, DeepSeek или Gemini)."
+            )
+            return
+        raise
 
     parsed = parse_reply(full_text)
     metrics = analyze_prompt(parsed.get("prompt_block", "")) if parsed.get("has_prompt") else {}
 
+    st.session_state.pop("model_error", None)  # Очищаем ошибку при успешной генерации
     st.session_state.last_result = {
         **parsed,
         "techniques":    techniques,
@@ -332,6 +343,9 @@ with col_in:
 with col_out:
     st.subheader("Результат")
 
+    if st.session_state.get("model_error"):
+        st.error(st.session_state["model_error"])
+
     result = st.session_state.last_result
 
     if result is None:
@@ -344,14 +358,22 @@ with col_out:
         # ── Q&A flow ──────────────────────────────────────────────────────────
         questions = parse_questions(result.get("questions_raw", ""))
         if questions:
-            st.info("Ответь на вопросы — это поможет создать более точный промпт.")
-            q_answers: dict[int, str] = {}
+            st.info("Ответь на вопросы — можно выбрать несколько вариантов или ввести свой.")
+            q_answers: dict[int, list[str]] = {}
+            q_custom: dict[int, str] = {}
             for i, q in enumerate(questions):
                 st.write(f"**{i + 1}. {q['question']}**")
-                q_answers[i] = st.radio(
-                    "",
+                q_answers[i] = st.multiselect(
+                    "Варианты",
                     q["options"],
+                    default=[],
                     key=f"qa_{i}",
+                    label_visibility="collapsed",
+                )
+                q_custom[i] = st.text_input(
+                    "Свой вариант",
+                    placeholder="Или введите свой ответ...",
+                    key=f"qa_custom_{i}",
                     label_visibility="collapsed",
                 )
 
@@ -372,8 +394,14 @@ with col_out:
                     st.rerun()
             with col_go:
                 if st.button("Создать промпт с этими ответами", type="primary", use_container_width=True):
+                    def _format_answer(i: int, q: dict) -> str:
+                        selected = q_answers.get(i, [])
+                        custom = (q_custom.get(i) or "").strip()
+                        parts = selected + ([custom] if custom else [])
+                        return ", ".join(parts) if parts else "Пропустить"
+
                     answers_text = "\n".join(
-                        f"{q['question']}: {q_answers.get(i, 'Пропустить')}"
+                        f"{q['question']}: {_format_answer(i, q)}"
                         for i, q in enumerate(questions)
                     )
                     combined = (

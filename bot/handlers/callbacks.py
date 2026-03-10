@@ -256,7 +256,12 @@ async def cb_tech_explain(cq: CallbackQuery, registry: TechniqueRegistry):
 
 # ─── Агентный Q&A ─────────────────────────────────────────────────────────────
 
-@router.callback_query(F.data.startswith("aq_") & ~F.data.endswith("next") & ~F.data.endswith("skip"))
+@router.callback_query(
+    F.data.startswith("aq_")
+    & ~F.data.endswith("next")
+    & ~F.data.endswith("skip")
+    & ~F.data.startswith("aq_custom_"),
+)
 async def cb_answer_question(cq: CallbackQuery, state: FSMContext):
     parts = cq.data.split("_")
     if len(parts) < 3:
@@ -280,11 +285,24 @@ async def cb_answer_question(cq: CallbackQuery, state: FSMContext):
     await state.update_data(agent_answers=answers)
 
     questions = data.get("agent_questions", [])
-    # Обновляем разметку текущего вопроса
-    # Определяем, к какому вопросу относится это сообщение
+    custom_answers = data.get("agent_custom_answers", {})
     await cq.message.edit_reply_markup(
-        reply_markup=get_agent_questions_keyboard(questions, answers, q_idx)
+        reply_markup=get_agent_questions_keyboard(questions, answers, q_idx, custom_answers)
     )
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("aq_custom_"))
+async def cb_question_custom(cq: CallbackQuery, state: FSMContext):
+    """Переход в режим ввода своего ответа."""
+    try:
+        q_idx = int(cq.data.split("_")[-1])
+    except ValueError:
+        await cq.answer()
+        return
+    await state.set_state(AgentStates.awaiting_custom_answer)
+    await state.update_data(agent_custom_q_idx=q_idx)
+    await cq.message.answer("✏️ Введите свой ответ текстом:")
     await cq.answer()
 
 
@@ -293,9 +311,8 @@ async def cb_question_next(cq: CallbackQuery, state: FSMContext, db: SQLiteManag
     data = await state.get_data()
     questions: list[dict] = data.get("agent_questions", [])
     answers: dict = data.get("agent_answers", {})
+    custom_answers: dict = data.get("agent_custom_answers", {})
 
-    # Находим текущий вопрос по индексу в сообщении
-    # Используем счётчик в state для отслеживания текущего вопроса
     current_q = data.get("current_question_idx", 0)
     next_q = current_q + 1
 
@@ -305,12 +322,11 @@ async def cb_question_next(cq: CallbackQuery, state: FSMContext, db: SQLiteManag
         await cq.message.answer(
             _html_escape(q["question"]),
             parse_mode="HTML",
-            reply_markup=get_agent_questions_keyboard(questions, answers, next_q),
+            reply_markup=get_agent_questions_keyboard(questions, answers, next_q, custom_answers),
         )
         await cq.answer()
     else:
-        # Все вопросы пройдены — генерируем промпт
-        await _generate_from_answers(cq, state, db, llm, registry, answers, questions)
+        await _generate_from_answers(cq, state, db, llm, registry, answers, questions, custom_answers)
 
 
 @router.callback_query(F.data == "aq_skip")
@@ -318,7 +334,8 @@ async def cb_question_skip(cq: CallbackQuery, state: FSMContext, db: SQLiteManag
     data = await state.get_data()
     questions = data.get("agent_questions", [])
     answers = data.get("agent_answers", {})
-    await _generate_from_answers(cq, state, db, llm, registry, answers, questions)
+    custom_answers = data.get("agent_custom_answers", {})
+    await _generate_from_answers(cq, state, db, llm, registry, answers, questions, custom_answers)
 
 
 async def _generate_from_answers(
@@ -329,22 +346,26 @@ async def _generate_from_answers(
     registry: TechniqueRegistry,
     answers: dict,
     questions: list[dict],
+    custom_answers: dict | None = None,
 ):
     data = await state.get_data()
     original_request = data.get("agent_original_request", "")
     provider = data.get("agent_provider", "trinity")
     technique_ids = data.get("agent_technique_ids", [])
     user_id = cq.from_user.id
+    custom_answers = custom_answers or {}
 
     await state.clear()
 
-    # Формируем текст с ответами
+    # Формируем текст с ответами (варианты + свой ввод)
     answers_text = ""
     for i, q in enumerate(questions):
         selected_indices = answers.get(i, [])
-        if selected_indices:
-            selected_opts = [q["options"][j] for j in selected_indices if j < len(q["options"])]
-            answers_text += f"\n{q['question']}: {', '.join(selected_opts)}"
+        selected_opts = [q["options"][j] for j in selected_indices if j < len(q["options"])]
+        custom = (custom_answers.get(i) or "").strip()
+        parts = selected_opts + ([custom] if custom else [])
+        if parts:
+            answers_text += f"\n{q['question']}: {', '.join(parts)}"
 
     if not answers_text.strip():
         answers_text = " (пользователь пропустил вопросы)"

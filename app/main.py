@@ -33,7 +33,6 @@ pages = [
     st.Page("pages/2_Compare.py", title="Сравнение"),
     st.Page("pages/3_Library.py", title="Библиотека"),
     st.Page("pages/4_Techniques.py", title="Техники"),
-    st.Page("pages/5_Settings.py", title="Настройки"),
 ]
 pg = st.navigation(pages, position="hidden")
 inject_styles()
@@ -47,10 +46,9 @@ url_to_current = {
     "": "Home.py", "2_Compare": "2_Compare.py", "Compare": "2_Compare.py",
     "3_Library": "3_Library.py", "Library": "3_Library.py",
     "4_Techniques": "4_Techniques.py", "Techniques": "4_Techniques.py",
-    "5_Settings": "5_Settings.py", "Settings": "5_Settings.py",
 }
 current = url_to_current.get(url_path, "Home.py")
-cols = st.columns([1, 1, 1, 1, 1, 2, 1, 1])
+cols = st.columns([1, 1, 1, 1, 2, 1, 1])
 for i, (label, page) in enumerate(NAV_ITEMS):
     is_active = page.endswith(current)
     with cols[i]:
@@ -58,9 +56,9 @@ for i, (label, page) in enumerate(NAV_ITEMS):
             st.markdown(f'<p class="nav-item-active">{label}</p>', unsafe_allow_html=True)
         else:
             st.page_link(page, label=label, use_container_width=True)
-with cols[6]:
+with cols[5]:
     _render_theme_select()
-with cols[7]:
+with cols[6]:
     _render_font_select()
 st.markdown('<hr class="nav-divider" />', unsafe_allow_html=True)
 

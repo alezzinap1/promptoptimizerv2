@@ -120,10 +120,12 @@ def get_agent_questions_keyboard(
     questions: list[dict],
     answers: dict[int, list[int]],
     current_q: int,
+    custom_answers: dict[int, str] | None = None,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура для одного вопроса с вариантами ответа."""
+    """Клавиатура для одного вопроса с вариантами ответа (множественный выбор + свой вариант)."""
     builder = InlineKeyboardBuilder()
     q = questions[current_q]
+    custom_answers = custom_answers or {}
     for opt_idx, opt_text in enumerate(q["options"]):
         selected = opt_idx in (answers.get(current_q) or [])
         mark = "✅ " if selected else ""
@@ -131,6 +133,12 @@ def get_agent_questions_keyboard(
             text=f"{mark}{opt_text}",
             callback_data=f"aq_{current_q}_{opt_idx}",
         ))
+    custom = (custom_answers.get(current_q) or "").strip()
+    custom_label = f" ({custom[:15]}…)" if len(custom) > 15 else f" ({custom})" if custom else ""
+    builder.row(InlineKeyboardButton(
+        text=f"{'✅ ' if custom else ''}✏️ Свой вариант{custom_label}",
+        callback_data=f"aq_custom_{current_q}",
+    ))
 
     is_last = current_q == len(questions) - 1
     nav_text = "✅ Готово — создать промпт" if is_last else "▶ Следующий вопрос"
