@@ -1,0 +1,143 @@
+.home {
+  max-width: 1200px;
+}
+
+.home h1 {
+  margin: 0 0 24px;
+  font-size: 2rem;
+}
+
+.expander {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--secondary);
+  border-radius: 8px;
+}
+
+.expander summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.field select,
+.field input[type="range"] {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg);
+  color: var(--text);
+  min-width: 180px;
+}
+
+.radioRow {
+  display: flex;
+  gap: 16px;
+}
+
+.radioRow label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 32px;
+}
+
+.left textarea,
+.right textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--secondary);
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+
+.primaryBtn {
+  padding: 12px 24px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.info {
+  padding: 12px;
+  background: rgba(34, 211, 238, 0.1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.error {
+  color: #ef4444;
+  padding: 12px;
+}
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  border: 2px dashed var(--primary);
+  border-radius: 8px;
+  opacity: 0.8;
+}
+
+.resultPrompt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+.reasoning {
+  white-space: pre-wrap;
+  font-size: 14px;
+  padding: 12px;
+  background: var(--secondary);
+  border-radius: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.actions a,
+.actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}

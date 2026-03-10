@@ -30,7 +30,7 @@ from services.llm_client import (
     TARGET_MODELS,
     LLMClient,
 )
-from app.shared_styles import THEMES
+from app.shared_styles import THEMES, inject_styles
 
 # ── Resources (cached) ────────────────────────────────────────────────────────
 @st.cache_resource
@@ -72,6 +72,15 @@ def _init_state() -> None:
         "iteration_mode":   False,
         "show_save_dialog": False,
         "questions_state":  None,
+        "sb_gen_model":     DEFAULT_PROVIDER,
+        "sb_target_model":  "unknown",
+        "sb_domain":        "auto",
+        "sb_tech_mode":     "Авто",
+        "sb_temperature":   0.7,
+        "sb_top_p":         1.0,
+        "sb_top_k":         0,
+        "sb_questions_mode": True,
+        "sb_manual_techs":  [],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -181,112 +190,74 @@ def _run_generation(
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# SIDEBAR
-# ════════════════════════════════════════════════════════════════════════════════
-with st.sidebar:
-    st.caption("Prompt Engineer · Профессиональный инструмент")
-    st.divider()
-    st.subheader("Генерация")
-
-    gen_model = st.selectbox(
-        "Модель для генерации",
-        options=list(PROVIDER_NAMES.keys()),
-        format_func=lambda x: PROVIDER_NAMES[x],
-        index=list(PROVIDER_NAMES.keys()).index(DEFAULT_PROVIDER),
-        key="sb_gen_model",
-    )
-
-    target_model = st.selectbox(
-        "Целевая модель промпта",
-        options=list(TARGET_MODELS.keys()),
-        format_func=lambda x: TARGET_MODELS[x],
-        key="sb_target_model",
-        help="Для какой LLM создаётся промпт. Определяет стиль инструкций (XML для Claude, JSON mode для GPT) и набор техник.",
-    )
-
-    domain_list = _cached_domain_list()
-    domain = st.selectbox(
-        "Шаблон домена",
-        options=[d[0] for d in domain_list],
-        format_func=lambda x: dict(domain_list).get(x, x),
-        key="sb_domain",
-        help="Контент, редактура, анализ и т.д. — подставляет чеклист и рекомендуемые техники.",
-    )
-
-    technique_mode_label = st.radio(
-        "Режим техник",
-        ["Авто", "Вручную"],
-        key="sb_tech_mode",
-        help="Авто: подбор по типу задачи и целевой модели. Вручную: полный контроль.",
-        horizontal=True,
-    )
-    technique_mode = "auto" if technique_mode_label == "Авто" else "manual"
-
-    manual_techs: list[str] = []
-    if technique_mode == "manual":
-        all_techs   = registry.get_all()
-        tech_options = {t["id"]: t.get("name", t["id"]) for t in all_techs}
-        manual_techs = st.multiselect(
-            "Выбери техники (1–6)",
-            options=list(tech_options.keys()),
-            format_func=lambda x: tech_options[x],
-            max_selections=6,
-            key="sb_manual_techs",
-        )
-
-    with st.expander("Доп. параметры", expanded=False):
-        temperature = st.slider(
-            "Температура",
-            min_value=0.1,
-            max_value=1.0,
-            value=0.7,
-            step=0.1,
-            key="sb_temperature",
-            help="0.1 = строго/точно, 0.7 = баланс, 1.0 = максимально вариативно",
-        )
-        top_p = st.slider(
-            "Top-P",
-            min_value=0.0,
-            max_value=1.0,
-            value=1.0,
-            step=0.05,
-            key="sb_top_p",
-            help="Ограничивает выбор токенов по кумулятивной вероятности.",
-        )
-        top_k = st.number_input(
-            "Top-K",
-            min_value=0,
-            max_value=100,
-            value=0,
-            step=1,
-            key="sb_top_k",
-            help="0 = выкл. Не все модели поддерживают.",
-        )
-        questions_mode = st.checkbox(
-            "Режим уточняющих вопросов",
-            value=True,
-            key="sb_questions_mode",
-            help="Агент задаёт 2-5 вопросов, если задача недостаточно конкретна.",
-        )
-
-    st.divider()
-
-    versions = db.get_session_versions(st.session_state.session_id)
-    col_new, col_nav = st.columns(2)
-    with col_new:
-        if st.button("Новая сессия", use_container_width=True):
-            st.session_state.session_id     = str(uuid.uuid4())
-            st.session_state.last_result    = None
-            st.session_state.iteration_mode = False
-            st.rerun()
-    with col_nav:
-        st.metric("Версий", len(versions))
-
-
-# ════════════════════════════════════════════════════════════════════════════════
 # MAIN CONTENT
 # ════════════════════════════════════════════════════════════════════════════════
-st.title("Prompt Engineer")
+inject_styles()
+
+versions = db.get_session_versions(st.session_state.session_id)
+
+# ── Title + settings gear ─────────────────────────────────────────────────────
+col_title, col_gear = st.columns([10, 1])
+with col_title:
+    st.title("Prompt Engineer")
+with col_gear:
+    with st.popover("⚙️", help="Настройки генерации"):
+        st.caption("Параметры генерации")
+        st.selectbox(
+            "Модель для генерации",
+            options=list(PROVIDER_NAMES.keys()),
+            format_func=lambda x: PROVIDER_NAMES[x],
+            key="sb_gen_model",
+        )
+        st.selectbox(
+            "Целевая модель промпта",
+            options=list(TARGET_MODELS.keys()),
+            format_func=lambda x: TARGET_MODELS[x],
+            key="sb_target_model",
+            help="Для какой LLM создаётся промпт.",
+        )
+        domain_list = _cached_domain_list()
+        st.selectbox(
+            "Шаблон домена",
+            options=[d[0] for d in domain_list],
+            format_func=lambda x: dict(domain_list).get(x, x),
+            key="sb_domain",
+            help="Контент, редактура, анализ и т.д.",
+        )
+        st.radio(
+            "Режим техник",
+            ["Авто", "Вручную"],
+            key="sb_tech_mode",
+            horizontal=True,
+        )
+        if st.session_state.get("sb_tech_mode") == "Вручную":
+            all_techs = registry.get_all()
+            tech_options = {t["id"]: t.get("name", t["id"]) for t in all_techs}
+            st.multiselect(
+                "Выбери техники (1–6)",
+                options=list(tech_options.keys()),
+                format_func=lambda x: tech_options[x],
+                max_selections=6,
+                key="sb_manual_techs",
+            )
+        with st.expander("Доп. параметры", expanded=False):
+            st.slider("Температура", 0.1, 1.0, 0.7, 0.1, key="sb_temperature")
+            st.slider("Top-P", 0.0, 1.0, 1.0, 0.05, key="sb_top_p")
+            st.number_input("Top-K", 0, 100, 0, 1, key="sb_top_k")
+            st.checkbox("Режим уточняющих вопросов", True, key="sb_questions_mode")
+        st.divider()
+        col_new, col_ver = st.columns(2)
+        with col_new:
+            if st.button("Новая сессия", use_container_width=True, key="popover_new_session"):
+                st.session_state.session_id = str(uuid.uuid4())
+                st.session_state.last_result = None
+                st.session_state.iteration_mode = False
+                st.rerun()
+        with col_ver:
+            st.metric("Версий", len(versions))
+
+technique_mode = "auto" if st.session_state.get("sb_tech_mode", "Авто") == "Авто" else "manual"
+manual_techs = st.session_state.get("sb_manual_techs", [])
 
 # ── Input section ─────────────────────────────────────────────────────────────
 col_in, col_out = st.columns([2, 3], gap="large")

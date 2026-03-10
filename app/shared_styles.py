@@ -1,10 +1,13 @@
 """
 Shared theme palettes and font config for all app pages.
 Uses CSS custom properties override to fix themes on all pages.
+Theme/font stored in data/user_prefs.json for persistence across pages.
 """
 from __future__ import annotations
 
 import streamlit as st
+
+from app.user_prefs import load_prefs, save_prefs
 
 # ── Theme palettes ────────────────────────────────────────────────────────────
 THEMES = {
@@ -110,7 +113,28 @@ def get_theme_css(theme_id: str, font_id: str) -> str:
     font_import = f"@import url('{f['url']}');\n" if font_id != "jetbrains" else ""
     return f"""
 {font_import}
-/* Override Streamlit CSS custom properties — fixes theme on ALL pages */
+/* Root-level targets — apply first */
+#root, #root > div, html, body {{
+    background-color: {t['bg']} !important;
+    color: {t['text']} !important;
+    font-family: {ff} !important;
+}}
+/* Hide Streamlit's default top bar (Deploy, menu, toolbar) */
+[data-testid="stHeader"],
+[data-testid="stToolbar"],
+header[data-testid="stHeader"],
+.stDeployButton,
+#MainMenu,
+footer,
+[data-testid="stDecoration"] {{
+    display: none !important;
+}}
+
+.block-container {{
+    padding-top: 1rem !important;
+    max-width: 100% !important;
+}}
+
 :root {{
     --primary-color: {t['primary']} !important;
     --background-color: {t['bg']} !important;
@@ -118,7 +142,6 @@ def get_theme_css(theme_id: str, font_id: str) -> str:
     --text-color: {t['text']} !important;
 }}
 
-/* Background — high specificity to override Streamlit */
 [data-testid="stAppViewContainer"],
 [data-testid="stAppViewContainer"] > div,
 [data-testid="stMain"],
@@ -133,7 +156,6 @@ section.main > div {{
     background-color: {t['secondary']} !important;
 }}
 
-/* Font */
 html, body, [data-testid="stAppViewContainer"],
 [data-testid="stSidebar"], p, label,
 .stMarkdown, button, input, textarea, select {{
@@ -199,32 +221,89 @@ details[open] > summary::before {{
     box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
 }}
 
-/* Sidebar: subtle separation */
+/* Sidebar: hidden — controls moved to main content */
+section[data-testid="stSidebar"],
 [data-testid="stSidebar"] {{
-    border-right: 1px solid rgba(255,255,255,0.06) !important;
+    display: none !important;
+}}
+/* Expand main content to full width */
+[data-testid="stAppViewContainer"] > section[data-testid="stSidebar"] ~ div,
+[data-testid="stAppViewContainer"] > div:last-child {{
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
 }}
 
-/* Header / top nav */
-[data-testid="stHeader"] {{
-    background: {t['secondary']} !important;
-    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+/* ── Top navigation bar ────────────────────────────────────────────────── */
+[data-testid="stPageLink"] {{
+    padding: 0 !important;
+    margin: 0 !important;
+}}
+[data-testid="stPageLink"] a,
+[data-testid="stPageLink"] a:visited {{
+    display: block !important;
+    padding: 10px 16px 12px 16px !important;
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: {t['text']} !important;
+    text-decoration: none !important;
+    opacity: 0.6;
+    border-bottom: 2px solid transparent;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+    min-width: fit-content;
+}}
+[data-testid="stPageLink"] a:hover {{
+    opacity: 1 !important;
+    color: {t['primary']} !important;
+    border-bottom-color: {t['primary']};
+}}
+p.nav-item-active {{
+    display: block !important;
+    padding: 10px 16px 12px 16px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: {t['primary']} !important;
+    opacity: 1 !important;
+    border-bottom: 2px solid {t['primary']};
+    margin: 0 !important;
+    cursor: default;
+    line-height: 1.4 !important;
+}}
+hr.nav-divider {{
+    margin: 0 0 18px 0 !important;
+    border: none !important;
+    border-top: 1px solid rgba(255,255,255,0.07) !important;
+    height: 1px !important;
 }}
 """
 
 
-def inject_styles(theme_key: str = "sb_theme", font_key: str = "sb_font") -> None:
-    """Inject theme CSS. Called at top of every page."""
-    theme_id = st.session_state.get(theme_key, "slate")
-    font_id = st.session_state.get(font_key, "jetbrains")
-    st.markdown(f"<style>{get_theme_css(theme_id, font_id)}</style>", unsafe_allow_html=True)
+def inject_styles() -> None:
+    """Inject theme CSS. Reads theme/font from persistent file (not session_state)."""
+    prefs = load_prefs()
+    theme_id = prefs["theme"]
+    font_id = prefs["font"]
+    css = get_theme_css(theme_id, font_id)
+    # Use both style and link (data URL) — some Streamlit versions apply one but not the other
+    import base64
+    b64 = base64.b64encode(css.encode("utf-8")).decode("ascii")
+    html = f'<style>{css}</style><link rel="stylesheet" href="data:text/css;base64,{b64}" />'
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def render_theme_controls(theme_key: str = "sb_theme", font_key: str = "sb_font") -> None:
-    """Theme + font selectors — call in main content or sidebar."""
+    """
+    Theme + font selectors. Syncs with file: restores from file on load,
+    saves to file when user changes. Persists across page navigations.
+    """
+    prefs = load_prefs()
+    st.session_state[theme_key] = prefs["theme"]
+    st.session_state[font_key] = prefs["font"]
+
     st.caption("Оформление")
     col_t, col_f = st.columns(2)
     with col_t:
-        st.selectbox(
+        theme = st.selectbox(
             "Тема",
             options=list(THEMES.keys()),
             format_func=lambda x: THEMES[x]["label"],
@@ -232,10 +311,50 @@ def render_theme_controls(theme_key: str = "sb_theme", font_key: str = "sb_font"
             label_visibility="collapsed",
         )
     with col_f:
-        st.selectbox(
+        font = st.selectbox(
             "Шрифт",
             options=list(FONTS.keys()),
             format_func=lambda x: FONTS[x]["label"],
             key=font_key,
             label_visibility="collapsed",
         )
+
+    if theme != prefs["theme"] or font != prefs["font"]:
+        save_prefs(theme, font)
+        st.rerun()
+
+
+def _render_theme_select() -> str:
+    """Single theme selector for nav bar. Returns selected theme, saves to file if changed."""
+    prefs = load_prefs()
+    theme = st.selectbox(
+        "Тема",
+        options=list(THEMES.keys()),
+        format_func=lambda x: THEMES[x]["label"],
+        key="sb_theme",
+        label_visibility="collapsed",
+    )
+    font = st.session_state.get("sb_font", prefs["font"])
+    if theme != prefs["theme"] or font != prefs["font"]:
+        save_prefs(theme, font)
+        st.rerun()
+    return theme
+
+
+def _render_font_select() -> str:
+    """Single font selector for nav bar. Returns selected font, saves to file if changed."""
+    prefs = load_prefs()
+    font = st.selectbox(
+        "Шрифт",
+        options=list(FONTS.keys()),
+        format_func=lambda x: FONTS[x]["label"],
+        key="sb_font",
+        label_visibility="collapsed",
+    )
+    theme = st.session_state.get("sb_theme", prefs["theme"])
+    if theme != prefs["theme"] or font != prefs["font"]:
+        save_prefs(theme, font)
+        st.rerun()
+    return font
+
+

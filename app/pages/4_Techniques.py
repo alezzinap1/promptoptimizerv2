@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
 from core.technique_registry import TechniqueRegistry
+from app.shared_styles import inject_styles
 @st.cache_resource
 def load_registry() -> TechniqueRegistry:
     return TechniqueRegistry()
@@ -23,6 +24,7 @@ def load_registry() -> TechniqueRegistry:
 registry = load_registry()
 all_techs = registry.get_all()
 
+inject_styles()
 st.title("База знаний техник промптинга")
 
 # ── Filter bar ────────────────────────────────────────────────────────────────

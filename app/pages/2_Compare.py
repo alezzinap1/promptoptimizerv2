@@ -21,6 +21,7 @@ from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task, get_task_types_label, get_complexity_label
 from core.technique_registry import TechniqueRegistry
 from services.llm_client import PROVIDER_NAMES, TARGET_MODELS, LLMClient, DEFAULT_PROVIDER
+from app.shared_styles import inject_styles
 
 
 @st.cache_resource
@@ -43,6 +44,7 @@ llm      = load_llm()
 all_techs    = registry.get_all()
 tech_options = {t["id"]: t.get("name", t["id"]) for t in all_techs}
 
+inject_styles()
 st.title("A/B Сравнение техник")
 st.caption("Сгенерируй один промпт двумя разными наборами техник и сравни результат")
 

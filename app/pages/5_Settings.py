@@ -13,9 +13,10 @@ ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from app.shared_styles import render_theme_controls
+from app.shared_styles import inject_styles
 
+inject_styles()
 st.title("Настройки")
 
 st.subheader("Оформление")
-render_theme_controls()
+st.info("Тема и шрифт можно изменить в **верхней панели** справа (доступны на всех страницах).")

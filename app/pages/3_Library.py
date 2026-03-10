@@ -17,6 +17,7 @@ load_dotenv(ROOT / ".env")
 from db.manager import DBManager
 from core.quality_metrics import analyze_prompt
 from services.llm_client import TARGET_MODELS
+from app.shared_styles import inject_styles
 TASK_TYPE_LABELS = {
     "code":              "Код",
     "analysis":          "Анализ",
@@ -42,6 +43,8 @@ def load_db() -> DBManager:
 
 db = load_db()
 stats = db.get_library_stats()
+
+inject_styles()
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 hdr1, hdr2 = st.columns([3, 1])

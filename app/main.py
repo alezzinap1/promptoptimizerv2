@@ -1,6 +1,6 @@
 """
 Prompt Engineer — Web App Entrypoint
-Top navigation (header), shared styles, page router.
+Registers pages, applies shared styles, runs the router.
 
 Run: streamlit run app/main.py
 """
@@ -16,19 +16,18 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from app.shared_styles import inject_styles
+from app.shared_styles import inject_styles, _render_theme_select, _render_font_select
+from app.user_prefs import load_prefs
+from app.nav import NAV_ITEMS
 
 st.set_page_config(
     page_title="Prompt Engineer",
     page_icon=None,
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
     menu_items={"About": "Professional prompt engineering tool"},
 )
 
-inject_styles()
-
-# Сначала регистрируем страницы
 pages = [
     st.Page("Home.py", title="Home"),
     st.Page("pages/2_Compare.py", title="Сравнение"),
@@ -37,21 +36,32 @@ pages = [
     st.Page("pages/5_Settings.py", title="Настройки"),
 ]
 pg = st.navigation(pages, position="hidden")
+inject_styles()
 
-# Навигация НАД контентом страницы
-nav_cols = st.columns(6)
-with nav_cols[0]:
-    st.page_link("Home.py", label="Home")
-with nav_cols[1]:
-    st.page_link("pages/2_Compare.py", label="Сравнение")
-with nav_cols[2]:
-    st.page_link("pages/3_Library.py", label="Библиотека")
-with nav_cols[3]:
-    st.page_link("pages/4_Techniques.py", label="Техники")
-with nav_cols[4]:
-    st.page_link("pages/5_Settings.py", label="Настройки")
-with nav_cols[5]:
-    pass
-st.divider()
+# Nav in entrypoint — always rendered, theme/font survive navigation (Streamlit docs)
+prefs = load_prefs()
+st.session_state.setdefault("sb_theme", prefs["theme"])
+st.session_state.setdefault("sb_font", prefs["font"])
+url_path = getattr(pg, "url_path", "") or ""
+url_to_current = {
+    "": "Home.py", "2_Compare": "2_Compare.py", "Compare": "2_Compare.py",
+    "3_Library": "3_Library.py", "Library": "3_Library.py",
+    "4_Techniques": "4_Techniques.py", "Techniques": "4_Techniques.py",
+    "5_Settings": "5_Settings.py", "Settings": "5_Settings.py",
+}
+current = url_to_current.get(url_path, "Home.py")
+cols = st.columns([1, 1, 1, 1, 1, 2, 1, 1])
+for i, (label, page) in enumerate(NAV_ITEMS):
+    is_active = page.endswith(current)
+    with cols[i]:
+        if is_active:
+            st.markdown(f'<p class="nav-item-active">{label}</p>', unsafe_allow_html=True)
+        else:
+            st.page_link(page, label=label, use_container_width=True)
+with cols[6]:
+    _render_theme_select()
+with cols[7]:
+    _render_font_select()
+st.markdown('<hr class="nav-divider" />', unsafe_allow_html=True)
 
 pg.run()

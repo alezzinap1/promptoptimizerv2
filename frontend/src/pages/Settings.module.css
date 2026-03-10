@@ -1,0 +1,9 @@
+.settings {
+  max-width: 600px;
+}
+
+.info {
+  padding: 16px;
+  background: rgba(34, 211, 238, 0.1);
+  border-radius: 8px;
+}

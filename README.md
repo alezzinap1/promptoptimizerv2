@@ -87,10 +87,11 @@ python -m bot.main
 ### Web-приложение (Streamlit)
 
 ```bash
+pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-Страницы: Home, Compare, Library, Techniques. Навигация в верхней панели.
+Открой http://localhost:8501
 
 ### Docker
 

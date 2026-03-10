@@ -1,0 +1,72 @@
+.compare {
+  max-width: 1200px;
+}
+
+.subtitle {
+  opacity: 0.8;
+  margin-bottom: 24px;
+}
+
+.settings {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--secondary);
+  color: var(--text);
+}
+
+.primaryBtn {
+  padding: 12px 24px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #ef4444;
+}
+
+.results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.column h3 {
+  margin: 0 0 12px;
+}
+
+.prompt {
+  white-space: pre-wrap;
+  padding: 16px;
+  background: var(--secondary);
+  border-radius: 8px;
+  font-size: 14px;
+  overflow-x: auto;
+}

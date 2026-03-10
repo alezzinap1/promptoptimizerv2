@@ -1,0 +1,78 @@
+:root {
+  --bg: #0f172a;
+  --secondary: #1e293b;
+  --text: #f1f5f9;
+  --primary: #6366f1;
+  --accent: #22d3ee;
+  --font: 'JetBrains Mono', 'Inter', system-ui, sans-serif;
+}
+
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --secondary: #e2e8f0;
+  --text: #0f172a;
+  --primary: #4f46e5;
+  --accent: #0891b2;
+}
+
+[data-theme="forest"] {
+  --bg: #0d1117;
+  --secondary: #161b22;
+  --text: #c9d1d9;
+  --primary: #3fb950;
+  --accent: #58a6ff;
+}
+
+[data-theme="midnight"] {
+  --bg: #0a0a0f;
+  --secondary: #14141c;
+  --text: #e4e4e7;
+  --primary: #818cf8;
+  --accent: #38bdf8;
+}
+
+[data-theme="amber"] {
+  --bg: #1c1917;
+  --secondary: #292524;
+  --text: #faf5f0;
+  --primary: #ea580c;
+  --accent: #f59e0b;
+}
+
+[data-theme="ocean"] {
+  --bg: #0c1929;
+  --secondary: #132f4c;
+  --text: #e3f2fd;
+  --primary: #2196f3;
+  --accent: #00bcd4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}

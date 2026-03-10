@@ -1,11 +1,6 @@
-# Base theme — matches default "slate" to avoid FOUC
+# Base theme — minimal; app CSS controls colors and fonts
 [theme]
 base = "dark"
-primaryColor = "#6366f1"
-backgroundColor = "#0f172a"
-secondaryBackgroundColor = "#1e293b"
-textColor = "#f1f5f9"
-font = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap, monospace"
 
 [server]
 headless = true
