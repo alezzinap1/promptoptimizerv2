@@ -46,6 +46,87 @@ class DBManagerTests(unittest.TestCase):
             self.assertEqual(summary["prompt_acceptance_rate"], 100.0)
             self.assertGreater(summary["avg_generation_latency_ms"], 0)
 
+    def test_workspace_and_prompt_spec_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = DBManager(str(db_path))
+            db.init()
+
+            workspace_id = db.create_workspace(
+                name="Code Review",
+                description="Workspace for Python review prompts",
+                config={"default_constraints": ["Не придумывать баги"]},
+            )
+            workspaces = db.list_workspaces()
+            self.assertEqual(len(workspaces), 1)
+            self.assertEqual(workspaces[0]["id"], workspace_id)
+
+            spec_id = db.save_prompt_spec(
+                session_id="session-42",
+                workspace_id=workspace_id,
+                raw_input="Проверь Python код",
+                spec={"goal": "Проверить Python код", "output_format": "markdown"},
+                evidence={"goal": {"source_type": "user"}},
+                issues=[{"severity": "medium", "category": "missing_constraints"}],
+            )
+            latest = db.get_latest_prompt_spec("session-42")
+
+            self.assertIsNotNone(latest)
+            assert latest is not None
+            self.assertEqual(latest["id"], spec_id)
+            self.assertEqual(latest["workspace_id"], workspace_id)
+            self.assertEqual(latest["spec"]["output_format"], "markdown")
+
+    def test_users_and_session_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = DBManager(str(db_path))
+            db.init()
+
+            user_id = db.create_user("alice", "hash")
+            user = db.get_user_by_username("alice")
+            self.assertIsNotNone(user)
+            assert user is not None
+            self.assertEqual(user["id"], user_id)
+
+            db.bind_session_to_user("s-1", user_id)
+            bound = db.get_session_user("s-1")
+            self.assertIsNotNone(bound)
+            assert bound is not None
+            self.assertEqual(bound["username"], "alice")
+
+            db.clear_session_binding("s-1")
+            self.assertIsNone(db.get_session_user("s-1"))
+
+    def test_multitenancy_isolation_for_library_and_workspaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = DBManager(str(db_path))
+            db.init()
+
+            user_a = db.create_user("user_a", "hash_a")
+            user_b = db.create_user("user_b", "hash_b")
+
+            db.create_workspace(name="A ws", config={}, user_id=user_a)
+            db.create_workspace(name="B ws", config={}, user_id=user_b)
+
+            db.save_to_library(title="A", prompt="a", user_id=user_a)
+            db.save_to_library(title="B", prompt="b", user_id=user_b)
+
+            ws_a = db.list_workspaces(user_id=user_a)
+            ws_b = db.list_workspaces(user_id=user_b)
+            lib_a = db.get_library(user_id=user_a)
+            lib_b = db.get_library(user_id=user_b)
+
+            self.assertEqual(len(ws_a), 1)
+            self.assertEqual(len(ws_b), 1)
+            self.assertEqual(ws_a[0]["name"], "A ws")
+            self.assertEqual(ws_b[0]["name"], "B ws")
+            self.assertEqual(len(lib_a), 1)
+            self.assertEqual(len(lib_b), 1)
+            self.assertEqual(lib_a[0]["title"], "A")
+            self.assertEqual(lib_b[0]["title"], "B")
+
 
 if __name__ == "__main__":
     unittest.main()

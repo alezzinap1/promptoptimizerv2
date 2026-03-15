@@ -44,8 +44,25 @@ class DBManager:
     def init(self) -> None:
         with self._conn() as conn:
             conn.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username      TEXT    NOT NULL UNIQUE,
+                    password_hash TEXT    NOT NULL,
+                    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id    TEXT    NOT NULL UNIQUE,
+                    user_id       INTEGER NOT NULL,
+                    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+
                 CREATE TABLE IF NOT EXISTS prompt_sessions (
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id         INTEGER,
                     session_id      TEXT    NOT NULL,
                     version         INTEGER NOT NULL DEFAULT 1,
                     task_input      TEXT,
@@ -65,6 +82,7 @@ class DBManager:
 
                 CREATE TABLE IF NOT EXISTS prompt_library (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id      INTEGER,
                     title        TEXT    NOT NULL,
                     tags         TEXT    DEFAULT '[]',
                     target_model TEXT    DEFAULT 'unknown',
@@ -85,6 +103,7 @@ class DBManager:
 
                 CREATE TABLE IF NOT EXISTS app_events (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id      INTEGER,
                     session_id   TEXT    DEFAULT '',
                     event_name   TEXT    NOT NULL,
                     payload      TEXT    DEFAULT '{}',
@@ -96,10 +115,114 @@ class DBManager:
 
                 CREATE INDEX IF NOT EXISTS idx_app_events_session_id
                     ON app_events(session_id);
+
+                CREATE TABLE IF NOT EXISTS workspaces (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id      INTEGER,
+                    name         TEXT    NOT NULL UNIQUE,
+                    description  TEXT    DEFAULT '',
+                    config_json  TEXT    DEFAULT '{}',
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS prompt_specs (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id       INTEGER,
+                    session_id    TEXT    NOT NULL,
+                    workspace_id  INTEGER,
+                    raw_input     TEXT    DEFAULT '',
+                    spec_json     TEXT    DEFAULT '{}',
+                    evidence_json TEXT    DEFAULT '{}',
+                    issues_json   TEXT    DEFAULT '[]',
+                    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_prompt_specs_session_id
+                    ON prompt_specs(session_id);
             """)
+            self._migrate_phase2(conn)
         logger.info("DB initialized at %s", self._path)
 
+    def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
+        """Best-effort migration for auth/multitenancy columns on old DBs."""
+        self._safe_add_column(conn, "prompt_sessions", "user_id", "INTEGER")
+        self._safe_add_column(conn, "prompt_library", "user_id", "INTEGER")
+        self._safe_add_column(conn, "app_events", "user_id", "INTEGER")
+        self._safe_add_column(conn, "workspaces", "user_id", "INTEGER")
+        self._safe_add_column(conn, "prompt_specs", "user_id", "INTEGER")
+
+    def _safe_add_column(
+        self,
+        conn: sqlite3.Connection,
+        table_name: str,
+        column_name: str,
+        column_ddl: str,
+    ) -> None:
+        cols = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        existing = {c["name"] for c in cols}
+        if column_name not in existing:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_ddl}")
+
     # ─── Prompt sessions ──────────────────────────────────────────────────────
+
+    # ─── Users / auth ─────────────────────────────────────────────────────────
+
+    def create_user(self, username: str, password_hash: str) -> int:
+        """Create a user account. Raises sqlite3.IntegrityError for duplicates."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                (username.strip().lower(), password_hash),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def get_user_by_username(self, username: str) -> dict | None:
+        """Find user by username."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE username = ?",
+                (username.strip().lower(),),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_user_by_id(self, user_id: int) -> dict | None:
+        """Find user by id."""
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+    def bind_session_to_user(self, session_id: str, user_id: int) -> None:
+        """Bind Streamlit session_id to authenticated user."""
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_sessions (session_id, user_id, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    user_id = excluded.user_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (session_id, user_id),
+            )
+
+    def get_session_user(self, session_id: str) -> dict | None:
+        """Resolve currently bound user for a session_id."""
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT u.* FROM user_sessions s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.session_id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def clear_session_binding(self, session_id: str) -> None:
+        """Logout by deleting the session binding."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (session_id,))
 
     def save_prompt_version(
         self,
@@ -113,6 +236,7 @@ class DBManager:
         reasoning: str,
         final_prompt: str,
         metrics: dict | None = None,
+        user_id: int | None = None,
     ) -> int:
         """Save a new version, auto-incrementing version number per session."""
         with self._conn() as conn:
@@ -125,12 +249,12 @@ class DBManager:
             cur = conn.execute(
                 """
                 INSERT INTO prompt_sessions
-                    (session_id, version, task_input, task_types, complexity,
+                    (user_id, session_id, version, task_input, task_types, complexity,
                      target_model, gen_model, techniques_used, reasoning, final_prompt, metrics)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    session_id, version, task_input,
+                    user_id, session_id, version, task_input,
                     json.dumps(task_types, ensure_ascii=False),
                     complexity, target_model, gen_model,
                     json.dumps(techniques_used, ensure_ascii=False),
@@ -140,13 +264,19 @@ class DBManager:
             )
             return cur.lastrowid  # type: ignore[return-value]
 
-    def get_session_versions(self, session_id: str) -> list[dict]:
+    def get_session_versions(self, session_id: str, user_id: int | None = None) -> list[dict]:
         """Get all versions for a session, ordered by version ASC."""
         with self._conn() as conn:
-            cur = conn.execute(
-                "SELECT * FROM prompt_sessions WHERE session_id = ? ORDER BY version ASC",
-                (session_id,),
-            )
+            if user_id is None:
+                cur = conn.execute(
+                    "SELECT * FROM prompt_sessions WHERE session_id = ? ORDER BY version ASC",
+                    (session_id,),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT * FROM prompt_sessions WHERE session_id = ? AND user_id = ? ORDER BY version ASC",
+                    (session_id, user_id),
+                )
             rows = cur.fetchall()
 
         result = []
@@ -164,9 +294,189 @@ class DBManager:
             result.append(d)
         return result
 
-    def get_latest_version(self, session_id: str) -> dict | None:
-        versions = self.get_session_versions(session_id)
+    def get_latest_version(self, session_id: str, user_id: int | None = None) -> dict | None:
+        versions = self.get_session_versions(session_id, user_id=user_id)
         return versions[-1] if versions else None
+
+    # ─── Workspaces and prompt specs ───────────────────────────────────────────
+
+    def create_workspace(
+        self,
+        name: str,
+        description: str = "",
+        config: dict | None = None,
+        user_id: int | None = None,
+    ) -> int:
+        """Create a reusable workspace profile for prompt design."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO workspaces (user_id, name, description, config_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    name.strip(),
+                    description.strip(),
+                    json.dumps(config or {}, ensure_ascii=False),
+                ),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def list_workspaces(self, user_id: int | None = None) -> list[dict]:
+        """Return all saved workspaces ordered by name."""
+        with self._conn() as conn:
+            if user_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM workspaces ORDER BY lower(name) ASC"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM workspaces WHERE user_id = ? ORDER BY lower(name) ASC",
+                    (user_id,),
+                ).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            try:
+                d["config"] = json.loads(d.pop("config_json") or "{}")
+            except Exception:
+                d["config"] = {}
+            result.append(d)
+        return result
+
+    def get_workspace(self, workspace_id: int, user_id: int | None = None) -> dict | None:
+        """Return a single workspace with parsed config."""
+        with self._conn() as conn:
+            if user_id is None:
+                row = conn.execute(
+                    "SELECT * FROM workspaces WHERE id = ?",
+                    (workspace_id,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM workspaces WHERE id = ? AND user_id = ?",
+                    (workspace_id, user_id),
+                ).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        try:
+            data["config"] = json.loads(data.pop("config_json") or "{}")
+        except Exception:
+            data["config"] = {}
+        return data
+
+    def update_workspace(
+        self,
+        workspace_id: int,
+        name: str | None = None,
+        description: str | None = None,
+        config: dict | None = None,
+        user_id: int | None = None,
+    ) -> None:
+        """Update one or more workspace fields."""
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name.strip())
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description.strip())
+        if config is not None:
+            updates.append("config_json = ?")
+            params.append(json.dumps(config, ensure_ascii=False))
+        if not updates:
+            return
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(workspace_id)
+        with self._conn() as conn:
+            if user_id is None:
+                conn.execute(
+                    f"UPDATE workspaces SET {', '.join(updates)} WHERE id = ?",
+                    params,
+                )
+            else:
+                conn.execute(
+                    f"UPDATE workspaces SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                    [*params, user_id],
+                )
+
+    def delete_workspace(self, workspace_id: int, user_id: int | None = None) -> None:
+        """Delete a workspace and keep prompt specs as historical artifacts."""
+        with self._conn() as conn:
+            if user_id is None:
+                conn.execute("DELETE FROM workspaces WHERE id = ?", (workspace_id,))
+            else:
+                conn.execute("DELETE FROM workspaces WHERE id = ? AND user_id = ?", (workspace_id, user_id))
+
+    def save_prompt_spec(
+        self,
+        session_id: str,
+        raw_input: str,
+        spec: dict,
+        evidence: dict,
+        issues: list[dict],
+        workspace_id: int | None = None,
+        user_id: int | None = None,
+    ) -> int:
+        """Persist the structured prompt specification used by the IDE flow."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO prompt_specs
+                    (user_id, session_id, workspace_id, raw_input, spec_json, evidence_json, issues_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    session_id,
+                    workspace_id,
+                    raw_input,
+                    json.dumps(spec, ensure_ascii=False),
+                    json.dumps(evidence, ensure_ascii=False),
+                    json.dumps(issues, ensure_ascii=False),
+                ),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def get_latest_prompt_spec(self, session_id: str, user_id: int | None = None) -> dict | None:
+        """Return the most recent structured prompt specification for a session."""
+        with self._conn() as conn:
+            if user_id is None:
+                row = conn.execute(
+                    """
+                    SELECT * FROM prompt_specs
+                    WHERE session_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                    """,
+                    (session_id,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT * FROM prompt_specs
+                    WHERE session_id = ? AND user_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                    """,
+                    (session_id, user_id),
+                ).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        for src, dst, default in (
+            ("spec_json", "spec", {}),
+            ("evidence_json", "evidence", {}),
+            ("issues_json", "issues", []),
+        ):
+            try:
+                data[dst] = json.loads(data.pop(src) or json.dumps(default))
+            except Exception:
+                data[dst] = default
+        return data
 
     # ─── Product events / metrics ──────────────────────────────────────────────
 
@@ -175,14 +485,16 @@ class DBManager:
         event_name: str,
         session_id: str | None = None,
         payload: dict | None = None,
+        user_id: int | None = None,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO app_events (session_id, event_name, payload)
-                VALUES (?, ?, ?)
+                INSERT INTO app_events (user_id, session_id, event_name, payload)
+                VALUES (?, ?, ?, ?)
                 """,
                 (
+                    user_id,
                     session_id or "",
                     event_name,
                     json.dumps(payload or {}, ensure_ascii=False),
@@ -190,12 +502,18 @@ class DBManager:
             )
             return cur.lastrowid  # type: ignore[return-value]
 
-    def get_recent_events(self, limit: int = 50) -> list[dict]:
+    def get_recent_events(self, limit: int = 50, user_id: int | None = None) -> list[dict]:
         with self._conn() as conn:
-            cur = conn.execute(
-                "SELECT * FROM app_events ORDER BY created_at DESC, id DESC LIMIT ?",
-                (max(1, limit),),
-            )
+            if user_id is None:
+                cur = conn.execute(
+                    "SELECT * FROM app_events ORDER BY created_at DESC, id DESC LIMIT ?",
+                    (max(1, limit),),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT * FROM app_events WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+                    (user_id, max(1, limit)),
+                )
             rows = cur.fetchall()
 
         result = []
@@ -208,8 +526,8 @@ class DBManager:
             result.append(d)
         return result
 
-    def get_product_metrics_summary(self) -> dict:
-        events = self.get_recent_events(limit=5000)
+    def get_product_metrics_summary(self, user_id: int | None = None) -> dict:
+        events = self.get_recent_events(limit=5000, user_id=user_id)
         counts: dict[str, int] = {}
         generation_latencies: list[float] = []
         prompt_scores: list[float] = []
@@ -277,15 +595,17 @@ class DBManager:
         task_type: str = "general",
         techniques: list[str] | None = None,
         notes: str = "",
+        user_id: int | None = None,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
                 """
                 INSERT INTO prompt_library
-                    (title, tags, target_model, task_type, techniques, prompt, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (user_id, title, tags, target_model, task_type, techniques, prompt, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    user_id,
                     title,
                     json.dumps(tags or [], ensure_ascii=False),
                     target_model, task_type,
@@ -300,9 +620,13 @@ class DBManager:
         target_model: str | None = None,
         task_type: str | None = None,
         search: str | None = None,
+        user_id: int | None = None,
     ) -> list[dict]:
         query = "SELECT * FROM prompt_library WHERE 1=1"
         params: list = []
+        if user_id is not None:
+            query += " AND user_id = ?"
+            params.append(user_id)
 
         if target_model and target_model != "all":
             query += " AND target_model = ?"
@@ -339,6 +663,7 @@ class DBManager:
         tags: list[str] | None = None,
         notes: str | None = None,
         rating: int | None = None,
+        user_id: int | None = None,
     ) -> None:
         updates = []
         params = []
@@ -359,21 +684,39 @@ class DBManager:
         updates.append("updated_at = CURRENT_TIMESTAMP")
         params.append(item_id)
         with self._conn() as conn:
-            conn.execute(
-                f"UPDATE prompt_library SET {', '.join(updates)} WHERE id = ?",
-                params,
-            )
+            if user_id is None:
+                conn.execute(
+                    f"UPDATE prompt_library SET {', '.join(updates)} WHERE id = ?",
+                    params,
+                )
+            else:
+                conn.execute(
+                    f"UPDATE prompt_library SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                    [*params, user_id],
+                )
 
-    def delete_from_library(self, item_id: int) -> None:
+    def delete_from_library(self, item_id: int, user_id: int | None = None) -> None:
         with self._conn() as conn:
-            conn.execute("DELETE FROM prompt_library WHERE id = ?", (item_id,))
+            if user_id is None:
+                conn.execute("DELETE FROM prompt_library WHERE id = ?", (item_id,))
+            else:
+                conn.execute("DELETE FROM prompt_library WHERE id = ? AND user_id = ?", (item_id, user_id))
 
-    def get_library_stats(self) -> dict:
+    def get_library_stats(self, user_id: int | None = None) -> dict:
         with self._conn() as conn:
-            cur = conn.execute("SELECT COUNT(*) FROM prompt_library")
+            if user_id is None:
+                cur = conn.execute("SELECT COUNT(*) FROM prompt_library")
+            else:
+                cur = conn.execute("SELECT COUNT(*) FROM prompt_library WHERE user_id = ?", (user_id,))
             total = cur.fetchone()[0]
-            cur = conn.execute("SELECT DISTINCT target_model FROM prompt_library")
+            if user_id is None:
+                cur = conn.execute("SELECT DISTINCT target_model FROM prompt_library")
+            else:
+                cur = conn.execute("SELECT DISTINCT target_model FROM prompt_library WHERE user_id = ?", (user_id,))
             models = [r[0] for r in cur.fetchall()]
-            cur = conn.execute("SELECT DISTINCT task_type FROM prompt_library")
+            if user_id is None:
+                cur = conn.execute("SELECT DISTINCT task_type FROM prompt_library")
+            else:
+                cur = conn.execute("SELECT DISTINCT task_type FROM prompt_library WHERE user_id = ?", (user_id,))
             types = [r[0] for r in cur.fetchall()]
         return {"total": total, "models": models, "task_types": types}

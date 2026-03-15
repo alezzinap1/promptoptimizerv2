@@ -12,6 +12,9 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+# Default timeout for LLM calls (seconds). Override via OpenAI client init.
+DEFAULT_TIMEOUT = 120.0
+
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Generation models (for generating prompts)
@@ -66,10 +69,11 @@ DEFAULT_TEMPERATURE = 0.7
 class LLMClient:
     """Synchronous LLM client for Streamlit compatibility."""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, timeout: float = DEFAULT_TIMEOUT):
         self._client = OpenAI(
             api_key=api_key,
             base_url=OPENROUTER_BASE_URL,
+            timeout=timeout,
         )
 
     def _get_model(self, provider: str) -> str:

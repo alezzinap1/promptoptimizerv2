@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+import inspect
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -21,7 +22,10 @@ from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task, get_task_types_label, get_complexity_label
 from core.technique_registry import TechniqueRegistry
 from db.manager import DBManager
+from app.auth import get_current_user_id, require_auth
 from services.llm_client import PROVIDER_NAMES, TARGET_MODELS, LLMClient, DEFAULT_PROVIDER
+from app.abuse import check_input_size, check_rate_limit, check_session_budget
+from app.config import DB_PATH, LLM_TIMEOUT_SEC
 from app.shared_styles import inject_styles
 
 
@@ -36,12 +40,14 @@ def load_llm() -> LLMClient:
     if not api_key:
         st.error("OPENROUTER_API_KEY not set")
         st.stop()
+    if "timeout" in inspect.signature(LLMClient).parameters:
+        return LLMClient(api_key, timeout=float(LLM_TIMEOUT_SEC))
     return LLMClient(api_key)
 
 
 @st.cache_resource
 def load_db() -> DBManager:
-    db = DBManager()
+    db = DBManager(db_path=DB_PATH)
     db.init()
     return db
 
@@ -49,6 +55,8 @@ def load_db() -> DBManager:
 registry = load_registry()
 llm      = load_llm()
 db       = load_db()
+current_user = require_auth(db)
+user_id = get_current_user_id()
 
 all_techs    = registry.get_all()
 tech_options = {t["id"]: t.get("name", t["id"]) for t in all_techs}
@@ -137,6 +145,19 @@ compare_clicked = st.button(
 )
 
 if compare_clicked and task_input.strip():
+    ok, err = check_input_size(task_input)
+    if not ok:
+        st.error(err)
+        st.stop()
+    ok, err = check_rate_limit(st.session_state.get("session_id", ""))
+    if not ok:
+        st.error(err)
+        st.stop()
+    gen_count = st.session_state.get("generation_count", 0)
+    ok, err = check_session_budget(gen_count, additional=2)
+    if not ok:
+        st.error(err)
+        st.stop()
     classification = classify_task(task_input)
     task_types     = classification["task_types"]
     complexity     = classification["complexity"]
@@ -295,4 +316,6 @@ if compare_clicked and task_input.strip():
             "score_a": score_a,
             "score_b": score_b,
         },
+        user_id=user_id,
     )
+    st.session_state["generation_count"] = st.session_state.get("generation_count", 0) + 2

@@ -16,6 +16,12 @@
 - платному доступу;
 - открытому интернет-деплою без ограничений.
 
+## Текущий прогресс
+
+- Фаза 1 (abuse/config/observability) — выполнена.
+- Фаза 2 (auth/users/multitenancy/storage migration path) — выполнена в MVP-варианте.
+- Фаза 3 (integration tests + deploy runbook + dashboards) — в работе.
+
 ## Обязательный минимум перед production
 
 ### Auth and users

@@ -13,20 +13,24 @@ ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
+from app.config import DB_PATH
 from app.shared_styles import inject_styles
+from app.auth import get_current_user_id, require_auth
 from db.manager import DBManager
 
 
 @st.cache_resource
 def load_db() -> DBManager:
-    db = DBManager()
+    db = DBManager(db_path=DB_PATH)
     db.init()
     return db
 
 
 db = load_db()
-summary = db.get_product_metrics_summary()
-recent_events = db.get_recent_events(limit=25)
+current_user = require_auth(db)
+user_id = get_current_user_id()
+summary = db.get_product_metrics_summary(user_id=user_id)
+recent_events = db.get_recent_events(limit=25, user_id=user_id)
 
 inject_styles()
 st.title("Продуктовые метрики")

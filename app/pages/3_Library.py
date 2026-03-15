@@ -15,8 +15,10 @@ sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
 from db.manager import DBManager
+from app.auth import get_current_user_id, require_auth
 from core.quality_metrics import analyze_prompt
 from services.llm_client import TARGET_MODELS
+from app.config import DB_PATH
 from app.shared_styles import inject_styles
 TASK_TYPE_LABELS = {
     "code":              "Код",
@@ -36,13 +38,15 @@ TASK_TYPE_LABELS = {
 
 @st.cache_resource
 def load_db() -> DBManager:
-    db = DBManager()
+    db = DBManager(db_path=DB_PATH)
     db.init()
     return db
 
 
 db = load_db()
-stats = db.get_library_stats()
+current_user = require_auth(db)
+user_id = get_current_user_id()
+stats = db.get_library_stats(user_id=user_id)
 
 inject_styles()
 
@@ -80,6 +84,7 @@ items = db.get_library(
     target_model=target_filter if target_filter != "all" else None,
     task_type=type_filter if type_filter != "all" else None,
     search=search if search else None,
+    user_id=user_id,
 )
 
 if not items:
@@ -156,6 +161,7 @@ for row_start in range(0, len(items), 3):
                             event_name="library_open_prompt",
                             session_id=st.session_state.get("session_id", ""),
                             payload={"item_id": item["id"], "target_model": item["target_model"]},
+                            user_id=user_id,
                         )
                         st.session_state["prefill_task"] = f"Улучши этот промпт:\n\n{item['prompt']}"
                         st.session_state["last_result"] = None
@@ -167,8 +173,9 @@ for row_start in range(0, len(items), 3):
                             event_name="library_delete_prompt",
                             session_id=st.session_state.get("session_id", ""),
                             payload={"item_id": item["id"]},
+                            user_id=user_id,
                         )
-                        db.delete_from_library(item["id"])
+                        db.delete_from_library(item["id"], user_id=user_id)
                         st.rerun()
 
                 # ── Full prompt + edit (collapsed) ─────────────────────────────
@@ -184,7 +191,7 @@ for row_start in range(0, len(items), 3):
                         format_func=lambda x: f"{x}/5",
                     )
                     if new_rating != rating:
-                        db.update_library_item(item["id"], rating=new_rating)
+                        db.update_library_item(item["id"], rating=new_rating, user_id=user_id)
                         st.rerun()
 
                     if item.get("notes"):
@@ -202,6 +209,7 @@ for row_start in range(0, len(items), 3):
                                 title=new_title,
                                 tags=[t.strip() for t in new_tags.split(",") if t.strip()],
                                 notes=new_notes,
+                                user_id=user_id,
                             )
                             st.success("Обновлено")
                             st.rerun()
