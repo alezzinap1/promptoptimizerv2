@@ -14,6 +14,7 @@ import logging
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+from statistics import mean
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,20 @@ class DBManager:
 
                 CREATE INDEX IF NOT EXISTS idx_library_task_type
                     ON prompt_library(task_type);
+
+                CREATE TABLE IF NOT EXISTS app_events (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id   TEXT    DEFAULT '',
+                    event_name   TEXT    NOT NULL,
+                    payload      TEXT    DEFAULT '{}',
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_app_events_event_name
+                    ON app_events(event_name);
+
+                CREATE INDEX IF NOT EXISTS idx_app_events_session_id
+                    ON app_events(session_id);
             """)
         logger.info("DB initialized at %s", self._path)
 
@@ -152,6 +167,104 @@ class DBManager:
     def get_latest_version(self, session_id: str) -> dict | None:
         versions = self.get_session_versions(session_id)
         return versions[-1] if versions else None
+
+    # ─── Product events / metrics ──────────────────────────────────────────────
+
+    def log_event(
+        self,
+        event_name: str,
+        session_id: str | None = None,
+        payload: dict | None = None,
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO app_events (session_id, event_name, payload)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    session_id or "",
+                    event_name,
+                    json.dumps(payload or {}, ensure_ascii=False),
+                ),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def get_recent_events(self, limit: int = 50) -> list[dict]:
+        with self._conn() as conn:
+            cur = conn.execute(
+                "SELECT * FROM app_events ORDER BY created_at DESC, id DESC LIMIT ?",
+                (max(1, limit),),
+            )
+            rows = cur.fetchall()
+
+        result = []
+        for row in rows:
+            d = dict(row)
+            try:
+                d["payload"] = json.loads(d["payload"]) if d["payload"] else {}
+            except Exception:
+                d["payload"] = {}
+            result.append(d)
+        return result
+
+    def get_product_metrics_summary(self) -> dict:
+        events = self.get_recent_events(limit=5000)
+        counts: dict[str, int] = {}
+        generation_latencies: list[float] = []
+        prompt_scores: list[float] = []
+
+        for event in events:
+            name = event.get("event_name", "")
+            counts[name] = counts.get(name, 0) + 1
+
+            payload = event.get("payload") or {}
+            if name == "generation_result":
+                latency = payload.get("latency_ms")
+                if isinstance(latency, (int, float)):
+                    generation_latencies.append(float(latency))
+
+                score = payload.get("completeness_score")
+                if isinstance(score, (int, float)):
+                    prompt_scores.append(float(score))
+
+        generate_requests = counts.get("generate_requested", 0)
+        generated_prompts = counts.get("generate_prompt_success", 0)
+        generated_questions = counts.get("generate_questions", 0)
+        saved_prompts = counts.get("prompt_saved_to_library", 0)
+        compare_runs = counts.get("compare_run", 0)
+        question_answers = counts.get("questions_answered", 0)
+        question_skips = counts.get("questions_skipped", 0)
+        iterations_started = counts.get("iteration_started", 0)
+        library_opens = counts.get("library_open_prompt", 0)
+
+        def pct(part: int, whole: int) -> float:
+            return round((part / whole) * 100, 1) if whole else 0.0
+
+        p95_latency = 0.0
+        if generation_latencies:
+            ordered = sorted(generation_latencies)
+            idx = max(0, min(len(ordered) - 1, int(len(ordered) * 0.95) - 1))
+            p95_latency = round(ordered[idx], 1)
+
+        return {
+            "event_counts": counts,
+            "generate_requests": generate_requests,
+            "generated_prompts": generated_prompts,
+            "generated_questions": generated_questions,
+            "saved_prompts": saved_prompts,
+            "compare_runs": compare_runs,
+            "question_answers": question_answers,
+            "question_skips": question_skips,
+            "iterations_started": iterations_started,
+            "library_opens": library_opens,
+            "prompt_acceptance_rate": pct(saved_prompts, generated_prompts),
+            "questions_response_rate": pct(question_answers + question_skips, generated_questions),
+            "save_to_library_rate": pct(saved_prompts, generated_prompts),
+            "avg_generation_latency_ms": round(mean(generation_latencies), 1) if generation_latencies else 0.0,
+            "p95_generation_latency_ms": p95_latency,
+            "avg_prompt_completeness": round(mean(prompt_scores), 1) if prompt_scores else 0.0,
+        }
 
     # ─── Prompt library ───────────────────────────────────────────────────────
 

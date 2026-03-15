@@ -152,10 +152,22 @@ for row_start in range(0, len(items), 3):
                     )
                 with ac2:
                     if st.button("Открыть", key=f"open_{item['id']}", use_container_width=True, help="Открыть в инженере"):
+                        db.log_event(
+                            event_name="library_open_prompt",
+                            session_id=st.session_state.get("session_id", ""),
+                            payload={"item_id": item["id"], "target_model": item["target_model"]},
+                        )
                         st.session_state["prefill_task"] = f"Улучши этот промпт:\n\n{item['prompt']}"
+                        st.session_state["last_result"] = None
+                        st.session_state["iteration_mode"] = False
                         st.switch_page("Home.py")
                 with ac3:
                     if st.button("Удалить", key=f"del_{item['id']}", use_container_width=True, help="Удалить"):
+                        db.log_event(
+                            event_name="library_delete_prompt",
+                            session_id=st.session_state.get("session_id", ""),
+                            payload={"item_id": item["id"]},
+                        )
                         db.delete_from_library(item["id"])
                         st.rerun()
 

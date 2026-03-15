@@ -20,6 +20,9 @@ AVOID_ON_SMALL_MODELS = {"chain_of_thought", "self_consistency", "meta_prompting
 # Claude-specific techniques (XML framing, thinking tags)
 CLAUDE_PREFERRED = {"xml_framing", "role_prompting", "chain_of_thought", "constraints_prompting"}
 
+# Fallback when no technique matches task_type (e.g. "general", "data_analysis")
+FALLBACK_TECHNIQUE_IDS = ["role_prompting", "structured_output", "constraints_prompting"]
+
 
 class TechniqueRegistry:
     def __init__(self, techniques_dir: Path | None = None):
@@ -103,7 +106,16 @@ class TechniqueRegistry:
         else:
             selected.sort(key=lambda t: t.get("priority", 99))
 
-        return selected[:max_techniques]
+        result = selected[:max_techniques]
+        if not result:
+            # No technique matched task_types (e.g. "general", "data_analysis") — use fallback
+            for tid in FALLBACK_TECHNIQUE_IDS:
+                tech = self._techniques.get(tid)
+                if tech and (target_model != "small_model" or tid not in AVOID_ON_SMALL_MODELS):
+                    result.append(tech)
+                    if len(result) >= max_techniques:
+                        break
+        return result[:max_techniques]
 
     def build_technique_context(self, technique_ids: list[str]) -> str:
         """Build compact context string from technique cards for injection into system prompt."""

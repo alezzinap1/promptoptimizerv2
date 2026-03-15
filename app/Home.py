@@ -8,6 +8,7 @@ import os
 import sys
 import uuid
 from pathlib import Path
+from time import perf_counter
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -90,6 +91,14 @@ _init_state()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+def _log_event(event_name: str, payload: dict | None = None) -> None:
+    db.log_event(
+        event_name=event_name,
+        session_id=st.session_state.get("session_id"),
+        payload=payload or {},
+    )
+
+
 def _run_generation(
     task_input: str,
     feedback: str,
@@ -149,6 +158,7 @@ def _run_generation(
 
     # Stream to buffer (clean UX: no raw tags shown to user)
     full_text = ""
+    started_at = perf_counter()
     try:
         with st.spinner("Генерирую промпт..."):
             for chunk in llm.stream(
@@ -159,15 +169,31 @@ def _run_generation(
     except Exception as e:
         err_msg = str(e).lower()
         if "not a valid model id" in err_msg or "invalid model" in err_msg:
+            _log_event("generation_error", {"error": "invalid_model", "gen_model": gen_model})
             st.session_state["model_error"] = (
                 "**ID модели устарел.** Выбранная модель больше не поддерживается API. "
                 "Выбери другую модель в выпадающем меню слева (например, DeepSeek или Gemini)."
             )
             return
+        _log_event("generation_error", {"error": str(e), "gen_model": gen_model})
         raise
 
     parsed = parse_reply(full_text)
     metrics = analyze_prompt(parsed.get("prompt_block", "")) if parsed.get("has_prompt") else {}
+    latency_ms = round((perf_counter() - started_at) * 1000, 1)
+    outcome = "prompt" if parsed.get("has_prompt") else "questions" if parsed.get("has_questions") else "raw_text"
+
+    _log_event(
+        "generation_result",
+        {
+            "outcome": outcome,
+            "gen_model": gen_model,
+            "target_model": target_model,
+            "latency_ms": latency_ms,
+            "technique_ids": technique_ids,
+            "completeness_score": metrics.get("completeness_score", 0.0),
+        },
+    )
 
     st.session_state.pop("model_error", None)  # Очищаем ошибку при успешной генерации
     st.session_state.last_result = {
@@ -195,6 +221,26 @@ def _run_generation(
             final_prompt    = parsed["prompt_block"],
             metrics         = metrics,
         )
+        _log_event(
+            "generate_prompt_success",
+            {
+                "target_model": target_model,
+                "gen_model": gen_model,
+                "completeness_score": metrics.get("completeness_score", 0.0),
+            },
+        )
+    elif parsed.get("has_questions"):
+        parsed_questions = parse_questions(parsed.get("questions_raw", "")) or []
+        _log_event(
+            "generate_questions",
+            {
+                "target_model": target_model,
+                "gen_model": gen_model,
+                "question_count": len(parsed_questions),
+            },
+        )
+    else:
+        _log_event("generate_raw_text", {"target_model": target_model, "gen_model": gen_model})
 
     st.session_state.iteration_mode   = False
     st.session_state.show_save_dialog = False
@@ -280,6 +326,11 @@ with col_in:
     else:
         st.subheader("Задача")
 
+    prefill_task = st.session_state.pop("prefill_task", "")
+    if prefill_task:
+        st.session_state["main_task_input"] = prefill_task
+        st.session_state["main_feedback"] = ""
+        st.session_state["iteration_mode"] = False
     task_input = st.text_area(
         "Опиши задачу или вставь промпт для улучшения",
         height=180,
@@ -323,6 +374,14 @@ with col_in:
     )
 
     if generate_clicked and task_input.strip():
+        _log_event(
+            "generate_requested",
+            {
+                "iteration_mode": st.session_state.iteration_mode,
+                "questions_mode": st.session_state.get("sb_questions_mode", True),
+                "technique_mode": technique_mode,
+            },
+        )
         _run_generation(
             task_input     = task_input.strip(),
             feedback       = feedback,
@@ -380,6 +439,7 @@ with col_out:
             col_skip, col_go = st.columns(2)
             with col_skip:
                 if st.button("Пропустить все", use_container_width=True):
+                    _log_event("questions_skipped", {"question_count": len(questions)})
                     _run_generation(
                         task_input=result["task_input"], feedback="",
                         gen_model=result.get("gen_model", DEFAULT_PROVIDER),
@@ -389,7 +449,7 @@ with col_out:
                         technique_mode="manual" if result.get("technique_ids") else "auto",
                         manual_techs=result.get("technique_ids", []),
                         domain=st.session_state.get("sb_domain", "auto"),
-                        questions_mode=st.session_state.get("sb_questions_mode", True),
+                        questions_mode=False,
                     )
                     st.rerun()
             with col_go:
@@ -409,6 +469,13 @@ with col_out:
                         f"Ответы на уточняющие вопросы:\n{answers_text}\n\n"
                         "Создай промпт в блоке [PROMPT]...[/PROMPT]."
                     )
+                    _log_event(
+                        "questions_answered",
+                        {
+                            "question_count": len(questions),
+                            "answered_count": sum(1 for i, q in enumerate(questions) if _format_answer(i, q) != "Пропустить"),
+                        },
+                    )
                     _run_generation(
                         task_input=combined, feedback="",
                         gen_model=result.get("gen_model", DEFAULT_PROVIDER),
@@ -418,9 +485,12 @@ with col_out:
                         technique_mode="manual" if result.get("technique_ids") else "auto",
                         manual_techs=result.get("technique_ids", []),
                         domain=st.session_state.get("sb_domain", "auto"),
-                        questions_mode=st.session_state.get("sb_questions_mode", True),
+                        questions_mode=False,
                     )
                     st.rerun()
+        else:
+            st.warning("Модель вернула блок вопросов в неожиданном формате. Попробуй сгенерировать снова или отключить режим уточнений.")
+            st.code(result.get("questions_raw", ""), language=None)
 
     elif result.get("has_prompt"):
         # ── Prompt result ──────────────────────────────────────────────────────
@@ -489,13 +559,14 @@ with col_out:
 
         with ac2:
             if st.button("Итерировать", use_container_width=True, help="Режим правок: следующий запрос учтёт текущий промпт и твои комментарии"):
+                _log_event("iteration_started", {"has_existing_prompt": True})
                 st.session_state.last_result["prompt_block"] = edited_prompt
                 st.session_state.iteration_mode = True
                 st.rerun()
 
         with ac3:
-            if st.button("Сравнить", use_container_width=True, help="Открыть страницу A/B: одна задача, два набора техник, сравнение метрик"):
-                st.session_state["compare_prompt"] = edited_prompt
+            if st.button("Сравнить", use_container_width=True, help="Открыть страницу A/B и сравнить техники на исходной задаче"):
+                st.session_state["compare_prompt"] = result.get("task_input", edited_prompt)
                 st.switch_page("pages/2_Compare.py")
 
         with ac4:
@@ -530,6 +601,14 @@ with col_out:
                         task_type    = task_types[0] if task_types else "general",
                         techniques   = technique_ids,
                         notes        = save_notes,
+                    )
+                    _log_event(
+                        "prompt_saved_to_library",
+                        {
+                            "target_model": result.get("target_model", "unknown"),
+                            "task_type": task_types[0] if task_types else "general",
+                            "technique_count": len(technique_ids),
+                        },
                     )
                     st.session_state.show_save_dialog = False
                     st.success("Сохранено!")

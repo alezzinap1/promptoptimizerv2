@@ -20,6 +20,7 @@ from core.parsing import parse_reply
 from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task, get_task_types_label, get_complexity_label
 from core.technique_registry import TechniqueRegistry
+from db.manager import DBManager
 from services.llm_client import PROVIDER_NAMES, TARGET_MODELS, LLMClient, DEFAULT_PROVIDER
 from app.shared_styles import inject_styles
 
@@ -38,8 +39,16 @@ def load_llm() -> LLMClient:
     return LLMClient(api_key)
 
 
+@st.cache_resource
+def load_db() -> DBManager:
+    db = DBManager()
+    db.init()
+    return db
+
+
 registry = load_registry()
 llm      = load_llm()
+db       = load_db()
 
 all_techs    = registry.get_all()
 tech_options = {t["id"]: t.get("name", t["id"]) for t in all_techs}
@@ -135,16 +144,32 @@ if compare_clicked and task_input.strip():
     builder = ContextBuilder(registry)
 
     # Resolve techniques for A and B
-    def resolve_techs(mode: str, manual: list[str]) -> list[dict]:
+    def resolve_techs(mode: str, manual: list[str], exclude_ids: set[str] | None = None) -> list[dict]:
         if mode == TECH_MODE_MANUAL and manual:
             return [t for t in (registry.get(tid) for tid in manual) if t]
-        return registry.select_techniques(task_types, complexity, 3, target_model)
+        candidates = registry.select_techniques(task_types, complexity, 6, target_model)
+        if exclude_ids:
+            distinct = [t for t in candidates if t["id"] not in exclude_ids]
+            if distinct:
+                return distinct[:3]
+        return candidates[:3]
 
     techniques_a = resolve_techs(techs_a_mode, techs_a)
-    techniques_b = resolve_techs(techs_b_mode, techs_b)
+    techniques_b = resolve_techs(techs_b_mode, techs_b, exclude_ids={t["id"] for t in techniques_a})
 
     ids_a = [t["id"] for t in techniques_a]
     ids_b = [t["id"] for t in techniques_b]
+
+    if not ids_a or not ids_b:
+        st.error("Не удалось подобрать техники для одного из вариантов. Проверь настройки и попробуй снова.")
+        st.stop()
+
+    if ids_a == ids_b:
+        st.warning(
+            "Оба варианта получили одинаковый набор техник. "
+            "Для честного A/B выбери хотя бы один вариант вручную или измени настройки."
+        )
+        st.stop()
 
     user_content = builder.build_user_content(task_input, task_classification=classification)
 
@@ -258,3 +283,16 @@ if compare_clicked and task_input.strip():
         st.success(f"По метрикам лидирует **Вариант {winner}** ({win_score:.0f}%)")
     else:
         st.info("Варианты одинаковы по метрикам — выбирай по содержанию")
+
+    db.log_event(
+        event_name="compare_run",
+        session_id=st.session_state.get("session_id", ""),
+        payload={
+            "task_types": task_types,
+            "complexity": complexity,
+            "techniques_a": ids_a,
+            "techniques_b": ids_b,
+            "score_a": score_a,
+            "score_b": score_b,
+        },
+    )
