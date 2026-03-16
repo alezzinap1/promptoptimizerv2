@@ -16,6 +16,16 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | null>(null)
 
 const STORAGE_KEY = 'prompt-engineer-prefs'
+const FONT_STACKS: Record<FontId, string> = {
+  jetbrains: "'JetBrains Mono', monospace",
+  inter: "'Inter', system-ui, sans-serif",
+  ibmplex: "'IBM Plex Sans', system-ui, sans-serif",
+  plusjakarta: "'Plus Jakarta Sans', system-ui, sans-serif",
+  spacegrotesk: "'Space Grotesk', system-ui, sans-serif",
+  manrope: "'Manrope', system-ui, sans-serif",
+  outfit: "'Outfit', system-ui, sans-serif",
+  firacode: "'Fira Code', monospace",
+}
 
 function loadPrefs(): { theme: ThemeId; font: FontId } {
   try {
@@ -39,11 +49,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', prefs.theme)
-    document.body.style.fontFamily = prefs.font === 'jetbrains'
-      ? "'JetBrains Mono', monospace"
-      : prefs.font === 'inter'
-      ? "'Inter', system-ui, sans-serif"
-      : "'JetBrains Mono', monospace"
+    document.body.style.fontFamily = FONT_STACKS[prefs.font]
   }, [prefs.theme, prefs.font])
 
   const setTheme = (t: ThemeId) => {

@@ -33,19 +33,34 @@
   gap: 4px;
 }
 
+.fieldWide {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 260px;
+}
+
 .field label {
   font-size: 14px;
   opacity: 0.9;
 }
 
 .field select,
-.field input[type="range"] {
+.field input[type="range"],
+.field input[type="number"],
+.fieldWide select,
+.ideSection input,
+.ideSection select {
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: var(--bg);
   color: var(--text);
   min-width: 180px;
+}
+
+.multiSelect {
+  min-height: 120px;
 }
 
 .radioRow {
@@ -67,7 +82,12 @@
 }
 
 .left textarea,
-.right textarea {
+.right textarea,
+.ideSection textarea,
+.saveBox textarea,
+.saveBox input,
+.questionItem input,
+.questionItem select {
   width: 100%;
   padding: 12px;
   border-radius: 8px;
@@ -140,4 +160,118 @@
   background: var(--secondary);
   color: var(--text);
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.previewBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--secondary);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ideBox,
+.resultSection {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--secondary);
+  border-radius: 10px;
+}
+
+.ideGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.ideSection {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ideSection h3,
+.metricsBox h3,
+.saveBox h3 {
+  margin: 0;
+}
+
+.ideItem,
+.issueCard,
+.evidenceCard,
+.versionCard,
+.questionItem {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ideItem p,
+.issueCard p,
+.evidenceCard p {
+  margin: 6px 0 0;
+}
+
+.evidenceActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.metricsBox,
+.saveBox,
+.questionBox {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--secondary);
+  border-radius: 10px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.versionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.versionCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.questionBox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.primaryAction {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+.success {
+  color: #22c55e;
 }

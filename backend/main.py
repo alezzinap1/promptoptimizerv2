@@ -17,7 +17,20 @@ sys.path.insert(0, str(ROOT))
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
 
-from backend.api import generate, library, techniques, config, compare
+from backend.api import (
+    auth,
+    compare,
+    config,
+    generate,
+    library,
+    metrics,
+    models,
+    prompt_ide,
+    sessions,
+    settings,
+    techniques,
+    workspaces,
+)
 
 app = FastAPI(
     title="Prompt Engineer API",
@@ -34,6 +47,13 @@ app.add_middleware(
 )
 
 app.include_router(config.router, prefix="/api", tags=["config"])
+app.include_router(auth.router, prefix="/api", tags=["auth"])
+app.include_router(settings.router, prefix="/api", tags=["settings"])
+app.include_router(models.router, prefix="/api", tags=["models"])
+app.include_router(workspaces.router, prefix="/api", tags=["workspaces"])
+app.include_router(metrics.router, prefix="/api", tags=["metrics"])
+app.include_router(sessions.router, prefix="/api", tags=["sessions"])
+app.include_router(prompt_ide.router, prefix="/api", tags=["prompt-ide"])
 app.include_router(generate.router, prefix="/api", tags=["generate"])
 app.include_router(compare.router, prefix="/api", tags=["compare"])
 app.include_router(library.router, prefix="/api", tags=["library"])

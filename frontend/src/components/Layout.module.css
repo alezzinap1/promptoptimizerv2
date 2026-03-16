@@ -15,6 +15,7 @@
 .nav {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .navLink,
@@ -45,6 +46,21 @@
   display: flex;
   gap: 16px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.userBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logoutBtn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--bg);
+  color: var(--text);
 }
 
 .selectGroup {

@@ -1,0 +1,57 @@
+.metrics {
+  max-width: 1200px;
+}
+
+.caption {
+  opacity: 0.8;
+  margin-bottom: 20px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card,
+.section,
+.eventCard {
+  background: var(--secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card span {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.section {
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.eventList {
+  display: grid;
+  gap: 12px;
+}
+
+.eventCard {
+  padding: 14px;
+}
+
+.eventCard pre {
+  white-space: pre-wrap;
+  overflow: hidden;
+}
+
+.error {
+  color: #ef4444;
+}

@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
 import styles from './Layout.module.css'
 
 const NAV_ITEMS = [
@@ -7,6 +8,9 @@ const NAV_ITEMS = [
   { to: '/compare', label: 'Сравнение' },
   { to: '/library', label: 'Библиотека' },
   { to: '/techniques', label: 'Техники' },
+  { to: '/metrics', label: 'Метрики' },
+  { to: '/workspaces', label: 'Workspaces' },
+  { to: '/models', label: 'Модели' },
   { to: '/settings', label: 'Настройки' },
 ]
 
@@ -32,6 +36,7 @@ const FONT_LABELS: Record<string, string> = {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, font, setTheme, setFont } = useTheme()
+  const { user, logout } = useAuth()
   const location = useLocation()
 
   return (
@@ -53,6 +58,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className={styles.controls}>
+          <div className={styles.userBox}>
+            <span>{user?.username}</span>
+            <button className={styles.logoutBtn} onClick={() => logout()}>
+              Logout
+            </button>
+          </div>
           <div className={styles.selectGroup}>
             <label>Тема</label>
             <select value={theme} onChange={(e) => setTheme(e.target.value as any)}>

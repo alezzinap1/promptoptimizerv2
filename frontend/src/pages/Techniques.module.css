@@ -3,6 +3,9 @@
 }
 
 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
@@ -20,6 +23,17 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 20px;
+}
+
+.error {
+  color: #ef4444;
+  margin-bottom: 16px;
+}
+
+.empty {
+  padding: 32px;
+  text-align: center;
+  opacity: 0.75;
 }
 
 .card {
@@ -44,4 +58,15 @@
   font-size: 13px;
   white-space: pre-wrap;
   overflow: hidden;
+}
+
+.details {
+  margin-top: 12px;
+}
+
+.variant {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
 }

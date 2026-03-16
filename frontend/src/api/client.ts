@@ -1,15 +1,74 @@
 const API_BASE = '/api'
+const AUTH_STORAGE_KEY = 'prompt-engineer-auth-session'
 
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(err || `HTTP ${res.status}`)
+export interface User {
+  id: number
+  username: string
+}
+
+export interface AuthResponse {
+  session_id: string
+  user: User
+}
+
+export interface PromptIdeIssue {
+  severity: string
+  category: string
+  message: string
+  why_it_matters: string
+  suggested_fix: string
+  affected_fields: string[]
+}
+
+export interface PromptIdeNode {
+  id: string
+  label: string
+  value: string
+  status: string
+  criticality: string
+}
+
+export interface PromptIdeEvidence {
+  source_type: string
+  confidence: number
+  reason: string
+  value_preview: string
+  can_accept_reject: boolean
+}
+
+export interface PromptSpec {
+  goal?: string
+  task_types?: string[]
+  complexity?: string
+  target_model?: string
+  workspace_id?: number | null
+  workspace_name?: string | null
+  audience?: string | null
+  input_description?: string
+  output_format?: string | null
+  constraints?: string[]
+  success_criteria?: string[]
+  source_of_truth?: string[]
+  previous_prompt?: string | null
+  workspace_context?: Record<string, unknown>
+}
+
+export interface Workspace {
+  id: number | null
+  name: string
+  description: string
+  config: {
+    preferred_target_model?: string
+    glossary?: string[]
+    style_rules?: string[]
+    default_constraints?: string[]
+    reference_snippets?: string[]
   }
-  return res.json()
+}
+
+export interface StructuredQuestion {
+  question: string
+  options: string[]
 }
 
 export interface GenerateRequest {
@@ -26,6 +85,10 @@ export interface GenerateRequest {
   questions_mode?: boolean
   session_id?: string
   previous_prompt?: string
+  workspace_id?: number | null
+  prompt_spec_overrides?: Record<string, unknown>
+  evidence_decisions?: Record<string, string>
+  question_answers?: { question: string; answers: string[] }[]
 }
 
 export interface GenerateResult {
@@ -34,19 +97,121 @@ export interface GenerateResult {
   has_prompt: boolean
   has_questions: boolean
   questions_raw?: string
+  questions?: StructuredQuestion[]
   techniques: { id: string; name: string }[]
   technique_ids: string[]
   task_types: string[]
   complexity: string
+  task_input?: string
   gen_model: string
   target_model: string
   metrics: Record<string, unknown>
   session_id: string
+  prompt_spec?: PromptSpec
+  evidence?: Record<string, PromptIdeEvidence>
+  debug_issues?: PromptIdeIssue[]
+  intent_graph?: PromptIdeNode[]
+  workspace?: Workspace
+}
+
+export interface PromptIdePreviewResponse {
+  classification: { task_types: string[]; complexity: string }
+  techniques: { id: string; name: string }[]
+  prompt_spec: PromptSpec
+  evidence: Record<string, PromptIdeEvidence>
+  debug_issues: PromptIdeIssue[]
+  intent_graph: PromptIdeNode[]
+  workspace: Workspace
+}
+
+export interface Settings {
+  openrouter_api_key_set: boolean
+  openrouter_api_key_masked: string
+}
+
+export interface CompareVariant {
+  prompt: string
+  reasoning: string
+  techniques: { id: string; name: string }[]
+  metrics: Record<string, unknown>
+}
+
+export interface LibraryItem {
+  id: number
+  title: string
+  prompt: string
+  tags: string[]
+  target_model: string
+  task_type: string
+  rating: number
+  notes: string
+  techniques: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface OpenRouterModel {
+  id: string
+  name: string
+  description?: string
+  context_length?: number
+  pricing: { prompt?: number; completion?: number }
+  top_provider?: Record<string, unknown>
+  architecture?: Record<string, unknown>
+}
+
+function getAuthSessionId(): string | null {
+  return localStorage.getItem(AUTH_STORAGE_KEY)
+}
+
+export function setAuthSessionId(sessionId: string | null) {
+  if (sessionId) localStorage.setItem(AUTH_STORAGE_KEY, sessionId)
+  else localStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
+async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers)
+  headers.set('Content-Type', 'application/json')
+  const sessionId = getAuthSessionId()
+  if (sessionId) headers.set('X-Session-Id', sessionId)
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(err || `HTTP ${res.status}`)
+  }
+  return res.json()
 }
 
 export const api = {
+  register: (req: { username: string; password: string }) =>
+    fetchApi<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(req) }),
+  login: (req: { username: string; password: string }) =>
+    fetchApi<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(req) }),
+  logout: () => fetchApi<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+  me: () => fetchApi<{ user: User }>('/auth/me'),
+
+  getSettings: () => fetchApi<Settings>('/settings'),
+  updateSettings: (req: { openrouter_api_key?: string }) =>
+    fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
+
+  previewPromptIde: (req: {
+    task_input: string
+    target_model?: string
+    workspace_id?: number | null
+    previous_prompt?: string
+    technique_mode?: string
+    manual_techs?: string[]
+    overrides?: Record<string, unknown>
+    evidence_decisions?: Record<string, string>
+  }) => fetchApi<PromptIdePreviewResponse>('/prompt-ide/preview', { method: 'POST', body: JSON.stringify(req) }),
+
   generate: (req: GenerateRequest) =>
-    fetchApi<GenerateResult>(`/generate`, { method: 'POST', body: JSON.stringify(req) }),
+    fetchApi<GenerateResult>('/generate', { method: 'POST', body: JSON.stringify(req) }),
 
   getProviders: () => fetchApi<{ providers: string[]; labels: Record<string, string> }>('/providers'),
   getTargetModels: () => fetchApi<{ models: string[]; labels: Record<string, string> }>('/target-models'),
@@ -62,11 +227,11 @@ export const api = {
     techs_a_manual?: string[]
     techs_b_mode?: string
     techs_b_manual?: string[]
-  }) => fetchApi<{ a: { prompt: string; reasoning: string; techniques: unknown[]; metrics: unknown }; b: unknown }>('/compare', { method: 'POST', body: JSON.stringify(req) }),
+  }) => fetchApi<{ a: CompareVariant; b: CompareVariant; winner: 'a' | 'b' | 'tie' }>('/compare', { method: 'POST', body: JSON.stringify(req) }),
 
   getLibrary: (params?: { target_model?: string; task_type?: string; search?: string }) => {
     const q = new URLSearchParams(params as Record<string, string>).toString()
-    return fetchApi<{ items: unknown[] }>(`/library${q ? `?${q}` : ''}`)
+    return fetchApi<{ items: LibraryItem[] }>(`/library${q ? `?${q}` : ''}`)
   },
   getLibraryStats: () => fetchApi<{ total: number; models: string[]; task_types: string[] }>('/library/stats'),
   saveToLibrary: (req: { title: string; prompt: string; tags?: string[]; target_model?: string; task_type?: string; techniques?: string[]; notes?: string }) =>
@@ -78,6 +243,36 @@ export const api = {
 
   getTechniques: (params?: { task_type?: string; complexity?: string; search?: string }) => {
     const q = new URLSearchParams(params as Record<string, string>).toString()
-    return fetchApi<{ techniques: unknown[] }>(`/techniques${q ? `?${q}` : ''}`)
+    return fetchApi<{ techniques: Record<string, unknown>[] }>(`/techniques${q ? `?${q}` : ''}`)
   },
+
+  getModels: (refresh?: boolean) => {
+    const q = refresh ? '?refresh=true' : ''
+    return fetchApi<{ data: OpenRouterModel[]; updated_at: number; from_cache: boolean; stale?: boolean; error?: string }>(`/models${q}`)
+  },
+
+  getSessionVersions: (sessionId: string) =>
+    fetchApi<{ items: Record<string, unknown>[] }>(`/sessions/${sessionId}/versions`),
+  getSessionPromptSpec: (sessionId: string) =>
+    fetchApi<{ item: Record<string, unknown> | null }>(`/sessions/${sessionId}/prompt-spec`),
+
+  getWorkspaces: () => fetchApi<{ items: Workspace[] }>('/workspaces'),
+  getWorkspace: (id: number) => fetchApi<{ item: Workspace }>('/workspaces/' + id),
+  createWorkspace: (req: {
+    name: string
+    description?: string
+    preferred_target_model?: string
+    glossary?: string[]
+    style_rules?: string[]
+    default_constraints?: string[]
+    reference_snippets?: string[]
+  }) => fetchApi<{ item: Workspace }>('/workspaces', { method: 'POST', body: JSON.stringify(req) }),
+  updateWorkspace: (id: number, req: Record<string, unknown>) =>
+    fetchApi<{ item: Workspace }>(`/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  deleteWorkspace: (id: number) =>
+    fetchApi<{ ok: boolean }>(`/workspaces/${id}`, { method: 'DELETE' }),
+
+  getMetricsSummary: () => fetchApi<Record<string, unknown>>('/metrics/summary'),
+  getMetricsEvents: (limit?: number) =>
+    fetchApi<{ items: Record<string, unknown>[] }>(`/metrics/events${limit ? `?limit=${limit}` : ''}`),
 }

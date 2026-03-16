@@ -53,11 +53,11 @@ def load_registry() -> TechniqueRegistry:
 @st.cache_resource
 def load_llm() -> LLMClient:
     from app.config import LLM_TIMEOUT_SEC
+    from services.api_key_resolver import resolve_openrouter_api_key
 
-    api_key = os.getenv("OPENROUTER_API_KEY", "")
+    api_key = resolve_openrouter_api_key()
     if not api_key:
-        st.error("Не задана переменная окружения **OPENROUTER_API_KEY**. "
-                 "Создайте файл `.env` или задайте переменную.")
+        st.error("OpenRouter API key не задан. Укажите в **Настройках** (React) или в переменной **OPENROUTER_API_KEY** (.env).")
         st.stop()
     if "timeout" in inspect.signature(LLMClient).parameters:
         return LLMClient(api_key, timeout=float(LLM_TIMEOUT_SEC))

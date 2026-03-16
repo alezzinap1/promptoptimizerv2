@@ -9,12 +9,14 @@
 
 .settings {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
 }
 
 .field {
   margin-bottom: 16px;
+  min-width: 180px;
 }
 
 .field label {
@@ -24,13 +26,25 @@
 }
 
 .field select,
-.field textarea {
+.field textarea,
+.field input,
+.multi,
+.textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: var(--secondary);
   color: var(--text);
+}
+
+.radioRow {
+  display: flex;
+  gap: 12px;
+}
+
+.multi {
+  min-height: 120px;
 }
 
 .primaryBtn {
@@ -56,6 +70,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
+  margin-top: 24px;
 }
 
 .column h3 {
@@ -69,4 +84,29 @@
   border-radius: 8px;
   font-size: 14px;
   overflow-x: auto;
+}
+
+.textarea {
+  min-height: 320px;
+  resize: vertical;
+  margin: 12px 0;
+  font-family: inherit;
+}
+
+.meta {
+  opacity: 0.75;
+}
+
+.winner,
+.metricCompare {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--secondary);
+  margin-top: 16px;
+}
+
+.metricCompare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
 }

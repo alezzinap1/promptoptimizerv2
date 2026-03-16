@@ -36,9 +36,11 @@ def load_registry() -> TechniqueRegistry:
 
 @st.cache_resource
 def load_llm() -> LLMClient:
-    api_key = os.getenv("OPENROUTER_API_KEY", "")
+    from services.api_key_resolver import resolve_openrouter_api_key
+
+    api_key = resolve_openrouter_api_key()
     if not api_key:
-        st.error("OPENROUTER_API_KEY not set")
+        st.error("OpenRouter API key не задан. Укажите в Настройках или OPENROUTER_API_KEY.")
         st.stop()
     if "timeout" in inspect.signature(LLMClient).parameters:
         return LLMClient(api_key, timeout=float(LLM_TIMEOUT_SEC))
