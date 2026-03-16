@@ -55,32 +55,34 @@
   gap: 8px;
 }
 
+.settingsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.settingsBtn:hover {
+  color: var(--primary);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.settingsIcon {
+  width: 18px;
+  height: 18px;
+}
+
 .logoutBtn {
   padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: var(--bg);
   color: var(--text);
-}
-
-.selectGroup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.selectGroup label {
-  font-size: 14px;
-  opacity: 0.8;
-}
-
-.selectGroup select {
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
 }
 
 .divider {
@@ -90,7 +92,7 @@
 }
 
 .main {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px 24px 28px;
 }

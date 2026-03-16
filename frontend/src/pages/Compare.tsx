@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, type OpenRouterModel } from '../api/client'
 import styles from './Compare.module.css'
 
 export default function Compare() {
@@ -9,11 +9,12 @@ export default function Compare() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ a: { prompt: string; reasoning: string; techniques: { id: string; name: string }[]; metrics: Record<string, unknown> }; b: { prompt: string; reasoning: string; techniques: { id: string; name: string }[]; metrics: Record<string, unknown> }; winner: 'a' | 'b' | 'tie' } | null>(null)
-  const [genModel, setGenModel] = useState('deepseek')
+  const [genModel, setGenModel] = useState('')
   const [targetModel, setTargetModel] = useState('unknown')
-  const [providers, setProviders] = useState<Record<string, string>>({})
-  const [targetModels, setTargetModels] = useState<Record<string, string>>({})
+  const [modelsMap, setModelsMap] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [techniques, setTechniques] = useState<{ id: string; name: string }[]>([])
+  const [generationOptions, setGenerationOptions] = useState<string[]>([])
+  const [targetOptions, setTargetOptions] = useState<string[]>(['unknown'])
   const [techsAMode, setTechsAMode] = useState<'auto' | 'manual'>('auto')
   const [techsBMode, setTechsBMode] = useState<'auto' | 'manual'>('auto')
   const [techsAManual, setTechsAManual] = useState<string[]>([])
@@ -24,12 +25,21 @@ export default function Compare() {
   useEffect(() => {
     const state = location.state as { taskInput?: string } | null
     if (state?.taskInput) setTaskInput(state.taskInput)
-    api.getProviders().then((r) => setProviders(r.labels))
-    api.getTargetModels().then((r) => setTargetModels(r.labels))
-    api.getTechniques().then((r) => setTechniques((r.techniques as Record<string, unknown>[]).map((item) => ({
-      id: String(item.id),
-      name: String(item.name || item.id),
-    }))))
+    Promise.all([api.getSettings(), api.getModels(), api.getTechniques()]).then(([settings, modelRes, techniquesRes]) => {
+      const labels = modelRes.data.reduce<Record<string, string>>((acc, item: OpenRouterModel) => {
+        acc[item.id] = item.name || item.id
+        return acc
+      }, { unknown: 'Неизвестно / Любая модель' })
+      setModelsMap(labels)
+      setGenerationOptions(settings.preferred_generation_models)
+      setTargetOptions(settings.preferred_target_models)
+      setGenModel(settings.preferred_generation_models[0] || '')
+      setTargetModel(settings.preferred_target_models[0] || 'unknown')
+      setTechniques(techniquesRes.techniques.map((item) => ({
+        id: String(item.id),
+        name: String(item.name || item.id),
+      })))
+    }).catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
   }, [location.state])
 
   const handleCompare = async () => {
@@ -65,16 +75,16 @@ export default function Compare() {
         <div className={styles.field}>
           <label>Модель генерации</label>
           <select value={genModel} onChange={(e) => setGenModel(e.target.value)}>
-            {Object.entries(providers).map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
+            {generationOptions.map((id) => (
+              <option key={id} value={id}>{modelsMap[id] || id}</option>
             ))}
           </select>
         </div>
         <div className={styles.field}>
           <label>Целевая модель</label>
           <select value={targetModel} onChange={(e) => setTargetModel(e.target.value)}>
-            {Object.entries(targetModels).map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
+            {targetOptions.map((id) => (
+              <option key={id} value={id}>{modelsMap[id] || id}</option>
             ))}
           </select>
         </div>

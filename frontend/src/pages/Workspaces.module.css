@@ -1,5 +1,5 @@
 .page {
-  max-width: 1200px;
+  max-width: 1400px;
 }
 
 .caption {
@@ -23,8 +23,84 @@
   margin-bottom: 20px;
 }
 
+.toolbar {
+  margin-bottom: 20px;
+}
+
+.createBtn {
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa));
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.createBtn:hover {
+  opacity: 0.95;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--secondary);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modalHeader h3 {
+  margin: 0;
+}
+
+.modalClose {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--text);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modalClose:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.primaryBtn {
+  background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa)) !important;
+  color: white !important;
+  border: none !important;
+  padding: 12px 20px !important;
+  font-weight: 600 !important;
+}
+
 .grid {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
 }
 
@@ -54,6 +130,38 @@
   margin-top: 12px;
 }
 
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.helpIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: help;
+}
+
 .form input,
 .form textarea,
 .actions button,
@@ -63,4 +171,10 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: var(--bg);
   color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
 }

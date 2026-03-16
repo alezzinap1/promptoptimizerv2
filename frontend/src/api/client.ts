@@ -127,6 +127,10 @@ export interface PromptIdePreviewResponse {
 export interface Settings {
   openrouter_api_key_set: boolean
   openrouter_api_key_masked: string
+  theme: string
+  font: string
+  preferred_generation_models: string[]
+  preferred_target_models: string[]
 }
 
 export interface CompareVariant {
@@ -160,8 +164,33 @@ export interface OpenRouterModel {
   architecture?: Record<string, unknown>
 }
 
+export interface TechniqueRecord {
+  id: string
+  db_id?: number | null
+  name: string
+  core_pattern?: string
+  why_it_works?: string
+  good_example?: string
+  anti_patterns?: string[]
+  variants?: { name?: string; pattern?: string; use_when?: string }[]
+  when_to_use?: { task_types?: string[]; complexity?: string[]; not_for?: string[] }
+  compatibility?: { combines_well_with?: string[] }
+  origin?: 'default' | 'custom'
+  editable?: boolean
+}
+
 function getAuthSessionId(): string | null {
   return localStorage.getItem(AUTH_STORAGE_KEY)
+}
+
+function toQueryString(params?: Record<string, string | number | boolean | undefined | null>) {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value === undefined || value === null || value === '') continue
+    search.set(key, String(value))
+  }
+  const query = search.toString()
+  return query ? `?${query}` : ''
 }
 
 export function setAuthSessionId(sessionId: string | null) {
@@ -196,7 +225,13 @@ export const api = {
   me: () => fetchApi<{ user: User }>('/auth/me'),
 
   getSettings: () => fetchApi<Settings>('/settings'),
-  updateSettings: (req: { openrouter_api_key?: string }) =>
+  updateSettings: (req: {
+    openrouter_api_key?: string
+    theme?: string
+    font?: string
+    preferred_generation_models?: string[]
+    preferred_target_models?: string[]
+  }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
 
   previewPromptIde: (req: {
@@ -230,8 +265,7 @@ export const api = {
   }) => fetchApi<{ a: CompareVariant; b: CompareVariant; winner: 'a' | 'b' | 'tie' }>('/compare', { method: 'POST', body: JSON.stringify(req) }),
 
   getLibrary: (params?: { target_model?: string; task_type?: string; search?: string }) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString()
-    return fetchApi<{ items: LibraryItem[] }>(`/library${q ? `?${q}` : ''}`)
+    return fetchApi<{ items: LibraryItem[] }>(`/library${toQueryString(params)}`)
   },
   getLibraryStats: () => fetchApi<{ total: number; models: string[]; task_types: string[] }>('/library/stats'),
   saveToLibrary: (req: { title: string; prompt: string; tags?: string[]; target_model?: string; task_type?: string; techniques?: string[]; notes?: string }) =>
@@ -242,9 +276,14 @@ export const api = {
     fetchApi<{ ok: boolean }>(`/library/${id}`, { method: 'DELETE' }),
 
   getTechniques: (params?: { task_type?: string; complexity?: string; search?: string }) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString()
-    return fetchApi<{ techniques: Record<string, unknown>[] }>(`/techniques${q ? `?${q}` : ''}`)
+    return fetchApi<{ techniques: TechniqueRecord[] }>(`/techniques${toQueryString(params)}`)
   },
+  createTechnique: (req: TechniqueRecord) =>
+    fetchApi<{ item: TechniqueRecord }>('/techniques', { method: 'POST', body: JSON.stringify(req) }),
+  updateTechnique: (id: number, req: TechniqueRecord) =>
+    fetchApi<{ item: TechniqueRecord }>(`/techniques/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  deleteTechnique: (id: number) =>
+    fetchApi<{ ok: boolean }>(`/techniques/${id}`, { method: 'DELETE' }),
 
   getModels: (refresh?: boolean) => {
     const q = refresh ? '?refresh=true' : ''

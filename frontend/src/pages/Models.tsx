@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, type OpenRouterModel } from '../api/client'
+import { api, type OpenRouterModel, type Settings } from '../api/client'
 import styles from './Models.module.css'
 
 function formatPrice(price: number | undefined): string {
@@ -19,19 +19,25 @@ function formatContext(len: number | undefined): string {
 
 export default function Models() {
   const [models, setModels] = useState<OpenRouterModel[]>([])
+  const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [meta, setMeta] = useState<{ updated_at: number; from_cache: boolean } | null>(null)
   const [search, setSearch] = useState('')
+  type SortKey = 'name' | 'id' | 'context' | 'prompt' | 'completion'
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const load = async (forceRefresh = false) => {
     if (forceRefresh) setRefreshing(true)
     else setLoading(true)
     setError(null)
     try {
-      const res = await api.getModels(forceRefresh)
+      const [res, settingsRes] = await Promise.all([api.getModels(forceRefresh), api.getSettings()])
       setModels(res.data)
+      setSettings(settingsRes)
       setMeta({ updated_at: res.updated_at, from_cache: res.from_cache })
       if (res.error) setError(res.error)
     } catch (e) {
@@ -54,9 +60,46 @@ export default function Models() {
       )
     : models
 
+  const selectedGen = new Set(settings?.preferred_generation_models || [])
+  const selectedTarget = new Set(settings?.preferred_target_models || [])
+
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0
+    if (sortKey === 'name') cmp = (a.name || a.id).localeCompare(b.name || b.id)
+    else if (sortKey === 'id') cmp = a.id.localeCompare(b.id)
+    else if (sortKey === 'context') cmp = (a.context_length ?? 0) - (b.context_length ?? 0)
+    else if (sortKey === 'prompt') cmp = (a.pricing?.prompt ?? 0) - (b.pricing?.prompt ?? 0)
+    else if (sortKey === 'completion') cmp = (a.pricing?.completion ?? 0) - (b.pricing?.completion ?? 0)
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const toggleSort = (key: SortKey) => {
+    setSortKey(key)
+    setSortDir((d) => (sortKey === key ? (d === 'asc' ? 'desc' : 'asc') : 'asc'))
+  }
+
   const updatedStr = meta?.updated_at
     ? new Date(meta.updated_at * 1000).toLocaleString('ru-RU')
     : ''
+
+  const toggleModel = async (kind: 'preferred_generation_models' | 'preferred_target_models', modelId: string) => {
+    if (!settings) return
+    setSaving(true)
+    setError(null)
+    try {
+      const current = new Set(settings[kind] || [])
+      if (current.has(modelId)) current.delete(modelId)
+      else current.add(modelId)
+      const updated = await api.updateSettings({
+        [kind]: Array.from(current),
+      })
+      setSettings(updated)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить набор моделей')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className={styles.models}>
@@ -94,6 +137,12 @@ export default function Models() {
           onChange={(e) => setSearch(e.target.value)}
           className={styles.search}
         />
+        {settings && (
+          <div className={styles.selectionBar}>
+            <span>В генерации: {settings.preferred_generation_models.length}</span>
+            <span>В target set: {settings.preferred_target_models.filter((item) => item !== 'unknown').length}</span>
+          </div>
+        )}
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
@@ -107,14 +156,15 @@ export default function Models() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Модель</th>
-                <th>Контекст</th>
-                <th>Вход ($/1M)</th>
-                <th>Выход ($/1M)</th>
+                <th className={styles.sortable} onClick={() => toggleSort('name')}>Модель {sortKey === 'name' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                <th className={styles.sortable} onClick={() => toggleSort('context')}>Контекст {sortKey === 'context' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                <th className={styles.sortable} onClick={() => toggleSort('prompt')}>Вход ($/1M) {sortKey === 'prompt' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                <th className={styles.sortable} onClick={() => toggleSort('completion')}>Выход ($/1M) {sortKey === 'completion' && (sortDir === 'asc' ? '↑' : '↓')}</th>
+                <th>Набор пользователя</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m) => (
+              {sorted.map((m) => (
                 <tr key={m.id}>
                   <td>
                     <div className={styles.modelCell}>
@@ -125,6 +175,24 @@ export default function Models() {
                   <td>{formatContext(m.context_length)}</td>
                   <td>{formatPrice(m.pricing?.prompt)}</td>
                   <td>{formatPrice(m.pricing?.completion)}</td>
+                  <td>
+                    <div className={styles.actionCell}>
+                      <button
+                        className={selectedGen.has(m.id) ? styles.removeBtn : styles.addBtn}
+                        onClick={() => toggleModel('preferred_generation_models', m.id)}
+                        disabled={saving}
+                      >
+                        {selectedGen.has(m.id) ? '− Генерация' : '+ Генерация'}
+                      </button>
+                      <button
+                        className={selectedTarget.has(m.id) ? styles.removeBtn : styles.addBtn}
+                        onClick={() => toggleModel('preferred_target_models', m.id)}
+                        disabled={saving}
+                      >
+                        {selectedTarget.has(m.id) ? '− Target' : '+ Target'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

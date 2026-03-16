@@ -140,6 +140,25 @@ class DBManager:
 
                 CREATE INDEX IF NOT EXISTS idx_prompt_specs_session_id
                     ON prompt_specs(session_id);
+
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    user_id             INTEGER PRIMARY KEY,
+                    theme               TEXT    DEFAULT 'slate',
+                    font                TEXT    DEFAULT 'jetbrains',
+                    gen_models_json     TEXT    DEFAULT '[]',
+                    target_models_json  TEXT    DEFAULT '[]',
+                    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS user_techniques (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id         INTEGER NOT NULL,
+                    technique_json  TEXT    NOT NULL,
+                    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
             """)
             self._migrate_phase2(conn)
         logger.info("DB initialized at %s", self._path)
@@ -223,6 +242,156 @@ class DBManager:
         """Logout by deleting the session binding."""
         with self._conn() as conn:
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (session_id,))
+
+    def get_user_preferences(self, user_id: int) -> dict:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM user_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return {
+                "user_id": user_id,
+                "theme": "slate",
+                "font": "jetbrains",
+                "preferred_generation_models": [],
+                "preferred_target_models": [],
+            }
+        data = dict(row)
+        for source, target in (
+            ("gen_models_json", "preferred_generation_models"),
+            ("target_models_json", "preferred_target_models"),
+        ):
+            try:
+                data[target] = json.loads(data.get(source) or "[]")
+            except Exception:
+                data[target] = []
+            data.pop(source, None)
+        return data
+
+    def upsert_user_preferences(
+        self,
+        user_id: int,
+        theme: str | None = None,
+        font: str | None = None,
+        preferred_generation_models: list[str] | None = None,
+        preferred_target_models: list[str] | None = None,
+    ) -> dict:
+        current = self.get_user_preferences(user_id)
+        next_theme = theme if theme is not None else str(current.get("theme") or "slate")
+        next_font = font if font is not None else str(current.get("font") or "jetbrains")
+        next_gen = (
+            preferred_generation_models
+            if preferred_generation_models is not None
+            else list(current.get("preferred_generation_models") or [])
+        )
+        next_target = (
+            preferred_target_models
+            if preferred_target_models is not None
+            else list(current.get("preferred_target_models") or [])
+        )
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_preferences
+                    (user_id, theme, font, gen_models_json, target_models_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    theme = excluded.theme,
+                    font = excluded.font,
+                    gen_models_json = excluded.gen_models_json,
+                    target_models_json = excluded.target_models_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    user_id,
+                    next_theme,
+                    next_font,
+                    json.dumps(next_gen, ensure_ascii=False),
+                    json.dumps(next_target, ensure_ascii=False),
+                ),
+            )
+        return self.get_user_preferences(user_id)
+
+    def list_user_techniques(self, user_id: int) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM user_techniques
+                WHERE user_id = ?
+                ORDER BY updated_at DESC, id DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        items: list[dict] = []
+        for row in rows:
+            data = dict(row)
+            try:
+                technique = json.loads(data.get("technique_json") or "{}")
+            except Exception:
+                technique = {}
+            technique["db_id"] = data["id"]
+            technique["editable"] = True
+            technique["origin"] = "custom"
+            technique["created_at"] = data.get("created_at")
+            technique["updated_at"] = data.get("updated_at")
+            items.append(technique)
+        return items
+
+    def create_user_technique(self, user_id: int, technique: dict) -> dict:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO user_techniques (user_id, technique_json)
+                VALUES (?, ?)
+                """,
+                (user_id, json.dumps(technique, ensure_ascii=False)),
+            )
+            item_id = cur.lastrowid
+        row = self.get_user_technique(int(item_id), user_id=user_id)
+        return row or {}
+
+    def get_user_technique(self, technique_id: int, user_id: int) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM user_techniques
+                WHERE id = ? AND user_id = ?
+                """,
+                (technique_id, user_id),
+            ).fetchone()
+        if not row:
+            return None
+        data = dict(row)
+        try:
+            technique = json.loads(data.get("technique_json") or "{}")
+        except Exception:
+            technique = {}
+        technique["db_id"] = data["id"]
+        technique["editable"] = True
+        technique["origin"] = "custom"
+        technique["created_at"] = data.get("created_at")
+        technique["updated_at"] = data.get("updated_at")
+        return technique
+
+    def update_user_technique(self, technique_id: int, user_id: int, technique: dict) -> dict | None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE user_techniques
+                SET technique_json = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+                """,
+                (json.dumps(technique, ensure_ascii=False), technique_id, user_id),
+            )
+        return self.get_user_technique(technique_id, user_id=user_id)
+
+    def delete_user_technique(self, technique_id: int, user_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "DELETE FROM user_techniques WHERE id = ? AND user_id = ?",
+                (technique_id, user_id),
+            )
 
     def save_prompt_version(
         self,

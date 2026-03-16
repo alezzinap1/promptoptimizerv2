@@ -2,6 +2,36 @@
   max-width: 1200px;
 }
 
+.createBox,
+.card {
+  padding: 20px;
+  background: var(--secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.createBox {
+  margin: 16px 0 24px;
+}
+
+.createHeader,
+.cardHead,
+.cardActions,
+.formActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.createGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -36,16 +66,34 @@
   opacity: 0.75;
 }
 
-.card {
-  padding: 20px;
-  background: var(--secondary);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+.createGrid input,
+.createGrid textarea,
+.cardActions button,
+.formActions button {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--bg);
+  color: var(--text);
 }
 
 .card h3 {
   margin: 0 0 8px;
   font-size: 1.1rem;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.badges span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .meta {
@@ -69,4 +117,10 @@
   padding: 10px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
+}
+
+@media (max-width: 860px) {
+  .createGrid {
+    grid-template-columns: 1fr;
+  }
 }

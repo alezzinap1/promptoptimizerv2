@@ -1,8 +1,31 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api, type Settings } from '../api/client'
+import { FONTS, THEMES, useTheme } from '../context/ThemeContext'
 import styles from './Settings.module.css'
 
+const THEME_LABELS: Record<string, string> = {
+  slate: 'Slate',
+  forest: 'Forest',
+  light: 'Light',
+  midnight: 'Midnight',
+  amber: 'Amber',
+  ocean: 'Ocean',
+}
+
+const FONT_LABELS: Record<string, string> = {
+  jetbrains: 'JetBrains Mono',
+  inter: 'Inter',
+  ibmplex: 'IBM Plex Sans',
+  plusjakarta: 'Plus Jakarta Sans',
+  spacegrotesk: 'Space Grotesk',
+  manrope: 'Manrope',
+  outfit: 'Outfit',
+  firacode: 'Fira Code',
+}
+
 export default function Settings() {
+  const { theme, font, setTheme, setFont } = useTheme()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
@@ -94,8 +117,34 @@ export default function Settings() {
       <section className={styles.section}>
         <h2>Оформление</h2>
         <p className={styles.info}>
-          Тема и шрифт можно изменить в <strong>верхней панели</strong> справа (доступны на всех страницах).
+          Персональные визуальные настройки интерфейса.
         </p>
+        <div className={styles.row}>
+          <select value={theme} onChange={(e) => setTheme(e.target.value as (typeof THEMES)[number])} className={styles.input}>
+            {THEMES.map((item) => (
+              <option key={item} value={item}>{THEME_LABELS[item]}</option>
+            ))}
+          </select>
+          <select value={font} onChange={(e) => setFont(e.target.value as (typeof FONTS)[number])} className={styles.input}>
+            {FONTS.map((item) => (
+              <option key={item} value={item}>{FONT_LABELS[item]}</option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2>Набор моделей пользователя</h2>
+        <p className={styles.info}>
+          Выбранные модели используются в `Home` и `Compare` как доступные варианты генерации и target model.
+        </p>
+        <p className={styles.masked}>
+          Для генерации: <strong>{settings?.preferred_generation_models?.length ?? 0}</strong> моделей
+        </p>
+        <p className={styles.masked}>
+          Target models: <strong>{settings?.preferred_target_models?.length ?? 0}</strong>
+        </p>
+        <Link to="/models" className={styles.btn}>Открыть каталог моделей</Link>
       </section>
     </div>
   )

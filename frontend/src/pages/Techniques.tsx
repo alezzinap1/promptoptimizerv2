@@ -1,39 +1,138 @@
-import { useState, useEffect } from 'react'
-import { api } from '../api/client'
+import { useEffect, useMemo, useState } from 'react'
+import { api, type TechniqueRecord } from '../api/client'
 import styles from './Techniques.module.css'
 
-interface Technique {
-  id: string
-  name: string
-  core_pattern?: string
-  why_it_works?: string
-  anti_patterns?: string[]
-  variants?: { name?: string; pattern?: string; use_when?: string }[]
-  compatibility?: { combines_well_with?: string[] }
-  good_example?: string
-  when_to_use?: { task_types?: string[]; complexity?: string[] }
+const EMPTY_FORM = {
+  id: '',
+  name: '',
+  core_pattern: '',
+  why_it_works: '',
+  good_example: '',
+  anti_patterns: '',
+  task_types: '',
+  complexity: '',
+  combines_well_with: '',
 }
 
 export default function Techniques() {
-  const [techniques, setTechniques] = useState<Technique[]>([])
+  const [techniques, setTechniques] = useState<TechniqueRecord[]>([])
   const [search, setSearch] = useState('')
   const [taskType, setTaskType] = useState('')
   const [complexity, setComplexity] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true)
     setError(null)
     api.getTechniques({ search: search || undefined, task_type: taskType || undefined, complexity: complexity || undefined })
-      .then((r) => setTechniques(r.techniques as Technique[]))
+      .then((r) => setTechniques(r.techniques))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    load()
   }, [search, taskType, complexity])
+
+  const customCount = useMemo(
+    () => techniques.filter((item) => item.origin === 'custom').length,
+    [techniques],
+  )
+  const defaultCount = useMemo(
+    () => techniques.filter((item) => item.origin !== 'custom').length,
+    [techniques],
+  )
+
+  const submitForm = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const payload: TechniqueRecord = {
+        id: form.id.trim(),
+        name: form.name.trim(),
+        core_pattern: form.core_pattern.trim(),
+        why_it_works: form.why_it_works.trim(),
+        good_example: form.good_example.trim(),
+        anti_patterns: form.anti_patterns.split('\n').map((item) => item.trim()).filter(Boolean),
+        when_to_use: {
+          task_types: form.task_types.split(',').map((item) => item.trim()).filter(Boolean),
+          complexity: form.complexity.split(',').map((item) => item.trim()).filter(Boolean),
+        },
+        compatibility: {
+          combines_well_with: form.combines_well_with.split(',').map((item) => item.trim()).filter(Boolean),
+        },
+        variants: [],
+      }
+      if (editingId) {
+        await api.updateTechnique(editingId, payload)
+      } else {
+        await api.createTechnique(payload)
+      }
+      setForm(EMPTY_FORM)
+      setEditingId(null)
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось сохранить технику')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const startEdit = (item: TechniqueRecord) => {
+    setEditingId(item.db_id || null)
+    setForm({
+      id: item.id,
+      name: item.name,
+      core_pattern: item.core_pattern || '',
+      why_it_works: item.why_it_works || '',
+      good_example: item.good_example || '',
+      anti_patterns: (item.anti_patterns || []).join('\n'),
+      task_types: (item.when_to_use?.task_types || []).join(', '),
+      complexity: (item.when_to_use?.complexity || []).join(', '),
+      combines_well_with: (item.compatibility?.combines_well_with || []).join(', '),
+    })
+  }
 
   return (
     <div className={styles.techniques}>
       <h1>База знаний техник промптинга</h1>
+      <p className={styles.meta}>Дефолтные техники доступны каждому пользователю. Свои техники можно добавлять поверх базы.</p>
+      <p className={styles.meta}>Сейчас доступно: {defaultCount} default / {customCount} custom.</p>
+
+      <div className={styles.createBox}>
+        <div className={styles.createHeader}>
+          <strong>{editingId ? 'Редактирование пользовательской техники' : 'Новая пользовательская техника'}</strong>
+          <span>Кастомных техник: {customCount}</span>
+        </div>
+        <div className={styles.createGrid}>
+          <input value={form.id} onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))} placeholder="ID: my_custom_technique" />
+          <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Название" />
+          <input value={form.task_types} onChange={(e) => setForm((prev) => ({ ...prev, task_types: e.target.value }))} placeholder="Task types через запятую" />
+          <input value={form.complexity} onChange={(e) => setForm((prev) => ({ ...prev, complexity: e.target.value }))} placeholder="Complexity: low, medium, high" />
+          <textarea rows={4} value={form.core_pattern} onChange={(e) => setForm((prev) => ({ ...prev, core_pattern: e.target.value }))} placeholder="Core pattern" />
+          <textarea rows={4} value={form.why_it_works} onChange={(e) => setForm((prev) => ({ ...prev, why_it_works: e.target.value }))} placeholder="Почему техника работает" />
+          <textarea rows={3} value={form.good_example} onChange={(e) => setForm((prev) => ({ ...prev, good_example: e.target.value }))} placeholder="Хороший пример" />
+          <textarea rows={3} value={form.combines_well_with} onChange={(e) => setForm((prev) => ({ ...prev, combines_well_with: e.target.value }))} placeholder="Совместимые техники через запятую" />
+          <textarea rows={4} value={form.anti_patterns} onChange={(e) => setForm((prev) => ({ ...prev, anti_patterns: e.target.value }))} placeholder="Anti-patterns, по одному на строку" />
+        </div>
+        <div className={styles.formActions}>
+          <button onClick={submitForm} disabled={saving || !form.id.trim() || !form.name.trim()}>
+            {saving ? 'Сохраняю...' : editingId ? 'Сохранить изменения' : 'Добавить технику'}
+          </button>
+          {editingId && (
+            <button onClick={() => {
+              setEditingId(null)
+              setForm(EMPTY_FORM)
+            }}>
+              Отмена
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className={styles.toolbar}>
         <input
@@ -70,7 +169,30 @@ export default function Techniques() {
         <div className={styles.grid}>
           {techniques.map((t) => (
             <div key={t.id} className={styles.card}>
-              <h3>{t.name || t.id}</h3>
+              <div className={styles.cardHead}>
+                <div>
+                  <h3>{t.name || t.id}</h3>
+                  <p className={styles.badges}>
+                    <span>{t.origin === 'custom' ? 'custom' : 'default'}</span>
+                    {t.editable && <span>editable</span>}
+                  </p>
+                </div>
+                {t.editable && t.db_id ? (
+                  <div className={styles.cardActions}>
+                    <button onClick={() => startEdit(t)}>Изменить</button>
+                    <button onClick={async () => {
+                      await api.deleteTechnique(t.db_id as number)
+                      if (editingId === t.db_id) {
+                        setEditingId(null)
+                        setForm(EMPTY_FORM)
+                      }
+                      load()
+                    }}>
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
+              </div>
               {t.when_to_use?.task_types && (
                 <p className={styles.meta}>{t.when_to_use.task_types.join(', ')}</p>
               )}

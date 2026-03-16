@@ -38,6 +38,54 @@
   margin-top: 20px;
 }
 
+.visualGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.funnel,
+.eventBars,
+.latencyBox {
+  display: grid;
+  gap: 12px;
+}
+
+.funnelRow,
+.eventBarRow {
+  display: grid;
+  grid-template-columns: 110px 1fr 56px;
+  gap: 12px;
+  align-items: center;
+}
+
+.funnelBar,
+.eventBar,
+.latencyMeter {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.funnelFill,
+.eventBarFill,
+.latencyAvg,
+.latencyP95 {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.funnelFill,
+.eventBarFill,
+.latencyAvg {
+  background: linear-gradient(90deg, #22d3ee, #3b82f6);
+}
+
+.latencyP95 {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
 .eventList {
   display: grid;
   gap: 12px;
@@ -54,4 +102,10 @@
 
 .error {
   color: #ef4444;
+}
+
+@media (max-width: 900px) {
+  .visualGrid {
+    grid-template-columns: 1fr;
+  }
 }

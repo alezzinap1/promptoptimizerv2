@@ -78,9 +78,11 @@ class LLMClient:
 
     def _get_model(self, provider: str) -> str:
         model = PROVIDER_MODELS.get(provider)
-        if not model:
-            raise ValueError(f"Unknown provider: {provider}. Available: {list(PROVIDER_MODELS)}")
-        return model
+        if model:
+            return model
+        if "/" in provider:
+            return provider
+        raise ValueError(f"Unknown provider: {provider}. Available: {list(PROVIDER_MODELS)}")
 
     def _build_completion_kwargs(
         self,

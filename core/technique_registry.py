@@ -25,10 +25,17 @@ FALLBACK_TECHNIQUE_IDS = ["role_prompting", "structured_output", "constraints_pr
 
 
 class TechniqueRegistry:
-    def __init__(self, techniques_dir: Path | None = None):
+    def __init__(
+        self,
+        techniques_dir: Path | None = None,
+        extra_techniques: list[dict[str, Any]] | None = None,
+    ):
         self._dir = techniques_dir or TECHNIQUES_DIR
         self._techniques: dict[str, dict[str, Any]] = {}
         self._load_all()
+        for technique in extra_techniques or []:
+            if isinstance(technique, dict) and technique.get("id"):
+                self._techniques[str(technique["id"])] = technique
 
     def _load_all(self) -> None:
         if not self._dir.exists():

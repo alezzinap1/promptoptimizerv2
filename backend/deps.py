@@ -3,9 +3,11 @@ Shared FastAPI dependencies.
 """
 from __future__ import annotations
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
+from core.technique_registry import TechniqueRegistry
 from db.manager import DBManager
+from services.technique_catalog import get_user_registry
 
 
 def get_db() -> DBManager:
@@ -39,3 +41,10 @@ def get_optional_user(
         return None
     db = get_db()
     return db.get_session_user(x_session_id)
+
+
+def get_registry_for_user(
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+) -> TechniqueRegistry:
+    return get_user_registry(db, int(user["id"]))

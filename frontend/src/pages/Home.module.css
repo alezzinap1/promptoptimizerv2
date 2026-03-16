@@ -1,43 +1,77 @@
 .home {
-  max-width: 1200px;
+  max-width: none;
 }
 
 .home h1 {
-  margin: 0 0 24px;
+  margin: 0 0 18px;
   font-size: 2rem;
 }
 
-.expander {
-  margin-bottom: 24px;
-  padding: 16px;
+.mainGrid {
+  display: grid;
+  grid-template-columns: minmax(290px, 1.05fr) minmax(360px, 1.15fr) minmax(380px, 1.25fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.columnStack {
+  display: grid;
+  gap: 18px;
+}
+
+.panel,
+.resultSection,
+.metricsBox,
+.saveBox,
+.questionBox,
+.emptyStatePanel {
   background: var(--secondary);
-  border-radius: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.expander summary {
-  cursor: pointer;
-  font-weight: 600;
+.panel {
+  padding: 16px;
 }
 
-.controls {
+.panelHeader {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 16px;
-  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.panelHeader h2,
+.emptyStatePanel h3 {
+  margin: 0;
+}
+
+.panelHint {
+  margin: 6px 0 0;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.compactControls,
+.advancedGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .fieldWide {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 260px;
+  margin-top: 12px;
 }
 
 .field label {
@@ -50,22 +84,25 @@
 .field input[type="number"],
 .fieldWide select,
 .ideSection input,
-.ideSection select {
+.ideSection select,
+.specGrid input,
+.specGrid select {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: var(--bg);
   color: var(--text);
-  min-width: 180px;
+  min-width: 0;
 }
 
 .multiSelect {
-  min-height: 120px;
+  min-height: 110px;
 }
 
 .radioRow {
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .radioRow label {
@@ -75,38 +112,32 @@
   cursor: pointer;
 }
 
-.columns {
-  display: grid;
-  grid-template-columns: 2fr 3fr;
-  gap: 32px;
-}
-
-.left textarea,
-.right textarea,
+.panel textarea,
 .ideSection textarea,
+.specGrid textarea,
 .saveBox textarea,
 .saveBox input,
 .questionItem input,
 .questionItem select {
   width: 100%;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 12px 13px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--secondary);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   font-family: inherit;
   resize: vertical;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .primaryBtn {
-  padding: 12px 24px;
-  background: var(--primary);
+  padding: 11px 18px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
-  margin-right: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
 }
 
 .primaryBtn:disabled {
@@ -114,10 +145,22 @@
   cursor: not-allowed;
 }
 
+.secondaryBtn {
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.primaryRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
 .info {
   padding: 12px;
   background: rgba(34, 211, 238, 0.1);
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 12px;
 }
 
@@ -127,16 +170,17 @@
 }
 
 .empty {
-  padding: 40px 20px;
+  padding: 30px 18px;
   text-align: center;
   border: 2px dashed var(--primary);
-  border-radius: 8px;
+  border-radius: 12px;
   opacity: 0.8;
 }
 
 .resultPrompt {
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
+  min-height: 320px;
 }
 
 .reasoning {
@@ -149,41 +193,281 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 16px;
 }
 
 .actions a,
 .actions button {
-  padding: 8px 16px;
-  border-radius: 6px;
-  background: var(--secondary);
-  color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.previewBar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--secondary);
+  padding: 9px 14px;
   border-radius: 10px;
-  margin-bottom: 20px;
 }
 
 .checkboxRow {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .ideBox,
 .resultSection {
-  margin: 16px 0;
-  padding: 16px;
-  background: var(--secondary);
+  margin: 0;
+  padding: 0;
+}
+
+.ideHeader,
+.ideStats,
+.ideTabs,
+.intentStrip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ideHeader {
+  justify-content: space-between;
+}
+
+.ideHint {
+  margin: 6px 0 0;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.ideStats span,
+.intentNode,
+.ideTab,
+.ideTabActive {
+  padding: 8px 10px;
   border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.intentNode {
+  display: flex;
+  flex-direction: column;
+  min-width: 100px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.intentNode span {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+.intentKnown {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+.intentMissing {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+.intentItem.intentKnown {
+  background: rgba(34, 197, 94, 0.12) !important;
+  border-color: rgba(34, 197, 94, 0.25) !important;
+}
+
+.intentItem.intentMissing {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+.techRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.techRadio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.techListWrap {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.techListLabel {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.techMulti {
+  min-height: 80px;
+  max-height: 110px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--bg);
+  color: var(--text);
+  list-style: none;
+}
+
+.techMulti option {
+  padding: 4px 0;
+  border-radius: 4px;
+}
+
+.techMulti option:checked {
+  background: rgba(34, 211, 238, 0.2);
+}
+
+.fieldCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldCompact label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.topKInput {
+  width: 70px !important;
+  padding: 6px 10px !important;
+}
+
+.questionsCompact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.ideModalBtn {
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.95rem;
+  width: 100%;
+  text-align: left;
+}
+
+.ideModalBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--secondary);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modalHeader h3 {
+  margin: 0;
+}
+
+.modalClose {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--text);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modalClose:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.iterateBtn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.libraryBtn {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.ideTabs {
+  margin-top: 12px;
+}
+
+.ideTabActive {
+  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
+.compactPanel {
+  margin-top: 12px;
+}
+
+.listPanel {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.specGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.specGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.specWide {
+  grid-column: 1 / -1;
 }
 
 .ideGrid {
@@ -214,10 +498,11 @@
 .evidenceCard,
 .versionCard,
 .questionItem {
-  padding: 10px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.9rem;
 }
 
 .ideItem p,
@@ -237,8 +522,11 @@
 .questionBox {
   margin-top: 16px;
   padding: 16px;
-  background: var(--secondary);
-  border-radius: 10px;
+}
+
+.resultSection {
+  margin-top: 16px;
+  padding: 16px;
 }
 
 .metricGrid {
@@ -274,4 +562,35 @@
 
 .success {
   color: #22c55e;
+}
+
+.emptyStatePanel {
+  padding: 18px;
+}
+
+@media (max-width: 1280px) {
+  .mainGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .mainGrid,
+  .specGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .compactControls,
+  .advancedGrid,
+  .ideGrid,
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .panelHeader,
+  .ideHeader {
+    flex-direction: column;
+  }
 }

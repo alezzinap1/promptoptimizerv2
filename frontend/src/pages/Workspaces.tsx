@@ -4,6 +4,16 @@ import styles from './Workspaces.module.css'
 
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
 
+const WORKSPACE_FIELDS = [
+  { key: 'name', label: 'Название', placeholder: 'Например: Fintech analytics', help: 'Короткое имя workspace для выбора в Home.' },
+  { key: 'description', label: 'Описание', placeholder: 'Что хранит этот workspace', help: 'Человеческое описание сценария и контекста.' },
+  { key: 'preferred_target_model', label: 'Preferred target model', placeholder: 'openai/gpt-4o', help: 'Какая модель считается основной для этого контекста.' },
+  { key: 'glossary', label: 'Глоссарий', placeholder: 'Один термин на строку', help: 'Термины и определения проекта, которые нужно учитывать в prompt.' },
+  { key: 'style_rules', label: 'Style rules', placeholder: 'Одно правило на строку', help: 'Тон, стиль, форматирование и editorial-правила.' },
+  { key: 'default_constraints', label: 'Default constraints', placeholder: 'Одно ограничение на строку', help: 'Ограничения, которые должны автоматически попадать в prompt.' },
+  { key: 'reference_snippets', label: 'Reference snippets', placeholder: 'Один snippet на строку', help: 'Фрагменты, примеры или опорные куски контекста.' },
+] as const
+
 function splitLines(value: string) {
   return value.split('\n').map((v) => v.trim()).filter(Boolean)
 }
@@ -53,25 +63,72 @@ export default function Workspaces() {
     load()
   }
 
+  const renderField = (
+    form: typeof createForm,
+    onChange: (key: keyof typeof createForm, value: string) => void,
+  ) => (
+    <div className={styles.formGrid}>
+      {WORKSPACE_FIELDS.map((field) => {
+        const isTextarea = ['description', 'glossary', 'style_rules', 'default_constraints', 'reference_snippets'].includes(field.key)
+        return (
+          <label key={field.key} className={styles.formField}>
+            <span className={styles.labelRow}>
+              <span>{field.label}</span>
+              <span className={styles.helpIcon} title={field.help}>?</span>
+            </span>
+            {isTextarea ? (
+              <textarea
+                rows={field.key === 'description' ? 3 : 4}
+                placeholder={field.placeholder}
+                value={form[field.key]}
+                onChange={(e) => onChange(field.key, e.target.value)}
+              />
+            ) : (
+              <input
+                placeholder={field.placeholder}
+                value={form[field.key]}
+                onChange={(e) => onChange(field.key, e.target.value)}
+              />
+            )}
+          </label>
+        )
+      })}
+    </div>
+  )
+
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
   return (
     <div className={styles.page}>
       <h1>Workspaces</h1>
-      <p className={styles.caption}>Workspace хранит reusable контекст проекта: правила, глоссарий, ограничения и reference snippets.</p>
+      <p className={styles.caption}>
+        Workspace — это контекст проекта: правила, глоссарий, ограничения и примеры. Выберите workspace при генерации промптов.
+      </p>
       {error && <p className={styles.error}>{error}</p>}
 
-      <details className={styles.section} open={items.length === 0}>
-        <summary>Новый workspace</summary>
-        <div className={styles.form}>
-          <input placeholder="Название" value={createForm.name} onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))} />
-          <textarea rows={2} placeholder="Описание" value={createForm.description} onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))} />
-          <input placeholder="Preferred target model" value={createForm.preferred_target_model} onChange={(e) => setCreateForm((p) => ({ ...p, preferred_target_model: e.target.value }))} />
-          <textarea rows={3} placeholder="Глоссарий" value={createForm.glossary} onChange={(e) => setCreateForm((p) => ({ ...p, glossary: e.target.value }))} />
-          <textarea rows={3} placeholder="Style rules" value={createForm.style_rules} onChange={(e) => setCreateForm((p) => ({ ...p, style_rules: e.target.value }))} />
-          <textarea rows={3} placeholder="Default constraints" value={createForm.default_constraints} onChange={(e) => setCreateForm((p) => ({ ...p, default_constraints: e.target.value }))} />
-          <textarea rows={3} placeholder="Reference snippets" value={createForm.reference_snippets} onChange={(e) => setCreateForm((p) => ({ ...p, reference_snippets: e.target.value }))} />
-          <button onClick={createWorkspace}>Создать workspace</button>
+      <div className={styles.toolbar}>
+        <button className={styles.createBtn} onClick={() => setShowCreateModal(true)}>
+          Создать workspace
+        </button>
+      </div>
+
+      {showCreateModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>Новый workspace</h3>
+              <button className={styles.modalClose} onClick={() => setShowCreateModal(false)}>×</button>
+            </div>
+            <div className={styles.form}>
+              {renderField(createForm, (key, value) => setCreateForm((prev) => ({ ...prev, [key]: value })))}
+              <button className={styles.primaryBtn} onClick={async () => {
+                await createWorkspace()
+                setShowCreateModal(false)
+              }}>Создать</button>
+            </div>
+          </div>
         </div>
-      </details>
+      )}
 
       <div className={styles.grid}>
         {items.map((workspace) => {
@@ -109,13 +166,10 @@ export default function Workspaces() {
               <details>
                 <summary>Редактировать workspace</summary>
                 <div className={styles.form}>
-                  <input value={form.name} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, name: e.target.value } }))} />
-                  <textarea rows={2} value={form.description} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, description: e.target.value } }))} />
-                  <input value={form.preferred_target_model} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, preferred_target_model: e.target.value } }))} />
-                  <textarea rows={3} value={form.glossary} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, glossary: e.target.value } }))} />
-                  <textarea rows={3} value={form.style_rules} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, style_rules: e.target.value } }))} />
-                  <textarea rows={3} value={form.default_constraints} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, default_constraints: e.target.value } }))} />
-                  <textarea rows={3} value={form.reference_snippets} onChange={(e) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, reference_snippets: e.target.value } }))} />
+                  {renderField(
+                    form,
+                    (key, value) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, [key]: value } })),
+                  )}
                   <div className={styles.actions}>
                     <button onClick={async () => {
                       await api.updateWorkspace(workspace.id || 0, {

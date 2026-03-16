@@ -4,17 +4,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from backend.deps import get_current_user, get_db
+from backend.deps import get_current_user, get_db, get_registry_for_user
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.prompt_workflow import apply_evidence_decisions, build_preview_payload
-from core.technique_registry import TechniqueRegistry
 
 router = APIRouter()
-
-
-def get_registry() -> TechniqueRegistry:
-    return TechniqueRegistry()
 
 
 class PromptIdePreviewRequest(BaseModel):
@@ -33,7 +28,7 @@ def preview_prompt_ide(
     req: PromptIdePreviewRequest,
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
-    registry: TechniqueRegistry = Depends(get_registry),
+    registry = Depends(get_registry_for_user),
 ):
     workspace = None
     if req.workspace_id:

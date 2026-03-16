@@ -71,6 +71,22 @@ a:hover {
 button {
   font-family: inherit;
   cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  color: var(--text);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 input, textarea, select {

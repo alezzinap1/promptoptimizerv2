@@ -5,12 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.abuse import check_input_size, check_rate_limit
-from backend.deps import get_current_user, get_db, get_session_id
+from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
 from core.context_builder import ContextBuilder
 from core.parsing import parse_reply
 from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task
-from core.technique_registry import TechniqueRegistry
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
 from services.llm_client import LLMClient, DEFAULT_PROVIDER
@@ -23,11 +22,6 @@ def get_llm() -> LLMClient:
     if not api_key:
         raise HTTPException(500, "OpenRouter API key not set. Use Settings or OPENROUTER_API_KEY env.")
     return LLMClient(api_key)
-
-
-def get_registry() -> TechniqueRegistry:
-    return TechniqueRegistry()
-
 
 def _score(metrics: dict) -> float:
     return float(metrics.get("completeness_score", metrics.get("quality_score", 0.0)))
@@ -50,6 +44,7 @@ def compare_prompts(
     req: CompareRequest,
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
+    registry = Depends(get_registry_for_user),
     auth_session_id: str | None = Depends(get_session_id),
 ):
     """Generate two prompts with different technique sets and return both."""
@@ -61,7 +56,6 @@ def compare_prompts(
         raise HTTPException(429, err)
 
     llm = get_llm()
-    registry = get_registry()
     builder = ContextBuilder(registry)
 
     classification = classify_task(req.task_input)

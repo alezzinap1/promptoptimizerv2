@@ -19,6 +19,16 @@ export default function Metrics() {
   if (error) return <p className={styles.error}>{error}</p>
   if (!summary) return <p>Загрузка...</p>
 
+  const funnel = [
+    { label: 'Generate', value: Number(summary.generate_requests || 0) },
+    { label: 'Questions', value: Number(summary.generated_questions || 0) },
+    { label: 'Prompts', value: Number(summary.generated_prompts || 0) },
+    { label: 'Saved', value: Number(summary.saved_prompts || 0) },
+  ]
+  const funnelMax = Math.max(...funnel.map((item) => item.value), 1)
+  const eventCounts = Object.entries((summary.event_counts || {}) as Record<string, number>).sort((a, b) => b[1] - a[1])
+  const latencyScore = Math.max(Number(summary.p95_generation_latency_ms || 0), Number(summary.avg_generation_latency_ms || 0), 1)
+
   return (
     <div className={styles.metrics}>
       <h1>Продуктовые метрики</h1>
@@ -38,13 +48,54 @@ export default function Metrics() {
         <div className={styles.card}><strong>Итераций запущено</strong><span>{String(summary.iterations_started ?? 0)}</span></div>
       </div>
 
+      <div className={styles.visualGrid}>
+        <div className={styles.section}>
+          <h2>Session funnel</h2>
+          <div className={styles.funnel}>
+            {funnel.map((item) => (
+              <div key={item.label} className={styles.funnelRow}>
+                <span>{item.label}</span>
+                <div className={styles.funnelBar}>
+                  <div className={styles.funnelFill} style={{ width: `${(item.value / funnelMax) * 100}%` }} />
+                </div>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.section}>
+          <h2>Latency snapshot</h2>
+          <div className={styles.latencyBox}>
+            <div>
+              <span>AVG</span>
+              <div className={styles.latencyMeter}>
+                <div className={styles.latencyAvg} style={{ width: `${(Number(summary.avg_generation_latency_ms || 0) / latencyScore) * 100}%` }} />
+              </div>
+            </div>
+            <div>
+              <span>P95</span>
+              <div className={styles.latencyMeter}>
+                <div className={styles.latencyP95} style={{ width: `${(Number(summary.p95_generation_latency_ms || 0) / latencyScore) * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <details className={styles.section}>
         <summary>События</summary>
-        <ul>
-          {Object.entries((summary.event_counts || {}) as Record<string, number>).map(([name, count]) => (
-            <li key={name}><code>{name}</code>: {count}</li>
+        <div className={styles.eventBars}>
+          {eventCounts.map(([name, count]) => (
+            <div key={name} className={styles.eventBarRow}>
+              <code>{name}</code>
+              <div className={styles.eventBar}>
+                <div className={styles.eventBarFill} style={{ width: `${(count / Math.max(eventCounts[0]?.[1] || 1, 1)) * 100}%` }} />
+              </div>
+              <strong>{count}</strong>
+            </div>
           ))}
-        </ul>
+        </div>
       </details>
 
       <div className={styles.section}>

@@ -9,13 +9,12 @@ from pydantic import BaseModel
 
 from app.abuse import check_input_size, check_rate_limit
 from app.config import BUDGET_GENERATIONS_PER_SESSION
-from backend.deps import get_current_user, get_db, get_session_id
+from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
 from core.context_builder import ContextBuilder
 from core.domain_templates import get_domain_techniques
 from core.parsing import parse_questions, parse_reply
 from core.prompt_spec import build_generation_brief
 from core.quality_metrics import analyze_prompt
-from core.technique_registry import TechniqueRegistry
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -34,11 +33,6 @@ def get_llm() -> LLMClient:
     if not api_key:
         raise HTTPException(500, "OpenRouter API key not set. Use Settings or OPENROUTER_API_KEY env.")
     return LLMClient(api_key)
-
-
-def get_registry() -> TechniqueRegistry:
-    return TechniqueRegistry()
-
 
 class GenerateRequest(BaseModel):
     task_input: str
@@ -92,7 +86,7 @@ def generate_prompt(
     req: GenerateRequest,
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
-    registry: TechniqueRegistry = Depends(get_registry),
+    registry = Depends(get_registry_for_user),
     auth_session_id: str | None = Depends(get_session_id),
 ):
     """Generate prompt. Returns full result (LLM call is blocking)."""
