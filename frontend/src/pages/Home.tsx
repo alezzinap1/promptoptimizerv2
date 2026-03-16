@@ -56,6 +56,7 @@ export default function Home() {
   const [modelsData, setModelsData] = useState<OpenRouterModel[]>([])
 
   useEffect(() => {
+    setError(null)
     Promise.all([api.getSettings(), api.getModels(), api.getDomains(), api.getTechniques(), api.getWorkspaces()])
       .then(([settings, modelsRes, domainsRes, techniquesRes, workspaceRes]) => {
         setModelsData(modelsRes.data)
@@ -70,14 +71,17 @@ export default function Home() {
         setTargetModel((current) => current || settings.preferred_target_models[0] || 'unknown')
         setDomains(domainsRes.domains)
         const items = techniquesRes.techniques.map((item) => ({
-        id: String(item.id),
-        name: String(item.name || item.id),
+          id: String(item.id),
+          name: String(item.name || item.id),
         }))
         setTechniques(items)
         setWorkspaces(workspaceRes.items)
       })
-      .catch(() => {
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Ошибка загрузки данных')
         setWorkspaces([])
+        setDomains([])
+        setTechniques([])
       })
   }, [])
 

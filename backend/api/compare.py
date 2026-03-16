@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.abuse import check_input_size, check_rate_limit
+from config.abuse import check_input_size, check_rate_limit
 from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
 from core.context_builder import ContextBuilder
 from core.parsing import parse_reply

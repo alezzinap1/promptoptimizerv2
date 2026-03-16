@@ -5,13 +5,14 @@ from __future__ import annotations
 
 from fastapi import Depends, Header, HTTPException
 
+from config.settings import DB_PATH
 from core.technique_registry import TechniqueRegistry
 from db.manager import DBManager
 from services.technique_catalog import get_user_registry
 
 
 def get_db() -> DBManager:
-    db = DBManager()
+    db = DBManager(db_path=DB_PATH)
     db.init()
     return db
 
@@ -32,15 +33,6 @@ def get_current_user(
     if not user:
         raise HTTPException(401, "Invalid session")
     return user
-
-
-def get_optional_user(
-    x_session_id: str | None = Header(default=None, alias="X-Session-Id"),
-) -> dict | None:
-    if not x_session_id:
-        return None
-    db = get_db()
-    return db.get_session_user(x_session_id)
 
 
 def get_registry_for_user(

@@ -7,8 +7,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.abuse import check_input_size, check_rate_limit
-from app.config import BUDGET_GENERATIONS_PER_SESSION
+from config.abuse import check_input_size, check_rate_limit
+from config.settings import BUDGET_GENERATIONS_PER_SESSION
 from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
 from core.context_builder import ContextBuilder
 from core.domain_templates import get_domain_techniques
@@ -103,6 +103,8 @@ def generate_prompt(
     workspace = None
     if req.workspace_id:
         workspace = db.get_workspace(req.workspace_id, user_id=int(user["id"]))
+        if not workspace:
+            raise HTTPException(404, f"Workspace {req.workspace_id} not found")
 
     db.log_event(
         event_name="generate_requested",

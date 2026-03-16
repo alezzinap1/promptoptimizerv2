@@ -248,8 +248,6 @@ export const api = {
   generate: (req: GenerateRequest) =>
     fetchApi<GenerateResult>('/generate', { method: 'POST', body: JSON.stringify(req) }),
 
-  getProviders: () => fetchApi<{ providers: string[]; labels: Record<string, string> }>('/providers'),
-  getTargetModels: () => fetchApi<{ models: string[]; labels: Record<string, string> }>('/target-models'),
   getDomains: () => fetchApi<{ domains: { id: string; name: string }[] }>('/domains'),
 
   compare: (req: {
