@@ -1,134 +1,221 @@
 # Prompt Engineer
 
-`Prompt Engineer` — ассистент для проектирования промптов, который не просто отправляет запрос в LLM, а:
+**Prompt Engineer** — веб-приложение для осмысленного проектирования промптов: оно не просто пересылает текст в LLM, а структурирует задачу, подбирает техники из базы знаний, учитывает целевую модель и помогает итерировать результат до сохранения в библиотеку.
 
-- классифицирует задачу;
-- подбирает техники промптинга из собственной базы знаний;
-- учитывает целевую модель, под которую готовится промпт;
-- показывает reasoning по выбору техник;
-- хранит версии и библиотеку удачных промптов.
+**Актуальный продукт:** **FastAPI + React** (SPA). **Streamlit** (`app/`) оставлен как архивный вариант.
 
-**Основной рабочий продукт** — **FastAPI + React** (web-приложение). Streamlit — законсервирован для архивной памяти.
+---
 
-## Эволюция проекта
+## Зачем это нужно
 
-- `v1`: Telegram-бот (архив).
-- `v2`: Streamlit (архив, законсервирован).
-- `v3`: **FastAPI + React** — основной runtime.
+- **Классификация задачи** — тип и сложность влияют на выбор техник.
+- **База техник** — YAML-карточки с паттернами, ограничениями и примерами (`techniques/`).
+- **Целевая модель** — в system prompt подмешиваются подсказки под GPT, Claude, Gemini и др.
+- **Объяснение (reasoning)** — модель генерации описывает, почему выбраны техники.
+- **Режим уточняющих вопросов** — при недостатке контекста сначала `[QUESTIONS]`, затем `[PROMPT]`.
+- **Prompt IDE** — превью структурированной спецификации (цель, формат, ограничения, evidence) до вызова LLM (`/api/prompt-ide/preview`).
+- **Сравнение моделей** — страница Compare прогоняет один сценарий через разные модели генерации.
+- **Версии и библиотека** — история правок по сессии, сохранение удачных промптов в SQLite.
+- **Workspaces** — профили с глоссарием, правилами стиля и сниппетами для контекста.
+- **Метрики и модели** — учёт событий, справочник моделей OpenRouter, лимиты trial при общем ключе хоста.
 
-## Почему это не просто обёртка над API
+Поток в общих чертах: **описать задачу → (опционально) уточнить в IDE → сгенерировать → при необходимости итерировать → сохранить в библиотеку**.
 
-- `knowledge base` техник в YAML;
-- выбор техник привязан к типу задачи и сложности;
-- guidance под конкретные модели;
-- цикл `generate -> inspect -> iterate -> save`;
-- локальная библиотека промптов и история версий.
+---
 
-## Архитектура
+## Интерфейс (скриншоты)
+
+Добавьте файлы в каталог [`docs/screenshots/`](docs/screenshots/) (имена ниже). Пока файлов нет, картинки в GitHub не отобразятся — это нормально.
+
+Рекомендуемая ширина исходника: **920–960 px** по горизонтали (или 2× для чёткости на Retina).
+
+<p align="center">
+  <img src="docs/screenshots/01-home.png" alt="Главная страница: формулировка задачи и генерация" width="920" />
+</p>
+<p align="center"><em>Рис. 1 — Главная: ввод задачи, structured spec и генерация промпта с reasoning.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/02-compare.png" alt="Сравнение ответов нескольких моделей" width="920" />
+</p>
+<p align="center"><em>Рис. 2 — Compare: один запрос, несколько моделей генерации, сопоставление результатов.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/03-library.png" alt="Библиотека сохранённых промптов" width="920" />
+</p>
+<p align="center"><em>Рис. 3 — Библиотека: поиск, теги, сохранённые промпты и метаданные.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/04-techniques.png" alt="Каталог техник промптинга" width="920" />
+</p>
+<p align="center"><em>Рис. 4 — Техники: база знаний и пользовательские переопределения.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/05-settings.png" alt="Настройки, тема и API-ключ" width="920" />
+</p>
+<p align="center"><em>Рис. 5 — Настройки: тема, шрифты, предпочитаемые модели, ключ OpenRouter (опционально).</em></p>
+
+Подсказки по именам файлов — в [`docs/screenshots/README.md`](docs/screenshots/README.md).
+
+---
+
+## Страницы приложения (React)
+
+| Маршрут | Назначение |
+|---------|------------|
+| `/` | Главная: генерация, IDE-превью, ответы на уточняющие вопросы |
+| `/compare` | Сравнение моделей |
+| `/library` | Библиотека промптов |
+| `/techniques` | Список и редактирование техник (в т.ч. кастомные) |
+| `/metrics` | Метрики и события |
+| `/workspaces` | Рабочие профили |
+| `/models` | Модели OpenRouter |
+| `/settings` | Настройки UI и API-ключа |
+| `/user-info` | Информация о пользователе и trial |
+
+Вход по логину/паролю; сессия передаётся заголовком `X-Session-Id` (хранится на клиенте после login/register).
+
+---
+
+## Стек и архитектура
+
+| Слой | Технологии |
+|------|------------|
+| Frontend | React, Vite, TypeScript |
+| Backend | FastAPI, Uvicorn |
+| БД | SQLite (`db/manager.py`), опционально Postgres (скрипты миграции) |
+| LLM | OpenRouter (OpenAI-совместимый API) |
 
 ```text
-user -> React frontend -> FastAPI backend -> core/ + services/ + db/
-                                    -> techniques/ knowledge base
-                                    -> OpenRouter LLM
+user → React (Vite) → FastAPI /api → core/ + services/ + db/
+                              ├── techniques/*.yaml
+                              └── OpenRouter
 ```
+
+Сборка фронта: `frontend/dist` может отдаваться тем же FastAPI (`backend/main.py`) для единого origin в production.
 
 ### Основные директории
 
 ```text
 prompt-engineer-agent/
-├── backend/          # FastAPI API
-├── frontend/         # React SPA
-├── config/           # Общие настройки (app + backend)
-├── core/             # Доменная логика
-├── db/               # SQLite-менеджер
-├── services/         # LLM-клиент, OpenRouter
-├── techniques/       # YAML-база техник
-├── app/              # Streamlit (архив, законсервирован)
-└── docs/             # Исследования и заметки
+├── backend/           # FastAPI, роутеры API
+├── frontend/          # React SPA
+├── config/            # Настройки, rate limit, лимиты
+├── core/              # Классификация, context builder, техники, prompt spec
+├── db/                # SQLite-менеджер
+├── services/          # LLM, auth, шифрование ключей, workflow
+├── techniques/        # YAML-база техник
+├── scripts/           # backup / миграции
+├── docs/              # Скриншоты для README (корневые *.md — локально, см. .gitignore)
+└── app/               # Streamlit (архив)
 ```
 
-## Быстрый старт
+---
 
-### FastAPI + React (рекомендуется)
+## Быстрый старт (разработка)
 
 ```bash
-git clone <repo>
+git clone <repo-url>
 cd prompt-engineer-agent
 
 python -m venv venv
 # Windows: .\venv\Scripts\activate
-# Linux/Mac: source venv/bin/activate
+# Linux/macOS: source venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Заполни `OPENROUTER_API_KEY` в `.env`, затем:
+Укажите в `.env` как минимум **`OPENROUTER_API_KEY`** (общий ключ хоста для trial или разработки). Для публичного сервера задайте **`USER_API_KEY_FERNET_SECRET`** (шифрование пользовательских ключей в БД) — см. таблицу ниже.
 
 **Терминал 1 — backend:**
+
 ```bash
 uvicorn backend.main:app --reload --port 8000
 ```
 
 **Терминал 2 — frontend:**
+
 ```bash
 cd frontend && npm install && npm run dev
 ```
 
-Открой `http://localhost:5173`. Frontend проксирует `/api` на `localhost:8000`.
+Откройте [http://localhost:5173](http://localhost:5173). Запросы к `/api` проксируются на [http://localhost:8000](http://localhost:8000) (см. `frontend/vite.config.ts`).
 
-### Streamlit (архив, законсервирован)
+Зарегистрируйте пользователя через UI или вызовите `/api/auth/register`.
 
-```bash
-streamlit run app/main.py
-```
+---
 
-Открой `http://localhost:8501`. См. `docs/STREAMLIT_ARCHIVE.md` для контекста.
+## Docker (FastAPI + React)
 
-## Docker
-
-Текущий `Dockerfile` ориентирован на Streamlit. Для production FastAPI+React см. `docs/PRODUCTION_PLAN.md`.
+`Dockerfile` собирает фронтенд (Node) и подкладывает `frontend/dist` в образ с Python; контейнер поднимает Uvicorn на порту **8000**.
 
 ```bash
 docker build -t prompt-engineer .
-docker run --rm -p 8501:8501 --env-file .env -v $(pwd)/data:/app/data prompt-engineer
+docker run --rm -p 8000:8000 --env-file .env -v "%cd%/data:/app/data" prompt-engineer
 ```
+
+На Linux/macOS замените том на `-v "$(pwd)/data:/app/data"`. После запуска откройте `http://localhost:8000` (статика SPA + API).
+
+---
 
 ## Health check
 
-**Backend:**
 ```bash
 curl http://localhost:8000/api/health
 ```
 
-**Streamlit health server:**
-```bash
-uvicorn app.health_server:app --host 0.0.0.0 --port 8502
-```
+---
 
 ## Переменные окружения
 
 | Переменная | Описание |
-|---|---|
-| `OPENROUTER_API_KEY` | API-ключ OpenRouter |
+|------------|----------|
+| `OPENROUTER_API_KEY` | Ключ OpenRouter на стороне сервера (trial / дефолт, если у пользователя нет своего ключа) |
+| `USER_API_KEY_FERNET_SECRET` | Ключ Fernet (base64) для шифрования пользовательских OpenRouter-ключей в SQLite; для публичного деплоя задавать обязательно |
 | `DB_PATH` | Путь к SQLite (по умолчанию `data/web_agent.db`) |
 | `APP_ENV` | `dev` \| `demo` \| `prod` |
-| `CORS_ORIGINS` | CORS origins через запятую (для production) |
-| `MAX_INPUT_CHARS` | Лимит символов ввода (50000) |
-| `RATE_LIMIT_REQUESTS` | Запросов в минуту (30) |
-| `BUDGET_GENERATIONS_PER_SESSION` | Лимит генераций в сессии (50) |
-| `LLM_TIMEOUT_SEC` | Таймаут LLM (120) |
-| `SENTRY_DSN` | DSN для Sentry (опционально) |
+| `CORS_ORIGINS` | Origins через запятую (production: ваш HTTPS-URL фронта) |
+| `SESSION_TTL_HOURS` | Срок жизни сессии после login/register (по умолчанию 24) |
+| `AUTH_REGISTER_RATE_LIMIT_REQUESTS` | Лимит регистраций с одного IP за окно |
+| `AUTH_REGISTER_RATE_WINDOW_SEC` | Окно для лимита регистраций (сек) |
+| `AUTH_LOGIN_RATE_LIMIT_REQUESTS` | Лимит попыток входа с одного IP за окно |
+| `AUTH_LOGIN_RATE_WINDOW_SEC` | Окно для лимита входа (сек) |
+| `MAX_INPUT_CHARS` | Макс. длина ввода (по умолчанию 50000) |
+| `RATE_LIMIT_REQUESTS` | Запросов к генерации/compare за окно на ключ сессии/IP |
+| `RATE_LIMIT_WINDOW_SEC` | Окно rate limit генерации (сек) |
+| `BUDGET_GENERATIONS_PER_SESSION` | Макс. генераций на auth-сессию |
+| `TRIAL_TOKENS_LIMIT` | Лимит токенов trial на пользователя при использовании ключа хоста |
+| `TRIAL_MAX_COMPLETION_PER_M` | Порог $/1M для моделей в trial |
+| `LLM_TIMEOUT_SEC` | Таймаут запросов к LLM |
+| `SENTRY_DSN` | Sentry (опционально) |
+| `LOG_LEVEL` | Уровень логирования |
 | `POSTGRES_DSN` | DSN для миграции SQLite → Postgres |
 
-## Storage operations
+Полный шаблон: [`.env.example`](.env.example).
 
-- Backup: `python scripts/backup_sqlite.py --db data/web_agent.db --out backups`
-- Migration: `python scripts/migrate_sqlite_to_postgres.py --sqlite data/web_agent.db --postgres "$POSTGRES_DSN"`
+---
 
-## Добавление новых техник
+## Безопасность и публичный деплой (кратко)
 
-Создай YAML-файл в `techniques/` по шаблону:
+- Сессии **истекают** по времени (`SESSION_TTL_HOURS`); идентификатор передаётся в `X-Session-Id`.
+- Регистрация и вход ограничены **rate limit по IP** (in-memory; при одном воркере за прокси важен корректный `X-Forwarded-For`).
+- Пользовательские ключи OpenRouter в БД хранятся **в зашифрованном виде**, если задан `USER_API_KEY_FERNET_SECRET`.
+- Пароли — **PBKDF2** (см. `services/auth_service.py`).
+
+Это не замена аудиту и HTTPS: в production используйте TLS, сужайте `CORS_ORIGINS`, ограничивайте доступ к хосту и бэкапам БД.
+
+---
+
+## Операции с данными
+
+- Резервная копия SQLite: `python scripts/backup_sqlite.py --db data/web_agent.db --out backups`
+- Миграция в Postgres: `python scripts/migrate_sqlite_to_postgres.py --sqlite data/web_agent.db --postgres "$POSTGRES_DSN"`
+
+---
+
+## Добавление техник
+
+Создайте YAML в `techniques/`:
 
 ```yaml
 id: my_technique
@@ -140,21 +227,44 @@ core_pattern: "Шаблон с {переменными}"
 why_it_works: "Объяснение..."
 ```
 
+---
+
 ## Ключевые файлы
 
-- `backend/main.py` — точка входа FastAPI
-- `frontend/src/pages/Home.tsx` — основной сценарий генерации
-- `core/context_builder.py` — сборка system prompt
-- `core/prompt_spec.py` — структурированная спецификация
-- `core/technique_registry.py` — база и выбор техник
-- `db/manager.py` — версии и библиотека промптов
-- `services/llm_client.py` — OpenRouter
+| Файл | Роль |
+|------|------|
+| `backend/main.py` | FastAPI, CORS, статика `frontend/dist`, роутеры |
+| `backend/deps.py` | Сессия, БД, реестр техник |
+| `backend/api/generate.py` | Генерация промпта |
+| `backend/api/auth.py` | Регистрация, вход, logout |
+| `frontend/src/pages/Home.tsx` | Основной сценарий |
+| `core/context_builder.py` | System/user контент для LLM |
+| `core/prompt_spec.py` | Спецификация и brief |
+| `core/technique_registry.py` | Реестр техник |
+| `db/manager.py` | Пользователи, сессии, библиотека, шифрование полей |
+| `services/llm_client.py` | OpenRouter |
+| `services/api_key_crypto.py` | Fernet для ключей пользователей |
 
-## Документы проекта
+---
 
-- `docs/IMPROVEMENT_PLAN.md` — план дальнейших улучшений
-- `docs/PRODUCTION_PLAN.md` — план перехода в production
-- `docs/STREAMLIT_ARCHIVE.md` — Streamlit законсервирован
-- `docs/METRICS_FRAMEWORK.md` — метрики
-- `docs/PROMPT_IDE_ARCHITECTURE.md` — IDE-слой
-- `docs/PRODUCTION_CHECKLIST.md` — чеклист production
+## Документация в `docs/`
+
+Файлы `docs/*.md` (планы, чеклисты, архивные заметки) **не коммитятся** — они в [`.gitignore`](.gitignore), остаются у вас локально. В репозитории по смыслу держим только то, что нужно всем клонам (например, [`docs/screenshots/README.md`](docs/screenshots/README.md) для скриншотов).
+
+---
+
+## Streamlit (архив)
+
+```bash
+streamlit run app/main.py
+```
+
+Подробности — в локальном `docs/STREAMLIT_ARCHIVE.md`, если вы ведёте копию у себя.
+
+Опциональный health-сервер Streamlit: `uvicorn app.health_server:app --host 0.0.0.0 --port 8502`.
+
+---
+
+## Что игнорируется Git
+
+В [`.gitignore`](.gitignore) в том числе: `.env`, `venv`, `node_modules`, `data/`, **`docs/*.md`** (внутренние заметки в корне `docs/`), офисные форматы (`*.pdf`, `*.docx`, …), папка `documents/`, вложения такого типа под `docs/**`, служебные `.cursor/`, `*.log`. Скриншоты для README — **`docs/screenshots/*.png`** и **`docs/screenshots/README.md`** (не подпадают под `docs/*.md`); закоммитьте PNG, когда будут готовы.

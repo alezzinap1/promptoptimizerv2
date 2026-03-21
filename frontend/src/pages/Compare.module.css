@@ -32,10 +32,20 @@
 .textarea {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
+}
+
+.field select:focus,
+.field textarea:focus,
+.field input:focus,
+.multi:focus,
+.textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.2);
+  outline: none;
 }
 
 .radioRow {
@@ -49,11 +59,11 @@
 
 .primaryBtn {
   padding: 12px 24px;
-  background: var(--primary);
-  color: white;
+  background: linear-gradient(130deg, var(--primary-strong), var(--accent));
+  color: #041016;
   border: none;
-  border-radius: 8px;
-  font-weight: 600;
+  border-radius: 12px;
+  font-weight: 700;
   margin-bottom: 24px;
 }
 

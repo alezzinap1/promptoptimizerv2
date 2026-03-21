@@ -12,9 +12,13 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from statistics import mean
+
+from config.settings import SESSION_TTL_SEC
+from services.api_key_crypto import decrypt_stored_user_api_key, encrypt_user_api_key_for_storage
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +165,8 @@ class DBManager:
                 );
             """)
             self._migrate_phase2(conn)
+            self._migrate_phase3(conn)
+            self._migrate_phase4_sessions_ttl(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -170,6 +176,39 @@ class DBManager:
         self._safe_add_column(conn, "app_events", "user_id", "INTEGER")
         self._safe_add_column(conn, "workspaces", "user_id", "INTEGER")
         self._safe_add_column(conn, "prompt_specs", "user_id", "INTEGER")
+
+    def _migrate_phase3(self, conn: sqlite3.Connection) -> None:
+        """Trial/usage: user API key, user_usage table."""
+        self._safe_add_column(conn, "user_preferences", "openrouter_api_key", "TEXT DEFAULT ''")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_usage (
+                user_id         INTEGER PRIMARY KEY,
+                tokens_used     INTEGER DEFAULT 0,
+                dollars_used    REAL DEFAULT 0,
+                updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+
+    def _migrate_phase4_sessions_ttl(self, conn: sqlite3.Connection) -> None:
+        """Session expiry (Unix seconds). Backfill and drop stale rows."""
+        self._safe_add_column(conn, "user_sessions", "expires_at", "INTEGER")
+        now_sec = int(time.time())
+        conn.execute(
+            """
+            UPDATE user_sessions
+            SET expires_at = ? + ?
+            WHERE expires_at IS NULL
+            """,
+            (now_sec, SESSION_TTL_SEC),
+        )
+        conn.execute(
+            """
+            DELETE FROM user_sessions
+            WHERE expires_at IS NOT NULL AND expires_at < ?
+            """,
+            (now_sec,),
+        )
 
     def _safe_add_column(
         self,
@@ -212,29 +251,34 @@ class DBManager:
         return dict(row) if row else None
 
     def bind_session_to_user(self, session_id: str, user_id: int) -> None:
-        """Bind Streamlit session_id to authenticated user."""
+        """Bind session_id to user. Session expires after SESSION_TTL_SEC from bind/login."""
+        expires_at = int(time.time()) + SESSION_TTL_SEC
         with self._conn() as conn:
             conn.execute(
                 """
-                INSERT INTO user_sessions (session_id, user_id, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO user_sessions (session_id, user_id, updated_at, expires_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP, ?)
                 ON CONFLICT(session_id) DO UPDATE SET
                     user_id = excluded.user_id,
-                    updated_at = CURRENT_TIMESTAMP
+                    updated_at = CURRENT_TIMESTAMP,
+                    expires_at = excluded.expires_at
                 """,
-                (session_id, user_id),
+                (session_id, user_id, expires_at),
             )
 
     def get_session_user(self, session_id: str) -> dict | None:
-        """Resolve currently bound user for a session_id."""
+        """Resolve user for session_id if session exists and is not expired."""
+        now_sec = int(time.time())
         with self._conn() as conn:
             row = conn.execute(
                 """
                 SELECT u.* FROM user_sessions s
                 JOIN users u ON u.id = s.user_id
                 WHERE s.session_id = ?
+                  AND s.expires_at IS NOT NULL
+                  AND s.expires_at > ?
                 """,
-                (session_id,),
+                (session_id, now_sec),
             ).fetchone()
         return dict(row) if row else None
 
@@ -312,6 +356,70 @@ class DBManager:
                 ),
             )
         return self.get_user_preferences(user_id)
+
+    def get_user_openrouter_api_key(self, user_id: int) -> str:
+        """Get user's OpenRouter API key. Empty if not set."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT openrouter_api_key FROM user_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return ""
+        data = dict(row)
+        raw = str(data.get("openrouter_api_key") or "").strip()
+        return decrypt_stored_user_api_key(raw)
+
+    def set_user_openrouter_api_key(self, user_id: int, api_key: str) -> None:
+        """Set or clear user's OpenRouter API key (encrypted at rest when Fernet secret is set)."""
+        key = (api_key or "").strip()
+        stored = encrypt_user_api_key_for_storage(key)
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE user_preferences SET openrouter_api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                (stored, user_id),
+            )
+            if cur.rowcount == 0:
+                conn.execute(
+                    """
+                    INSERT INTO user_preferences (user_id, theme, font, gen_models_json, target_models_json, openrouter_api_key, updated_at)
+                    VALUES (?, 'slate', 'jetbrains', '[]', '["unknown"]', ?, CURRENT_TIMESTAMP)
+                    """,
+                    (user_id, stored),
+                )
+
+    def get_user_usage(self, user_id: int) -> dict:
+        """Get user's token and dollar usage."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT tokens_used, dollars_used, updated_at FROM user_usage WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return {"tokens_used": 0, "dollars_used": 0.0, "updated_at": None}
+        data = dict(row)
+        return {
+            "tokens_used": int(data.get("tokens_used") or 0),
+            "dollars_used": float(data.get("dollars_used") or 0),
+            "updated_at": data.get("updated_at"),
+        }
+
+    def add_user_usage(
+        self, user_id: int, tokens_delta: int, dollars_delta: float
+    ) -> None:
+        """Add usage. Creates row if not exists."""
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_usage (user_id, tokens_used, dollars_used, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    tokens_used = tokens_used + excluded.tokens_used,
+                    dollars_used = dollars_used + excluded.dollars_used,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, tokens_delta, dollars_delta),
+            )
 
     def list_user_techniques(self, user_id: int) -> list[dict]:
         with self._conn() as conn:

@@ -16,3 +16,33 @@ build/
 *.egg-info/
 node_modules/
 frontend/dist/
+
+# Cursor / локальные логи
+.cursor/
+*.log
+
+# Локальная папка с документами (черновики, экспорт)
+documents/
+
+# Офисные и прочие бинарные документы (не коммитить в репозиторий)
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.odt
+*.rtf
+
+# Те же типы внутри docs/ (исследования в PDF/DOCX остаются локально)
+docs/**/*.pdf
+docs/**/*.docx
+docs/**/*.doc
+
+# Markdown-заметки в корне docs/ (остаются только локально; не docs/screenshots/*.md)
+docs/*.md
+
+# ОС
+.DS_Store
+Thumbs.db

@@ -75,8 +75,8 @@ export default function Settings() {
       <section className={styles.section}>
         <h2>OpenRouter API</h2>
         <p className={styles.info}>
-          Укажите свой API ключ OpenRouter для генерации промптов. Ключ хранится локально на сервере.
-          Альтернатива: переменная окружения <code>OPENROUTER_API_KEY</code> в <code>.env</code>.
+          Ваш персональный API ключ OpenRouter. Без ключа доступен пробный режим (50 000 токенов, модели ≤$1/1M).
+          Ключ хранится на сервере и привязан к вашему аккаунту.
         </p>
         {settings?.openrouter_api_key_set && (
           <p className={styles.masked}>

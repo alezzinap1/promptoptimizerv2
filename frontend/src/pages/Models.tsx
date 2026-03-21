@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api, type OpenRouterModel, type Settings } from '../api/client'
 import styles from './Models.module.css'
 
@@ -30,6 +31,8 @@ export default function Models() {
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
+  const [trialMode, setTrialMode] = useState(false)
+
   const load = async (forceRefresh = false) => {
     if (forceRefresh) setRefreshing(true)
     else setLoading(true)
@@ -39,6 +42,7 @@ export default function Models() {
       setModels(res.data)
       setSettings(settingsRes)
       setMeta({ updated_at: res.updated_at, from_cache: res.from_cache })
+      setTrialMode(res.trial_mode ?? false)
       if (res.error) setError(res.error)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки')
@@ -128,6 +132,13 @@ export default function Models() {
       <p className={styles.subtitle}>
         Список моделей с ценами за токены. Данные обновляются раз в сутки.
       </p>
+
+      {trialMode && (
+        <div className={styles.trialBanner}>
+          <strong>Пробный режим:</strong> доступны только модели с выходом ≤$1/1M токенов. Лимит 50 000 пробных токенов на пользователя.
+          Введите свой API ключ OpenRouter в <Link to="/settings">Настройках</Link> для доступа ко всем моделям.
+        </div>
+      )}
 
       <div className={styles.toolbar}>
         <input

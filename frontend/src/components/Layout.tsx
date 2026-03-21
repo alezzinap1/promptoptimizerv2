@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/metrics', label: 'Метрики' },
   { to: '/workspaces', label: 'Workspaces' },
   { to: '/models', label: 'Модели' },
+  { to: '/user-info', label: 'User Info' },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {

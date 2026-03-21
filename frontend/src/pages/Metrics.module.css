@@ -2,67 +2,85 @@
   max-width: 1200px;
 }
 
+.title {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+
 .caption {
   opacity: 0.8;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
 }
 
 .card,
 .section,
 .eventCard {
   background: var(--secondary);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .card {
-  padding: 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+}
+
+.card strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .card span {
-  font-size: 1.4rem;
+  font-size: 1.15rem;
   font-weight: 600;
 }
 
 .section {
-  padding: 16px;
-  margin-top: 20px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.section h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
 }
 
 .visualGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .funnel,
 .eventBars,
 .latencyBox {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .funnelRow,
 .eventBarRow {
   display: grid;
-  grid-template-columns: 110px 1fr 56px;
-  gap: 12px;
+  grid-template-columns: 80px 1fr 44px;
+  gap: 8px;
   align-items: center;
+  font-size: 0.88rem;
 }
 
 .funnelBar,
 .eventBar,
 .latencyMeter {
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -88,16 +106,29 @@
 
 .eventList {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .eventCard {
-  padding: 14px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+
+.eventCard strong {
+  font-size: 0.88rem;
+}
+
+.eventCard p {
+  margin: 4px 0;
+  font-size: 0.8rem;
+  opacity: 0.85;
 }
 
 .eventCard pre {
   white-space: pre-wrap;
   overflow: hidden;
+  font-size: 0.78rem;
+  margin: 6px 0 0;
 }
 
 .error {

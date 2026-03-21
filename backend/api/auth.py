@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import sqlite3
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
+from config.abuse import check_auth_login_rate_limit, check_auth_register_rate_limit
 from db.manager import DBManager
 from services.auth_service import generate_session_id, hash_password, normalize_username, verify_password
 
@@ -38,7 +39,10 @@ def _auth_response(user: dict, session_id: str) -> dict:
 
 
 @router.post("/auth/register")
-def register(req: AuthRequest, db: DBManager = Depends(get_db)):
+def register(req: AuthRequest, request: Request, db: DBManager = Depends(get_db)):
+    ok, err = check_auth_register_rate_limit(request)
+    if not ok:
+        raise HTTPException(429, err)
     username, password = _validate_credentials(req.username, req.password)
     try:
         user_id = db.create_user(username, hash_password(password))
@@ -53,7 +57,10 @@ def register(req: AuthRequest, db: DBManager = Depends(get_db)):
 
 
 @router.post("/auth/login")
-def login(req: AuthRequest, db: DBManager = Depends(get_db)):
+def login(req: AuthRequest, request: Request, db: DBManager = Depends(get_db)):
+    ok, err = check_auth_login_rate_limit(request)
+    if not ok:
+        raise HTTPException(429, err)
     username = normalize_username(req.username)
     user = db.get_user_by_username(username)
     if not user or not verify_password(req.password, user.get("password_hash", "")):

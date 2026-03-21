@@ -31,7 +31,7 @@ export default function Metrics() {
 
   return (
     <div className={styles.metrics}>
-      <h1>Продуктовые метрики</h1>
+      <h1 className={styles.title}>Продуктовые метрики</h1>
       <p className={styles.caption}>Локальная телеметрия usage и outcome сигналов для web-версии.</p>
 
       <div className={styles.grid}>

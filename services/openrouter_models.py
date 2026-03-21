@@ -104,3 +104,24 @@ def get_models(force_refresh: bool = False) -> dict:
             except (json.JSONDecodeError, OSError):
                 pass
         return {"data": [], "updated_at": 0, "from_cache": False, "error": str(e)}
+
+
+def get_model_pricing(model_id: str) -> tuple[float, float]:
+    """
+    Get pricing per token for a model. Returns (prompt_price, completion_price).
+    Prices are in $ per token (OpenRouter format).
+    """
+    models_data = get_models().get("data", [])
+    for m in models_data:
+        if m.get("id") == model_id:
+            p = m.get("pricing") or {}
+            prompt = p.get("prompt") or p.get("input") or 0
+            completion = p.get("completion") or p.get("output") or 0
+            return (float(prompt) if prompt else 0.0, float(completion) if completion else 0.0)
+    return (0.0, 0.0)
+
+
+def completion_price_per_m(model_id: str) -> float:
+    """Get completion price in $ per 1M tokens. For trial filter."""
+    _, comp = get_model_pricing(model_id)
+    return comp * 1_000_000 if comp else 0.0

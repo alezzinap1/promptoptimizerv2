@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from cryptography.fernet import Fernet
 
 from db.manager import DBManager
+from services.api_key_crypto import decrypt_stored_user_api_key, encrypt_user_api_key_for_storage
 
 
 class DBManagerTests(unittest.TestCase):
@@ -97,6 +103,28 @@ class DBManagerTests(unittest.TestCase):
 
             db.clear_session_binding("s-1")
             self.assertIsNone(db.get_session_user("s-1"))
+
+    def test_session_rejected_when_expired(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = DBManager(str(db_path))
+            db.init()
+            user_id = db.create_user("bob", "hash")
+            db.bind_session_to_user("s-exp", user_id)
+            with db._conn() as conn:
+                conn.execute(
+                    "UPDATE user_sessions SET expires_at = ? WHERE session_id = ?",
+                    (int(time.time()) - 60, "s-exp"),
+                )
+            self.assertIsNone(db.get_session_user("s-exp"))
+
+    def test_openrouter_key_fernet_roundtrip(self) -> None:
+        secret = Fernet.generate_key().decode()
+        with patch.dict(os.environ, {"USER_API_KEY_FERNET_SECRET": secret}):
+            raw = "sk-or-v1-demo-key-abcdef"
+            stored = encrypt_user_api_key_for_storage(raw)
+            self.assertTrue(stored.startswith("enc:v1:"))
+            self.assertEqual(decrypt_stored_user_api_key(stored), raw)
 
     def test_multitenancy_isolation_for_library_and_workspaces(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

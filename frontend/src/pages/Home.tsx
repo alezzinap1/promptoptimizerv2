@@ -36,6 +36,7 @@ export default function Home() {
   const [questionsMode, setQuestionsMode] = useState(true)
   const [workspaceId, setWorkspaceId] = useState<number>(Number(localStorage.getItem(ACTIVE_WORKSPACE_KEY) || 0))
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showGenSettings, setShowGenSettings] = useState(true)
   const [preview, setPreview] = useState<PromptIdePreviewResponse | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [versions, setVersions] = useState<Record<string, unknown>[]>([])
@@ -54,6 +55,7 @@ export default function Home() {
   const [ideTab, setIdeTab] = useState<'spec' | 'intent' | 'issues' | 'evidence'>('spec')
   const [showIdeModal, setShowIdeModal] = useState(false)
   const [modelsData, setModelsData] = useState<OpenRouterModel[]>([])
+  const [focusMode, setFocusMode] = useState(false)
 
   useEffect(() => {
     setError(null)
@@ -256,22 +258,42 @@ export default function Home() {
     : null
   const previewEvidenceCount = Object.keys(preview?.evidence || {}).length
   const previewIntentCount = preview?.intent_graph?.length || 0
+  const tokenEstimate = Number(result?.metrics?.token_estimate ?? 0)
+  const stage = result?.has_prompt ? 3 : preview ? 2 : 1
+
+  const hintChips = [
+    'Начни с цели и конечного формата',
+    'Укажи аудиторию или канал',
+    'Добавь ограничения и стиль, если важны',
+    'Дай пример входа/выхода для точности',
+  ]
 
   return (
     <div className={styles.home}>
-      <h1>Prompt Engineer</h1>
+      {loading && (
+        <div className={styles.loadingBar}>
+          <div className={styles.loadingBarGradient} />
+          <span className={styles.loadingBarText}>
+            {iterationMode ? 'Обновляю промпт...' : 'Генерирую промпт...'}
+          </span>
+        </div>
+      )}
 
-      <div className={styles.mainGrid}>
-        <div className={styles.columnStack}>
-          <section className={styles.panel}>
+      
+      <section className={`${styles.panel} ${styles.settingsPanel}`}>
             <div className={styles.panelHeader}>
               <h2>Генерация</h2>
-              <button className={styles.secondaryBtn} type="button" onClick={() => setShowAdvanced(!showAdvanced)}>
-                {showAdvanced ? 'Скрыть' : 'Доп. параметры'}
+              <button className={styles.secondaryBtn} type="button" onClick={() => setShowGenSettings((v) => !v)}>
+                {showGenSettings ? 'Свернуть' : 'Развернуть'}
+              </button>
+              <button className={styles.focusToggle} type="button" onClick={() => setFocusMode((v) => !v)}>
+                {focusMode ? 'Показать IDE и результат' : 'Режим фокуса'}
               </button>
             </div>
 
-            <div className={styles.compactControls}>
+            {showGenSettings && (
+              <>
+                <div className={styles.compactControls}>
               <div className={styles.field}>
                 <label>Модель генерации</label>
                 <select value={genModel} onChange={(e) => setGenModel(e.target.value)}>
@@ -328,10 +350,16 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            </div>
+              <div className={styles.field}>
+                <label>&nbsp;</label>
+                <button className={styles.secondaryBtn} type="button" onClick={() => setShowAdvanced(!showAdvanced)}>
+                  {showAdvanced ? 'Скрыть доп.' : 'Доп. параметры'}
+                </button>
+              </div>
+                </div>
 
-            {showAdvanced && (
-              <div className={styles.advancedGrid}>
+                {showAdvanced && (
+                  <div className={styles.advancedGrid}>
                 <div className={styles.field}>
                   <label>Температура: {temperature}</label>
                   <input type="range" min={0.1} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
@@ -348,9 +376,21 @@ export default function Home() {
                   <input type="checkbox" checked={questionsMode} onChange={(e) => setQuestionsMode(e.target.checked)} />
                   <span>Уточняющие вопросы</span>
                 </label>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
+
+      <div className={styles.stepper}>
+        <div className={`${styles.step} ${stage >= 1 ? styles.done : ''} ${stage === 1 ? styles.active : ''}`}>Brief</div>
+        <div className={`${styles.step} ${stage >= 2 ? styles.done : ''} ${stage === 2 ? styles.active : ''}`}>Spec / IDE</div>
+        <div className={`${styles.step} ${stage >= 3 ? styles.done : ''} ${stage === 3 ? styles.active : ''}`}>Prompt</div>
+      </div>
+
+      <div className={styles.mainGrid}>
+        <div className={styles.columnStack} style={focusMode ? { gridColumn: 'span 12' } : undefined}>
+          
 
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
@@ -367,16 +407,18 @@ export default function Home() {
               />
             </>
           ) : (
-            <>
               <textarea
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
-                placeholder="Примеры:&#10;• Нужен промпт для анализа финансовых отчётов в JSON формате&#10;• Улучши этот промпт: [вставь свой промпт]"
-                rows={16}
+                placeholder={hintChips.join('\n')}
+                rows={12}
               />
-            </>
           )}
             <div className={styles.primaryRow}>
+              <div className={styles.tokenBadge}>
+                <span>Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}</span>
+                {promptCostStr && <span>{promptCostStr}</span>}
+              </div>
               <button
                 className={styles.primaryBtn}
                 onClick={() => handleGenerate()}
@@ -389,6 +431,7 @@ export default function Home() {
           </section>
         </div>
 
+        {!focusMode && (
         <section className={`${styles.panel} ${styles.ideColumn}`}>
           {preview ? (
             <div className={styles.ideBox}>
@@ -518,7 +561,9 @@ export default function Home() {
             </div>
           )}
         </section>
+        )}
 
+        {!focusMode && (
         <section className={`${styles.panel} ${styles.resultColumn}`}>
           <h2>Результат</h2>
           {error && <p className={styles.error}>{error}</p>}
@@ -721,6 +766,7 @@ export default function Home() {
             </div>
           )}
         </section>
+        )}
       </div>
     </div>
   )

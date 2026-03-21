@@ -25,10 +25,16 @@
   padding: 10px 16px;
   width: 100%;
   max-width: 400px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
+}
+
+.search:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.2);
+  outline: none;
 }
 
 .empty {
@@ -91,14 +97,14 @@
 .editBox input,
 .editBox textarea {
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  background: var(--bg);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
 }
 
 .exportBtn {
-  background: var(--secondary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .editBox {

@@ -10,9 +10,12 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
+FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
@@ -31,6 +34,7 @@ from backend.api import (
     sessions,
     settings,
     techniques,
+    user_info,
     workspaces,
 )
 
@@ -51,6 +55,7 @@ app.add_middleware(
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
+app.include_router(user_info.router, prefix="/api", tags=["user-info"])
 app.include_router(models.router, prefix="/api", tags=["models"])
 app.include_router(workspaces.router, prefix="/api", tags=["workspaces"])
 app.include_router(metrics.router, prefix="/api", tags=["metrics"])
@@ -65,3 +70,14 @@ app.include_router(techniques.router, prefix="/api", tags=["techniques"])
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{path:path}")
+    def serve_spa(path: str):
+        file_path = FRONTEND_DIST / path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_DIST / "index.html")

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from config.abuse import check_input_size, check_rate_limit
+from config.settings import TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
 from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
 from core.context_builder import ContextBuilder
 from core.parsing import parse_reply
@@ -12,16 +13,16 @@ from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import LLMClient, DEFAULT_PROVIDER
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.openrouter_models import get_model_pricing, completion_price_per_m
 
 router = APIRouter()
 
 
-def get_llm() -> LLMClient:
-    api_key = resolve_openrouter_api_key()
-    if not api_key:
-        raise HTTPException(500, "OpenRouter API key not set. Use Settings or OPENROUTER_API_KEY env.")
-    return LLMClient(api_key)
+def _get_openrouter_model_id(provider: str) -> str:
+    if provider in PROVIDER_MODELS:
+        return PROVIDER_MODELS[provider]
+    return provider if "/" in provider else provider
 
 def _score(metrics: dict) -> float:
     return float(metrics.get("completeness_score", metrics.get("quality_score", 0.0)))
@@ -55,7 +56,21 @@ def compare_prompts(
     if not ok:
         raise HTTPException(429, err)
 
-    llm = get_llm()
+    user_id = int(user["id"])
+    user_key = db.get_user_openrouter_api_key(user_id)
+    api_key = resolve_openrouter_api_key(user_key)
+    if not api_key:
+        raise HTTPException(500, "OpenRouter API key not set. Введите свой ключ в Настройках.")
+    using_host_key = not bool(user_key)
+    if using_host_key:
+        usage = db.get_user_usage(user_id)
+        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+            raise HTTPException(402, f"Пробный лимит ({TRIAL_TOKENS_LIMIT:,} токенов) исчерпан. Введите свой API ключ в Настройках.")
+        model_id = _get_openrouter_model_id(req.gen_model)
+        if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
+            raise HTTPException(403, f"Модель недоступна в пробном режиме. Введите свой API ключ в Настройках.")
+
+    llm = LLMClient(api_key)
     builder = ContextBuilder(registry)
 
     classification = classify_task(req.task_input)
@@ -107,6 +122,15 @@ def compare_prompts(
     score_b = _score(metrics_b)
     winner = "a" if score_a > score_b else "b" if score_b > score_a else "tie"
 
+    if using_host_key:
+        model_id = _get_openrouter_model_id(req.gen_model)
+        prompt_price, comp_price = get_model_pricing(model_id)
+        input_len = len(system_a) + len(system_b) + 2 * len(user_content)
+        output_len = len(result_a_text) + len(result_b_text)
+        total_tokens = input_len // 4 + output_len // 4
+        cost = (input_len // 4) * prompt_price + (output_len // 4) * comp_price
+        db.add_user_usage(user_id, total_tokens, cost)
+
     db.log_event(
         event_name="compare_run",
         session_id=auth_session_id or "",
@@ -118,7 +142,7 @@ def compare_prompts(
             "score_a": score_a,
             "score_b": score_b,
         },
-        user_id=int(user["id"]),
+        user_id=user_id,
     )
 
     return {

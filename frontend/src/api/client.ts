@@ -285,8 +285,19 @@ export const api = {
 
   getModels: (refresh?: boolean) => {
     const q = refresh ? '?refresh=true' : ''
-    return fetchApi<{ data: OpenRouterModel[]; updated_at: number; from_cache: boolean; stale?: boolean; error?: string }>(`/models${q}`)
+    return fetchApi<{ data: OpenRouterModel[]; updated_at: number; from_cache: boolean; trial_mode?: boolean; stale?: boolean; error?: string }>(`/models${q}`)
   },
+
+  getUserInfo: () =>
+    fetchApi<{
+      tokens_used: number
+      dollars_used: number
+      has_own_api_key: boolean
+      trial_tokens_limit: number
+      trial_tokens_remaining: number | null
+      trial_max_completion_per_m: number
+      service_info: { title: string; description: string; features: string[] }
+    }>('/user-info'),
 
   getSessionVersions: (sessionId: string) =>
     fetchApi<{ items: Record<string, unknown>[] }>(`/sessions/${sessionId}/versions`),

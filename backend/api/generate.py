@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from config.abuse import check_input_size, check_rate_limit
-from config.settings import BUDGET_GENERATIONS_PER_SESSION
+from config.settings import BUDGET_GENERATIONS_PER_SESSION, TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
 from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
 from core.context_builder import ContextBuilder
 from core.domain_templates import get_domain_techniques
@@ -18,7 +18,8 @@ from core.quality_metrics import analyze_prompt
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import LLMClient, DEFAULT_PROVIDER
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.openrouter_models import get_model_pricing, completion_price_per_m
 from services.prompt_workflow import (
     apply_evidence_decisions,
     build_preview_payload,
@@ -26,13 +27,6 @@ from services.prompt_workflow import (
 )
 
 router = APIRouter()
-
-
-def get_llm() -> LLMClient:
-    api_key = resolve_openrouter_api_key()
-    if not api_key:
-        raise HTTPException(500, "OpenRouter API key not set. Use Settings or OPENROUTER_API_KEY env.")
-    return LLMClient(api_key)
 
 class GenerateRequest(BaseModel):
     task_input: str
@@ -81,6 +75,15 @@ def _build_answers_text(question_answers: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _get_openrouter_model_id(provider: str) -> str:
+    """Resolve provider short name to OpenRouter model id."""
+    if provider in PROVIDER_MODELS:
+        return PROVIDER_MODELS[provider]
+    if "/" in provider:
+        return provider
+    return provider
+
+
 @router.post("/generate")
 def generate_prompt(
     req: GenerateRequest,
@@ -98,7 +101,33 @@ def generate_prompt(
         raise HTTPException(429, err)
     _check_session_budget(db, int(user["id"]), auth_session_id)
 
-    llm = get_llm()
+    user_id = int(user["id"])
+    user_key = db.get_user_openrouter_api_key(user_id)
+    api_key = resolve_openrouter_api_key(user_key)
+    if not api_key:
+        raise HTTPException(
+            500,
+            "OpenRouter API key not set. Введите свой ключ в Настройках или настройте OPENROUTER_API_KEY на сервере.",
+        )
+
+    using_host_key = not bool(user_key)
+    if using_host_key:
+        usage = db.get_user_usage(user_id)
+        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+            raise HTTPException(
+                402,
+                f"Пробный лимит ({TRIAL_TOKENS_LIMIT:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках для продолжения.",
+            )
+        model_id = _get_openrouter_model_id(req.gen_model)
+        comp_per_m = completion_price_per_m(model_id)
+        if comp_per_m > TRIAL_MAX_COMPLETION_PER_M:
+            raise HTTPException(
+                403,
+                f"Модель {req.gen_model} недоступна в пробном режиме (выход >${TRIAL_MAX_COMPLETION_PER_M}/1M). "
+                "Введите свой API ключ в Настройках для доступа ко всем моделям.",
+            )
+
+    llm = LLMClient(api_key)
     session_id = req.session_id or str(uuid.uuid4())
     workspace = None
     if req.workspace_id:
@@ -200,6 +229,15 @@ def generate_prompt(
     metrics = analyze_prompt(parsed.get("prompt_block", "")) if parsed.get("has_prompt") else {}
     latency_ms = round((time.perf_counter() - started_at) * 1000, 1)
     outcome = "prompt" if parsed.get("has_prompt") else "questions" if parsed.get("has_questions") else "raw_text"
+
+    if using_host_key:
+        prompt_tokens = int(metrics.get("token_estimate", 0) or 0)
+        completion_tokens = max(0, len(full_text) // 4)
+        total_tokens = prompt_tokens + completion_tokens
+        model_id = _get_openrouter_model_id(req.gen_model)
+        prompt_price, comp_price = get_model_pricing(model_id)
+        cost = (prompt_tokens * prompt_price) + (completion_tokens * comp_price)
+        db.add_user_usage(user_id, total_tokens, cost)
 
     db.log_event(
         "generation_result",

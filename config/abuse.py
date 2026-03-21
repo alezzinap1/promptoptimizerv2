@@ -8,7 +8,13 @@ import time
 from collections import deque
 from threading import Lock
 
+from fastapi import Request
+
 from config.settings import (
+    AUTH_LOGIN_RATE_LIMIT_REQUESTS,
+    AUTH_LOGIN_RATE_WINDOW_SEC,
+    AUTH_REGISTER_RATE_LIMIT_REQUESTS,
+    AUTH_REGISTER_RATE_WINDOW_SEC,
     BUDGET_GENERATIONS_PER_SESSION,
     MAX_INPUT_CHARS,
     RATE_LIMIT_REQUESTS,
@@ -52,6 +58,33 @@ class RateLimiter:
 
 
 _rate_limiter = RateLimiter()
+
+_auth_register_limiter = RateLimiter(
+    max_requests=AUTH_REGISTER_RATE_LIMIT_REQUESTS,
+    window_sec=float(AUTH_REGISTER_RATE_WINDOW_SEC),
+)
+_auth_login_limiter = RateLimiter(
+    max_requests=AUTH_LOGIN_RATE_LIMIT_REQUESTS,
+    window_sec=float(AUTH_LOGIN_RATE_WINDOW_SEC),
+)
+
+
+def client_ip(request: Request) -> str:
+    """Client IP for rate limiting. Prefer X-Forwarded-For when behind one proxy."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip() or "unknown"
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def check_auth_register_rate_limit(request: Request) -> tuple[bool, str]:
+    return _auth_register_limiter.allow(f"auth_reg:{client_ip(request)}")
+
+
+def check_auth_login_rate_limit(request: Request) -> tuple[bool, str]:
+    return _auth_login_limiter.allow(f"auth_login:{client_ip(request)}")
 
 
 def check_rate_limit(session_id: str) -> tuple[bool, str]:

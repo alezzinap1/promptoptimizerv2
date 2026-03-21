@@ -18,12 +18,25 @@ ROOT = Path(__file__).parent.parent
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "50000"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW_SEC = int(os.getenv("RATE_LIMIT_WINDOW_SEC", "60"))
+# Auth endpoints (per client IP; in-memory — one process)
+AUTH_REGISTER_RATE_LIMIT_REQUESTS = int(os.getenv("AUTH_REGISTER_RATE_LIMIT_REQUESTS", "5"))
+AUTH_REGISTER_RATE_WINDOW_SEC = int(os.getenv("AUTH_REGISTER_RATE_WINDOW_SEC", "3600"))
+AUTH_LOGIN_RATE_LIMIT_REQUESTS = int(os.getenv("AUTH_LOGIN_RATE_LIMIT_REQUESTS", "25"))
+AUTH_LOGIN_RATE_WINDOW_SEC = int(os.getenv("AUTH_LOGIN_RATE_WINDOW_SEC", "60"))
 BUDGET_GENERATIONS_PER_SESSION = int(os.getenv("BUDGET_GENERATIONS_PER_SESSION", "50"))
 LLM_TIMEOUT_SEC = int(os.getenv("LLM_TIMEOUT_SEC", "120"))
 MAX_ITERATION_CYCLES = int(os.getenv("MAX_ITERATION_CYCLES", "10"))
 
 # ── Paths ────────────────────────────────────────────────────
 DB_PATH = os.getenv("DB_PATH", str(ROOT / "data" / "web_agent.db"))
+
+# ── Sessions ─────────────────────────────────────────────────
+SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
+SESSION_TTL_SEC = max(3600, SESSION_TTL_HOURS * 3600)  # minimum 1 hour
+
+# ── Trial (host key) ─────────────────────────────────────────
+TRIAL_TOKENS_LIMIT = int(os.getenv("TRIAL_TOKENS_LIMIT", "50000"))
+TRIAL_MAX_COMPLETION_PER_M = float(os.getenv("TRIAL_MAX_COMPLETION_PER_M", "1.0"))  # $/1M tokens
 
 # ── Observability ────────────────────────────────────────────
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")

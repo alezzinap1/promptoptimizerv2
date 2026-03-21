@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
 from db.manager import DBManager
-from services.settings import get_settings_for_api, get_openrouter_api_key, set_openrouter_api_key
 from services.user_preferences import update_user_preferences_payload, get_user_preferences_payload
 
 router = APIRouter()
@@ -17,11 +16,8 @@ def get_settings(
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
 ):
-    """Return current settings (masked)."""
-    return {
-        **get_settings_for_api(),
-        **get_user_preferences_payload(db, int(user["id"])),
-    }
+    """Return current settings (masked). Per-user API key."""
+    return get_user_preferences_payload(db, int(user["id"]))
 
 
 class SettingsUpdate(BaseModel):
@@ -38,9 +34,9 @@ def update_settings(
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
 ):
-    """Update settings. Pass openrouter_api_key to set/clear (empty string to clear)."""
+    """Update settings. openrouter_api_key is per-user."""
     if req.openrouter_api_key is not None:
-        set_openrouter_api_key(req.openrouter_api_key)
+        db.set_user_openrouter_api_key(int(user["id"]), req.openrouter_api_key)
     prefs = update_user_preferences_payload(
         db,
         int(user["id"]),
@@ -49,7 +45,4 @@ def update_settings(
         preferred_generation_models=req.preferred_generation_models,
         preferred_target_models=req.preferred_target_models,
     )
-    return {
-        **get_settings_for_api(),
-        **prefs,
-    }
+    return prefs

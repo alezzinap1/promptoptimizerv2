@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, type OpenRouterModel } from '../api/client'
 import styles from './Compare.module.css'
+import pageStyles from '../styles/PageShell.module.css'
 
 export default function Compare() {
   const location = useLocation()
@@ -67,9 +68,15 @@ export default function Compare() {
   }
 
   return (
-    <div className={styles.compare}>
-      <h1>A/B Сравнение техник</h1>
-      <p className={styles.subtitle}>Сгенерируй один промпт двумя разными наборами техник и сравни результат</p>
+    <div className={`${pageStyles.page} ${styles.compare}`}>
+      <div className={pageStyles.panel}>
+        <div className={pageStyles.panelHeader}>
+          <div>
+            <h1 className={pageStyles.panelTitle}>A/B Сравнение техник</h1>
+            <p className={pageStyles.panelSubtitle}>Сгенерируй один промпт двумя разными наборами техник и сравни результат</p>
+          </div>
+          {loading && <span className={pageStyles.infoBadge}>Генерирую...</span>}
+        </div>
 
       <div className={styles.settings}>
         <div className={styles.field}>
@@ -200,6 +207,7 @@ export default function Compare() {
           </div>
         </>
       )}
+      </div>
     </div>
   )
 }

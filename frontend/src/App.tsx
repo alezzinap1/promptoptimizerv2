@@ -10,6 +10,7 @@ import Techniques from './pages/Techniques'
 import Metrics from './pages/Metrics'
 import Models from './pages/Models'
 import Settings from './pages/Settings'
+import UserInfo from './pages/UserInfo'
 import Workspaces from './pages/Workspaces'
 
 function AppShell() {
@@ -29,6 +30,7 @@ function AppShell() {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/models" element={<Models />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/user-info" element={<UserInfo />} />
       </Routes>
     </Layout>
   )
