@@ -2,6 +2,10 @@
 Sync LLM client via OpenRouter.
 Uses synchronous OpenAI SDK for Streamlit compatibility.
 Supports streaming for st.write_stream integration.
+
+Примечание: у провайдеров вроде OpenAI «structured outputs» / JSON Schema (response_format)
+дают более жёсткую гарантию формата, чем текстовые теги в system prompt; при расширении
+генерации можно добавить отдельный вызов с json_schema и парсинг JSON вместо [PROMPT]-блоков.
 """
 from __future__ import annotations
 

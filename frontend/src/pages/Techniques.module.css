@@ -2,7 +2,6 @@
   max-width: 1200px;
 }
 
-.createBox,
 .card {
   padding: 20px;
   background: var(--secondary);
@@ -10,11 +9,6 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.createBox {
-  margin: 16px 0 24px;
-}
-
-.createHeader,
 .cardHead,
 .cardActions,
 .formActions {
@@ -25,6 +19,81 @@
   justify-content: space-between;
 }
 
+.createBtn {
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa));
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.createBtn:hover {
+  opacity: 0.95;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--secondary);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.modalHeader h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.modalClose {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--text);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.modalClose:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.primaryBtn {
+  background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa)) !important;
+  color: white !important;
+  border: none !important;
+  padding: 12px 20px !important;
+  font-weight: 600 !important;
+}
+
 .createGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -32,9 +101,14 @@
   margin-top: 16px;
 }
 
+.modalForm .createGrid {
+  margin-top: 0;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
   margin-bottom: 24px;
 }

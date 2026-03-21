@@ -67,6 +67,43 @@
   align-items: start;
 }
 
+.mainGridFocus .columnStack {
+  grid-column: span 12;
+}
+
+.splitRoot {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.splitPane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.splitGutter {
+  flex: 0 0 5px;
+  margin: 0 2px;
+  cursor: col-resize;
+  align-self: stretch;
+  border-radius: 3px;
+  background: var(--stroke);
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.splitGutter:hover,
+.splitGutter:focus-visible {
+  opacity: 1;
+  background: rgba(56, 189, 248, 0.45);
+  outline: none;
+}
+
 .columnStack {
   display: grid;
   gap: 18px;
@@ -251,7 +288,7 @@
 .specGrid textarea:focus,
 .saveBox textarea:focus,
 .saveBox input:focus,
-.questionItem input:focus,
+.questionItem > input:focus,
 .questionItem select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.2);
@@ -260,6 +297,39 @@
 
 .multiSelect {
   min-height: 110px;
+}
+
+.optionChecks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.optionCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.optionCheck input[type='checkbox'] {
+  width: auto;
+  min-width: 1rem;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.optionCheck > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .radioRow {
@@ -285,7 +355,7 @@
 .specGrid textarea,
 .saveBox textarea,
 .saveBox input,
-.questionItem input,
+.questionItem > input,
 .questionItem select {
   width: 100%;
   padding: 13px 13px;
@@ -369,6 +439,80 @@
   padding: 12px;
   background: rgba(255, 255, 255, 0.04);
   border-radius: 10px;
+}
+
+.issueBanner {
+  position: relative;
+  margin-bottom: 14px;
+  padding: 14px 40px 14px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.issueBanner p {
+  margin: 0 0 12px;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.issueBannerClose {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.issueBannerClose:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.issueBannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rawFallback {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.rawFallback details {
+  margin-top: 10px;
+}
+
+.rawFallback summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.llmRaw {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  padding: 12px;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .actions {

@@ -91,11 +91,24 @@ export interface GenerateRequest {
   question_answers?: { question: string; answers: string[] }[]
 }
 
+export type GenerationIssue =
+  | 'format_failure'
+  | 'questions_unparsed'
+  | 'weak_question_options'
+
 export interface GenerateResult {
   prompt_block: string
   reasoning: string
   has_prompt: boolean
   has_questions: boolean
+  /** Полный текст ответа модели (для отладки / если парсер не нашёл [PROMPT]) */
+  llm_raw?: string
+  generation_issue?: GenerationIssue | null
+  generation_flags?: {
+    format_failure: boolean
+    questions_unparsed: boolean
+    weak_question_options: boolean
+  }
   questions_raw?: string
   questions?: StructuredQuestion[]
   techniques: { id: string; name: string }[]

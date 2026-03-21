@@ -10,9 +10,9 @@ from pydantic import BaseModel
 from config.abuse import check_input_size, check_rate_limit
 from config.settings import BUDGET_GENERATIONS_PER_SESSION, TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
 from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
-from core.context_builder import ContextBuilder
+from core.context_builder import CLARIFICATION_ANSWERS_PROVIDED, ContextBuilder
 from core.domain_templates import get_domain_techniques
-from core.parsing import parse_questions, parse_reply
+from core.parsing import diagnose_generation_response, parse_questions, parse_reply
 from core.prompt_spec import build_generation_brief
 from core.quality_metrics import analyze_prompt
 from core.workspace_profile import normalize_workspace
@@ -193,10 +193,9 @@ def generate_prompt(
     builder = ContextBuilder(registry)
 
     combined_input = build_generation_brief(prompt_spec)
-    if req.question_answers:
-        answers_text = _build_answers_text(req.question_answers)
-        if answers_text:
-            combined_input += f"\n\nОтветы на уточняющие вопросы:\n{answers_text}"
+    clarification_answers_text = _build_answers_text(req.question_answers) if req.question_answers else ""
+    if clarification_answers_text:
+        combined_input += f"\n\nОтветы на уточняющие вопросы:\n{clarification_answers_text}"
     if req.feedback.strip():
         combined_input += f"\n\nКомментарий к улучшению: {req.feedback}"
 
@@ -206,6 +205,8 @@ def generate_prompt(
         domain=req.domain or "auto",
         questions_mode=req.questions_mode,
     )
+    if clarification_answers_text:
+        system_prompt = system_prompt + "\n\n" + CLARIFICATION_ANSWERS_PROVIDED
     user_content = builder.build_user_content(
         combined_input,
         previous_agent_prompt=req.previous_prompt,
@@ -224,8 +225,17 @@ def generate_prompt(
     ):
         full_text += chunk
 
+    full_text = (full_text or "").strip()
     parsed = parse_reply(full_text)
     questions = parse_questions(parsed.get("questions_raw", "")) or []
+    gen_flags = diagnose_generation_response(parsed, questions)
+    generation_issue: str | None = None
+    if gen_flags["format_failure"]:
+        generation_issue = "format_failure"
+    elif gen_flags["questions_unparsed"]:
+        generation_issue = "questions_unparsed"
+    elif gen_flags["weak_question_options"]:
+        generation_issue = "weak_question_options"
     metrics = analyze_prompt(parsed.get("prompt_block", "")) if parsed.get("has_prompt") else {}
     latency_ms = round((time.perf_counter() - started_at) * 1000, 1)
     outcome = "prompt" if parsed.get("has_prompt") else "questions" if parsed.get("has_questions") else "raw_text"
@@ -300,6 +310,9 @@ def generate_prompt(
 
     return {
         **parsed,
+        "llm_raw": full_text,
+        "generation_issue": generation_issue,
+        "generation_flags": gen_flags,
         "questions": questions,
         "techniques": [{"id": t["id"], "name": t.get("name", t["id"])} for t in techniques],
         "technique_ids": technique_ids,

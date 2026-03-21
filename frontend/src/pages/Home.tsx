@@ -1,10 +1,46 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { api, type GenerateRequest, type GenerateResult, type OpenRouterModel, type PromptIdePreviewResponse, type Workspace } from '../api/client'
+import {
+  api,
+  type GenerateRequest,
+  type GenerateResult,
+  type GenerationIssue,
+  type OpenRouterModel,
+  type PromptIdePreviewResponse,
+  type Workspace,
+} from '../api/client'
 import styles from './Home.module.css'
 
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
 const ACTIVE_SESSION_KEY = 'prompt-engineer-active-prompt-session'
+const HOME_SPLIT_KEY = 'prompt-engineer-home-split'
+/** Минимальная доля ширины на колонку (0–1) */
+const MIN_COL_FRAC = 0.14
+const DEFAULT_SPLIT_A = 0.33
+const DEFAULT_SPLIT_B = 0.66
+
+function clampSplit(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n))
+}
+
+function loadHomeSplits(): { splitA: number; splitB: number } {
+  try {
+    const raw = localStorage.getItem(HOME_SPLIT_KEY)
+    if (raw) {
+      const o = JSON.parse(raw) as { splitA?: number; splitB?: number }
+      if (typeof o.splitA === 'number' && typeof o.splitB === 'number') {
+        let a = o.splitA
+        let b = o.splitB
+        a = clampSplit(a, MIN_COL_FRAC, 1 - 2 * MIN_COL_FRAC)
+        b = clampSplit(b, a + MIN_COL_FRAC, 1 - MIN_COL_FRAC)
+        return { splitA: a, splitB: b }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { splitA: DEFAULT_SPLIT_A, splitB: DEFAULT_SPLIT_B }
+}
 
 type Technique = { id: string; name: string }
 
@@ -56,6 +92,19 @@ export default function Home() {
   const [showIdeModal, setShowIdeModal] = useState(false)
   const [modelsData, setModelsData] = useState<OpenRouterModel[]>([])
   const [focusMode, setFocusMode] = useState(false)
+  const [splits, setSplits] = useState(() => loadHomeSplits())
+  const splitRootRef = useRef<HTMLDivElement>(null)
+  const [issueBannerDismissed, setIssueBannerDismissed] = useState(false)
+  const lastQuestionAnswersRef = useRef<{ question: string; answers: string[] }[] | undefined>(undefined)
+
+  const GENERATION_ISSUE_TEXT: Record<GenerationIssue, string> = {
+    format_failure:
+      'Ответ модели не удалось разобрать: нет распознаваемых блоков [PROMPT] и [QUESTIONS]. Часто так бывает, если модель генерации нарушила формат. Попробуйте снова или выберите другую модель.',
+    questions_unparsed:
+      'Блок вопросов в ответе есть, но список не разобрался. Ниже можно открыть полный текст ответа или повторить генерацию.',
+    weak_question_options:
+      'Вопросы распознаны, но почти без вариантов ответа (остались заглушки). Имеет смысл повторить генерацию или заполнить поле «Свой ответ».',
+  }
 
   useEffect(() => {
     setError(null)
@@ -172,6 +221,8 @@ export default function Home() {
 
   const handleGenerate = async (questionAnswers?: { question: string; answers: string[] }[]) => {
     if (!taskInput.trim()) return
+    lastQuestionAnswersRef.current = questionAnswers
+    setIssueBannerDismissed(false)
     setLoading(true)
     setError(null)
     try {
@@ -206,12 +257,60 @@ export default function Home() {
     }
   }
 
+  const handleRetryGeneration = () => {
+    const qa = lastQuestionAnswersRef.current
+    void handleGenerate(qa !== undefined ? qa : undefined)
+  }
+
+  const startSplitDrag = useCallback(
+    (which: 1 | 2) => (e: React.MouseEvent) => {
+      e.preventDefault()
+      const root = splitRootRef.current
+      if (!root) return
+      const w = Math.max(root.getBoundingClientRect().width, 1)
+      const startX = e.clientX
+      const a0 = splits.splitA
+      const b0 = splits.splitB
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX
+        const dFrac = dx / w
+        if (which === 1) {
+          const nextA = clampSplit(a0 + dFrac, MIN_COL_FRAC, b0 - MIN_COL_FRAC)
+          setSplits({ splitA: nextA, splitB: b0 })
+        } else {
+          const nextB = clampSplit(b0 + dFrac, a0 + MIN_COL_FRAC, 1 - MIN_COL_FRAC)
+          setSplits({ splitA: a0, splitB: nextB })
+        }
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        document.body.style.removeProperty('cursor')
+        document.body.style.removeProperty('user-select')
+        setSplits((cur) => {
+          localStorage.setItem(
+            HOME_SPLIT_KEY,
+            JSON.stringify({ splitA: cur.splitA, splitB: cur.splitB }),
+          )
+          return cur
+        })
+      }
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [splits.splitA, splits.splitB],
+  )
+
   const handleNewSession = () => {
     setResult(null)
     setSessionId(null)
     setIterationMode(false)
     setShowSaveDialog(false)
     setQuestionState({})
+    setIssueBannerDismissed(false)
   }
 
   const handleSaveToLibrary = async () => {
@@ -267,6 +366,50 @@ export default function Home() {
     'Добавь ограничения и стиль, если важны',
     'Дай пример входа/выхода для точности',
   ]
+
+  const renderTaskColumn = () => (
+    <div className={styles.columnStack}>
+      <section className={styles.panel}>
+        <div className={styles.panelHeader}>
+          <h2>{iterationMode ? 'Итерация' : 'Задача'}</h2>
+        </div>
+        {iterationMode ? (
+          <>
+            <p className={styles.info}>Опиши что нужно изменить в текущем промпте.</p>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Добавить few-shot примеры, сократить на 30%..."
+              rows={8}
+            />
+          </>
+        ) : (
+          <textarea
+            value={taskInput}
+            onChange={(e) => setTaskInput(e.target.value)}
+            placeholder={hintChips.join('\n')}
+            rows={12}
+          />
+        )}
+        <div className={styles.primaryRow}>
+          <div className={styles.tokenBadge}>
+            <span>Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}</span>
+            {promptCostStr && <span>{promptCostStr}</span>}
+          </div>
+          <button
+            className={styles.primaryBtn}
+            onClick={() => handleGenerate()}
+            disabled={!taskInput.trim() || loading}
+          >
+            {loading ? 'Генерирую...' : iterationMode ? 'Обновить промпт' : 'Создать промпт'}
+          </button>
+          <button className={styles.secondaryBtn} type="button" onClick={handleNewSession}>
+            Новая сессия
+          </button>
+        </div>
+      </section>
+    </div>
+  )
 
   return (
     <div className={styles.home}>
@@ -388,50 +531,27 @@ export default function Home() {
         <div className={`${styles.step} ${stage >= 3 ? styles.done : ''} ${stage === 3 ? styles.active : ''}`}>Prompt</div>
       </div>
 
-      <div className={styles.mainGrid}>
-        <div className={styles.columnStack} style={focusMode ? { gridColumn: 'span 12' } : undefined}>
-          
-
-          <section className={styles.panel}>
-            <div className={styles.panelHeader}>
-              <h2>{iterationMode ? 'Итерация' : 'Задача'}</h2>
-            </div>
-          {iterationMode ? (
-            <>
-              <p className={styles.info}>Опиши что нужно изменить в текущем промпте.</p>
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Добавить few-shot примеры, сократить на 30%..."
-                rows={8}
-              />
-            </>
-          ) : (
-              <textarea
-                value={taskInput}
-                onChange={(e) => setTaskInput(e.target.value)}
-                placeholder={hintChips.join('\n')}
-                rows={12}
-              />
-          )}
-            <div className={styles.primaryRow}>
-              <div className={styles.tokenBadge}>
-                <span>Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}</span>
-                {promptCostStr && <span>{promptCostStr}</span>}
-              </div>
-              <button
-                className={styles.primaryBtn}
-                onClick={() => handleGenerate()}
-                disabled={!taskInput.trim() || loading}
-              >
-                {loading ? 'Генерирую...' : iterationMode ? 'Обновить промпт' : 'Создать промпт'}
-              </button>
-              <button className={styles.secondaryBtn} type="button" onClick={handleNewSession}>Новая сессия</button>
-            </div>
-          </section>
-        </div>
-
-        {!focusMode && (
+      {focusMode ? (
+        <div className={`${styles.mainGrid} ${styles.mainGridFocus}`}>{renderTaskColumn()}</div>
+      ) : (
+        <div ref={splitRootRef} className={styles.splitRoot}>
+          <div
+            className={styles.splitPane}
+            style={{ flex: `${splits.splitA} 1 0%`, minWidth: 0 }}
+          >
+            {renderTaskColumn()}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Граница колонок Задача и IDE — перетащите для изменения ширины"
+            className={styles.splitGutter}
+            onMouseDown={startSplitDrag(1)}
+          />
+          <div
+            className={styles.splitPane}
+            style={{ flex: `${splits.splitB - splits.splitA} 1 0%`, minWidth: 0 }}
+          >
         <section className={`${styles.panel} ${styles.ideColumn}`}>
           {preview ? (
             <div className={styles.ideBox}>
@@ -561,11 +681,38 @@ export default function Home() {
             </div>
           )}
         </section>
-        )}
-
-        {!focusMode && (
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Граница колонок IDE и Результат — перетащите для изменения ширины"
+            className={styles.splitGutter}
+            onMouseDown={startSplitDrag(2)}
+          />
+          <div
+            className={styles.splitPane}
+            style={{ flex: `${1 - splits.splitB} 1 0%`, minWidth: 0 }}
+          >
         <section className={`${styles.panel} ${styles.resultColumn}`}>
           <h2>Результат</h2>
+          {result?.generation_issue && !issueBannerDismissed && (
+            <div className={styles.issueBanner} role="alert">
+              <button
+                type="button"
+                className={styles.issueBannerClose}
+                aria-label="Закрыть предупреждение"
+                onClick={() => setIssueBannerDismissed(true)}
+              >
+                ×
+              </button>
+              <p>{GENERATION_ISSUE_TEXT[result.generation_issue]}</p>
+              <div className={styles.issueBannerActions}>
+                <button type="button" className={styles.primaryAction} onClick={handleRetryGeneration}>
+                  Попробовать снова
+                </button>
+              </div>
+            </div>
+          )}
           {error && <p className={styles.error}>{error}</p>}
           {!result && !error && (
             <p className={styles.empty}>Опиши задачу в левой колонке и нажми <strong>Создать промпт</strong></p>
@@ -716,34 +863,58 @@ export default function Home() {
               )}
             </>
           )}
+          {result &&
+            result.llm_raw?.trim() &&
+            !result.has_prompt &&
+            (!result.has_questions || !result.questions?.length) && (
+            <div className={styles.rawFallback}>
+              <p className={styles.info}>
+                Ответ модели не удалось разобрать по маркерам [PROMPT] / [QUESTIONS]. Ниже — полный текст; при необходимости скопируйте промпт вручную.
+              </p>
+              <details open>
+                <summary>Текст ответа модели</summary>
+                <pre className={styles.llmRaw}>{result.llm_raw}</pre>
+              </details>
+            </div>
+          )}
           {result?.has_questions && !result?.has_prompt && (
             <div className={styles.questionBox}>
-              <p className={styles.info}>Ответь на вопросы, затем продолжи генерацию.</p>
+              <p className={styles.info}>
+                Отметь один или несколько вариантов (чекбоксы). При необходимости допиши свой ответ в поле ниже.
+              </p>
               {(result.questions || []).map((q, idx) => {
                 const state = questionState[idx] || { options: [], custom: '' }
                 return (
                   <div key={idx} className={styles.questionItem}>
                     <strong>{idx + 1}. {q.question}</strong>
-                    <select
-                      multiple
-                      value={state.options}
-                      onChange={(e) => setQuestionState((prev) => ({
-                        ...prev,
-                        [idx]: { ...state, options: Array.from(e.target.selectedOptions).map((o) => o.value) },
-                      }))}
-                      className={styles.multiSelect}
-                    >
-                      {q.options.map((option) => (
-                        <option key={option} value={option}>{option}</option>
+                    <div className={styles.optionChecks} role="group" aria-label={`Варианты для вопроса ${idx + 1}`}>
+                      {q.options.map((option, optIdx) => (
+                        <label key={`${idx}-${optIdx}-${option}`} className={styles.optionCheck}>
+                          <input
+                            type="checkbox"
+                            checked={state.options.includes(option)}
+                            onChange={() => {
+                              setQuestionState((prev) => {
+                                const cur = prev[idx] ?? { options: [], custom: '' }
+                                const on = cur.options.includes(option)
+                                const nextOpts = on
+                                  ? cur.options.filter((x) => x !== option)
+                                  : [...cur.options, option]
+                                return { ...prev, [idx]: { ...cur, options: nextOpts } }
+                              })
+                            }}
+                          />
+                          <span>{option}</span>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                     <input
                       value={state.custom}
-                      placeholder="Свой ответ"
-                      onChange={(e) => setQuestionState((prev) => ({
-                        ...prev,
-                        [idx]: { ...state, custom: e.target.value },
-                      }))}
+                      placeholder="Свой ответ (добавится к выбранным)"
+                      onChange={(e) => setQuestionState((prev) => {
+                        const cur = prev[idx] ?? { options: [], custom: '' }
+                        return { ...prev, [idx]: { ...cur, custom: e.target.value } }
+                      })}
                     />
                   </div>
                 )
@@ -766,8 +937,9 @@ export default function Home() {
             </div>
           )}
         </section>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

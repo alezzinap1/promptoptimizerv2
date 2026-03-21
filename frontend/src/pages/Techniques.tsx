@@ -24,6 +24,7 @@ export default function Techniques() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [showTechniqueModal, setShowTechniqueModal] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -74,12 +75,25 @@ export default function Techniques() {
       }
       setForm(EMPTY_FORM)
       setEditingId(null)
+      setShowTechniqueModal(false)
       load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить технику')
     } finally {
       setSaving(false)
     }
+  }
+
+  const openNewTechnique = () => {
+    setEditingId(null)
+    setForm(EMPTY_FORM)
+    setShowTechniqueModal(true)
+  }
+
+  const closeTechniqueModal = () => {
+    setShowTechniqueModal(false)
+    setEditingId(null)
+    setForm(EMPTY_FORM)
   }
 
   const startEdit = (item: TechniqueRecord) => {
@@ -95,6 +109,7 @@ export default function Techniques() {
       complexity: (item.when_to_use?.complexity || []).join(', '),
       combines_well_with: (item.compatibility?.combines_well_with || []).join(', '),
     })
+    setShowTechniqueModal(true)
   }
 
   return (
@@ -103,38 +118,10 @@ export default function Techniques() {
       <p className={styles.meta}>Дефолтные техники доступны каждому пользователю. Свои техники можно добавлять поверх базы.</p>
       <p className={styles.meta}>Сейчас доступно: {defaultCount} default / {customCount} custom.</p>
 
-      <div className={styles.createBox}>
-        <div className={styles.createHeader}>
-          <strong>{editingId ? 'Редактирование пользовательской техники' : 'Новая пользовательская техника'}</strong>
-          <span>Кастомных техник: {customCount}</span>
-        </div>
-        <div className={styles.createGrid}>
-          <input value={form.id} onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))} placeholder="ID: my_custom_technique" />
-          <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Название" />
-          <input value={form.task_types} onChange={(e) => setForm((prev) => ({ ...prev, task_types: e.target.value }))} placeholder="Task types через запятую" />
-          <input value={form.complexity} onChange={(e) => setForm((prev) => ({ ...prev, complexity: e.target.value }))} placeholder="Complexity: low, medium, high" />
-          <textarea rows={4} value={form.core_pattern} onChange={(e) => setForm((prev) => ({ ...prev, core_pattern: e.target.value }))} placeholder="Core pattern" />
-          <textarea rows={4} value={form.why_it_works} onChange={(e) => setForm((prev) => ({ ...prev, why_it_works: e.target.value }))} placeholder="Почему техника работает" />
-          <textarea rows={3} value={form.good_example} onChange={(e) => setForm((prev) => ({ ...prev, good_example: e.target.value }))} placeholder="Хороший пример" />
-          <textarea rows={3} value={form.combines_well_with} onChange={(e) => setForm((prev) => ({ ...prev, combines_well_with: e.target.value }))} placeholder="Совместимые техники через запятую" />
-          <textarea rows={4} value={form.anti_patterns} onChange={(e) => setForm((prev) => ({ ...prev, anti_patterns: e.target.value }))} placeholder="Anti-patterns, по одному на строку" />
-        </div>
-        <div className={styles.formActions}>
-          <button onClick={submitForm} disabled={saving || !form.id.trim() || !form.name.trim()}>
-            {saving ? 'Сохраняю...' : editingId ? 'Сохранить изменения' : 'Добавить технику'}
-          </button>
-          {editingId && (
-            <button onClick={() => {
-              setEditingId(null)
-              setForm(EMPTY_FORM)
-            }}>
-              Отмена
-            </button>
-          )}
-        </div>
-      </div>
-
       <div className={styles.toolbar}>
+        <button type="button" className={styles.createBtn} onClick={openNewTechnique}>
+          Новая техника
+        </button>
         <input
           type="search"
           placeholder="Поиск: chain of thought, роль..."
@@ -158,6 +145,41 @@ export default function Techniques() {
           <option value="high">high</option>
         </select>
       </div>
+
+      {showTechniqueModal && (
+        <div className={styles.modalOverlay} onClick={closeTechniqueModal}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>{editingId ? 'Редактирование техники' : 'Новая пользовательская техника'}</h3>
+              <button type="button" className={styles.modalClose} onClick={closeTechniqueModal} aria-label="Закрыть">
+                ×
+              </button>
+            </div>
+            <p className={styles.meta}>Кастомных техник: {customCount}</p>
+            <div className={styles.modalForm}>
+              <div className={styles.createGrid}>
+                <input value={form.id} onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))} placeholder="ID: my_custom_technique" disabled={!!editingId} />
+                <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Название" />
+                <input value={form.task_types} onChange={(e) => setForm((prev) => ({ ...prev, task_types: e.target.value }))} placeholder="Task types через запятую" />
+                <input value={form.complexity} onChange={(e) => setForm((prev) => ({ ...prev, complexity: e.target.value }))} placeholder="Complexity: low, medium, high" />
+                <textarea rows={4} value={form.core_pattern} onChange={(e) => setForm((prev) => ({ ...prev, core_pattern: e.target.value }))} placeholder="Core pattern" />
+                <textarea rows={4} value={form.why_it_works} onChange={(e) => setForm((prev) => ({ ...prev, why_it_works: e.target.value }))} placeholder="Почему техника работает" />
+                <textarea rows={3} value={form.good_example} onChange={(e) => setForm((prev) => ({ ...prev, good_example: e.target.value }))} placeholder="Хороший пример" />
+                <textarea rows={3} value={form.combines_well_with} onChange={(e) => setForm((prev) => ({ ...prev, combines_well_with: e.target.value }))} placeholder="Совместимые техники через запятую" />
+                <textarea rows={4} value={form.anti_patterns} onChange={(e) => setForm((prev) => ({ ...prev, anti_patterns: e.target.value }))} placeholder="Anti-patterns, по одному на строку" />
+              </div>
+              <div className={styles.formActions}>
+                <button type="button" className={styles.primaryBtn} onClick={() => void submitForm()} disabled={saving || !form.id.trim() || !form.name.trim()}>
+                  {saving ? 'Сохраняю...' : editingId ? 'Сохранить изменения' : 'Добавить технику'}
+                </button>
+                <button type="button" onClick={closeTechniqueModal}>
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
 
@@ -183,8 +205,7 @@ export default function Techniques() {
                     <button onClick={async () => {
                       await api.deleteTechnique(t.db_id as number)
                       if (editingId === t.db_id) {
-                        setEditingId(null)
-                        setForm(EMPTY_FORM)
+                        closeTechniqueModal()
                       }
                       load()
                     }}>
