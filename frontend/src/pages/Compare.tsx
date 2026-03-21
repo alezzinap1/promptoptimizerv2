@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, type OpenRouterModel } from '../api/client'
+import checkboxList from '../styles/CheckboxOptionList.module.css'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
 
@@ -123,11 +124,22 @@ export default function Compare() {
             <label><input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную</label>
           </div>
           {techsAMode === 'manual' && (
-            <select multiple className={styles.multi} value={techsAManual} onChange={(e) => setTechsAManual(Array.from(e.target.selectedOptions).map((o) => o.value))}>
+            <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта A">
               {techniques.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <label key={t.id} className={checkboxList.optionCheck}>
+                  <input
+                    type="checkbox"
+                    checked={techsAManual.includes(t.id)}
+                    onChange={() => {
+                      setTechsAManual((prev) =>
+                        prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                      )
+                    }}
+                  />
+                  <span>{t.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           )}
         </div>
         <div className={styles.column}>
@@ -137,11 +149,22 @@ export default function Compare() {
             <label><input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную</label>
           </div>
           {techsBMode === 'manual' && (
-            <select multiple className={styles.multi} value={techsBManual} onChange={(e) => setTechsBManual(Array.from(e.target.selectedOptions).map((o) => o.value))}>
+            <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта B">
               {techniques.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <label key={t.id} className={checkboxList.optionCheck}>
+                  <input
+                    type="checkbox"
+                    checked={techsBManual.includes(t.id)}
+                    onChange={() => {
+                      setTechsBManual((prev) =>
+                        prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                      )
+                    }}
+                  />
+                  <span>{t.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           )}
         </div>
       </div>

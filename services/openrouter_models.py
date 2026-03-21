@@ -7,8 +7,9 @@ import json
 import logging
 import time
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,29 @@ CACHE_TTL_SEC = 24 * 60 * 60  # 24 hours
 
 def _fetch_from_openrouter() -> dict:
     """Fetch models from OpenRouter API. No auth required for public list."""
-    req = Request(OPENROUTER_MODELS_URL, headers={"User-Agent": "PromptEngineer/1.0"})
+    # Prefer text completion models; we still filter I/O modalities below.
+    q = urlencode({"output_modalities": "text"})
+    url = f"{OPENROUTER_MODELS_URL}?{q}"
+    req = Request(url, headers={"User-Agent": "PromptEngineer/1.0"})
     with urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode())
+
+
+def _supports_text_input_and_output(m: dict) -> bool:
+    """
+    Keep models that accept text in and produce text out (multimodal OK: e.g. text+image → text).
+    Drop image-only / audio-only / embeddings-only when OpenRouter lists modalities explicitly.
+    """
+    arch = m.get("architecture")
+    if not isinstance(arch, dict):
+        return True
+    ins = arch.get("input_modalities")
+    outs = arch.get("output_modalities")
+    if isinstance(outs, list) and len(outs) > 0 and "text" not in outs:
+        return False
+    if isinstance(ins, list) and len(ins) > 0 and "text" not in ins:
+        return False
+    return True
 
 
 def _normalize_model(m: dict) -> dict:
@@ -70,8 +91,9 @@ def get_models(force_refresh: bool = False) -> dict:
             cached = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
             updated_at = cached.get("updated_at", 0)
             if now - updated_at < CACHE_TTL_SEC:
+                data = [m for m in cached.get("data", []) if _supports_text_input_and_output(m)]
                 return {
-                    "data": cached.get("data", []),
+                    "data": data,
                     "updated_at": updated_at,
                     "from_cache": True,
                 }
@@ -80,8 +102,8 @@ def get_models(force_refresh: bool = False) -> dict:
 
     try:
         raw = _fetch_from_openrouter()
-        raw_data = raw.get("data", [])
-        normalized = [_normalize_model(m) for m in raw_data if m.get("id")]
+        raw_data = [m for m in raw.get("data", []) if m.get("id") and _supports_text_input_and_output(m)]
+        normalized = [_normalize_model(m) for m in raw_data]
         result = {"data": normalized, "updated_at": now, "from_cache": False}
         CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         CACHE_PATH.write_text(
@@ -95,8 +117,9 @@ def get_models(force_refresh: bool = False) -> dict:
         if CACHE_PATH.exists():
             try:
                 cached = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+                data = [m for m in cached.get("data", []) if _supports_text_input_and_output(m)]
                 return {
-                    "data": cached.get("data", []),
+                    "data": data,
                     "updated_at": cached.get("updated_at", 0),
                     "from_cache": True,
                     "stale": True,

@@ -183,7 +183,9 @@
 }
 
 .settingsPanel .field {
-  min-width: 180px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 200px;
 }
 
 .settingsPanel .field label {
@@ -203,6 +205,8 @@
 .settingsPanel input[type="number"] {
   padding: 8px 10px;
   border-radius: 10px;
+  max-width: 100%;
+  width: 100%;
 }
 
 .panelHeader {
@@ -262,7 +266,7 @@
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--select-surface);
   color: var(--text);
   min-width: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
@@ -273,7 +277,7 @@
 .multiSelect option,
 .questionItem select option {
   color: var(--text);
-  background: #0f1625;
+  background: var(--select-surface);
 }
 
 .field select:focus,
@@ -297,39 +301,6 @@
 
 .multiSelect {
   min-height: 110px;
-}
-
-.optionChecks {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 10px 0 12px;
-}
-
-.optionCheck {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  cursor: pointer;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 0.92rem;
-  line-height: 1.35;
-}
-
-.optionCheck input[type='checkbox'] {
-  width: auto;
-  min-width: 1rem;
-  margin-top: 3px;
-  flex-shrink: 0;
-}
-
-.optionCheck > span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .radioRow {
@@ -361,7 +332,7 @@
   padding: 13px 13px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--select-surface);
   color: var(--text);
   font-family: inherit;
   resize: vertical;
@@ -616,6 +587,33 @@
   opacity: 0.85;
 }
 
+.techPickerPanel {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.techPickerHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.techPickCount {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+[data-theme='light'] .techPickerPanel {
+  background: rgba(255, 255, 255, 0.55);
+}
+
 .techMulti {
   min-height: 80px;
   max-height: 110px;
@@ -682,7 +680,9 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -691,14 +691,14 @@
 }
 
 .modalContent {
-  background: var(--panel);
+  background: var(--modal-surface);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--modal-border);
   max-width: 90vw;
   max-height: 90vh;
   overflow: auto;
   padding: 20px;
-  box-shadow: var(--glow);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
 .modalHeader {

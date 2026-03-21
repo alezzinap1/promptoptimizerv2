@@ -18,8 +18,11 @@
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
-  --option-bg: #0f1625;
+  --option-bg: #131b2d;
   --option-text: #f3f5f9;
+  --select-surface: #131b2d;
+  --modal-surface: rgba(19, 27, 45, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.14);
 }
 
 [data-theme="forest"] {
@@ -39,8 +42,11 @@
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
-  --option-bg: #0f1625;
-  --option-text: #f3f5f9;
+  --option-bg: #121f1c;
+  --option-text: #e9f7ef;
+  --select-surface: #121f1c;
+  --modal-surface: rgba(18, 31, 28, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="midnight"] {
@@ -60,8 +66,11 @@
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
-  --option-bg: #0f1625;
+  --option-bg: #12141f;
   --option-text: #ececf2;
+  --select-surface: #12141f;
+  --modal-surface: rgba(18, 20, 31, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="amber"] {
@@ -81,8 +90,11 @@
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
-  --option-bg: #1c1410;
+  --option-bg: #2a1f14;
   --option-text: #fff7ed;
+  --select-surface: #2a1f14;
+  --modal-surface: rgba(42, 31, 20, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="ocean"] {
@@ -102,8 +114,11 @@
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
-  --option-bg: #0a1420;
+  --option-bg: #0e2233;
   --option-text: #e3f6ff;
+  --select-surface: #0e2233;
+  --modal-surface: rgba(14, 34, 51, 0.98);
+  --modal-border: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="light"] {
@@ -123,8 +138,11 @@
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: light;
-  --option-bg: #f6f8fc;
+  --option-bg: #ffffff;
   --option-text: #0f172a;
+  --select-surface: #ffffff;
+  --modal-surface: rgba(255, 255, 255, 0.98);
+  --modal-border: rgba(15, 23, 42, 0.12);
 }
 
 * {
@@ -155,13 +173,13 @@ a:focus-visible {
 select,
 input,
 textarea {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--select-surface);
   color: var(--text);
 }
 
 select option {
-  background-color: var(--option-bg);
-  color: var(--option-text);
+  background-color: var(--select-surface);
+  color: var(--text);
 }
 
 select {

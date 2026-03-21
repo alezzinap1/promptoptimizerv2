@@ -9,6 +9,7 @@ import {
   type PromptIdePreviewResponse,
   type Workspace,
 } from '../api/client'
+import checkboxList from '../styles/CheckboxOptionList.module.css'
 import styles from './Home.module.css'
 
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
@@ -58,12 +59,10 @@ export default function Home() {
   const [modelLabels, setModelLabels] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
   const [targetOptions, setTargetOptions] = useState<string[]>(['unknown'])
-  const [domains, setDomains] = useState<{ id: string; name: string }[]>([])
   const [techniques, setTechniques] = useState<Technique[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [genModel, setGenModel] = useState('')
   const [targetModel, setTargetModel] = useState('unknown')
-  const [domain, setDomain] = useState('auto')
   const [techniqueMode, setTechniqueMode] = useState<'auto' | 'manual'>('auto')
   const [manualTechs, setManualTechs] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
@@ -108,8 +107,8 @@ export default function Home() {
 
   useEffect(() => {
     setError(null)
-    Promise.all([api.getSettings(), api.getModels(), api.getDomains(), api.getTechniques(), api.getWorkspaces()])
-      .then(([settings, modelsRes, domainsRes, techniquesRes, workspaceRes]) => {
+    Promise.all([api.getSettings(), api.getModels(), api.getTechniques(), api.getWorkspaces()])
+      .then(([settings, modelsRes, techniquesRes, workspaceRes]) => {
         setModelsData(modelsRes.data)
         const labels = modelsRes.data.reduce<Record<string, string>>((acc, item: OpenRouterModel) => {
           acc[item.id] = item.name || item.id
@@ -120,7 +119,6 @@ export default function Home() {
         setTargetOptions(settings.preferred_target_models)
         setGenModel((current) => current || settings.preferred_generation_models[0] || '')
         setTargetModel((current) => current || settings.preferred_target_models[0] || 'unknown')
-        setDomains(domainsRes.domains)
         const items = techniquesRes.techniques.map((item) => ({
           id: String(item.id),
           name: String(item.name || item.id),
@@ -131,7 +129,6 @@ export default function Home() {
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки данных')
         setWorkspaces([])
-        setDomains([])
         setTechniques([])
       })
   }, [])
@@ -231,7 +228,7 @@ export default function Home() {
         feedback: iterationMode ? feedback : '',
         gen_model: genModel,
         target_model: targetModel,
-        domain,
+        domain: 'auto',
         technique_mode: techniqueMode,
         manual_techs: techniqueMode === 'manual' ? manualTechs : [],
         temperature,
@@ -454,14 +451,6 @@ export default function Home() {
                 </select>
               </div>
               <div className={styles.field}>
-                <label>Шаблон домена</label>
-                <select value={domain} onChange={(e) => setDomain(e.target.value)}>
-                  {domains.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.field}>
                 <label>Workspace</label>
                 <select value={workspaceId} onChange={(e) => setWorkspaceId(Number(e.target.value))}>
                   <option value={0}>Без workspace</option>
@@ -476,22 +465,6 @@ export default function Home() {
                   <label className={styles.techRadio}><input type="radio" checked={techniqueMode === 'auto'} onChange={() => setTechniqueMode('auto')} /> Авто</label>
                   <label className={styles.techRadio}><input type="radio" checked={techniqueMode === 'manual'} onChange={() => setTechniqueMode('manual')} /> Вручную</label>
                 </div>
-                {techniqueMode === 'manual' && (
-                  <div className={styles.techListWrap}>
-                    <span className={styles.techListLabel}>Выберите техники (Ctrl+клик):</span>
-                    <select
-                      multiple
-                      value={manualTechs}
-                      onChange={(e) => setManualTechs(Array.from(e.target.selectedOptions).map((o) => o.value))}
-                      className={styles.techMulti}
-                      title="Выберите техники (Ctrl+клик для нескольких)"
-                    >
-                      {techniques.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
               <div className={styles.field}>
                 <label>&nbsp;</label>
@@ -500,6 +473,33 @@ export default function Home() {
                 </button>
               </div>
                 </div>
+
+                {techniqueMode === 'manual' && (
+                  <div className={styles.techPickerPanel}>
+                    <div className={styles.techPickerHead}>
+                      <span className={styles.techListLabel}>Техники вручную — отметьте нужные</span>
+                      {manualTechs.length > 0 ? (
+                        <span className={styles.techPickCount}>Выбрано: {manualTechs.length}</span>
+                      ) : null}
+                    </div>
+                    <div className={checkboxList.gridWrap} role="group" aria-label="Выбор техник для генерации">
+                      {techniques.map((t) => (
+                        <label key={t.id} className={checkboxList.optionCheck}>
+                          <input
+                            type="checkbox"
+                            checked={manualTechs.includes(t.id)}
+                            onChange={() => {
+                              setManualTechs((prev) =>
+                                prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                              )
+                            }}
+                          />
+                          <span>{t.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {showAdvanced && (
                   <div className={styles.advancedGrid}>
@@ -887,9 +887,9 @@ export default function Home() {
                 return (
                   <div key={idx} className={styles.questionItem}>
                     <strong>{idx + 1}. {q.question}</strong>
-                    <div className={styles.optionChecks} role="group" aria-label={`Варианты для вопроса ${idx + 1}`}>
+                    <div className={checkboxList.optionChecks} role="group" aria-label={`Варианты для вопроса ${idx + 1}`}>
                       {q.options.map((option, optIdx) => (
-                        <label key={`${idx}-${optIdx}-${option}`} className={styles.optionCheck}>
+                        <label key={`${idx}-${optIdx}-${option}`} className={checkboxList.optionCheck}>
                           <input
                             type="checkbox"
                             checked={state.options.includes(option)}

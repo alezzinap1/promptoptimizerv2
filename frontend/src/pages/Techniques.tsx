@@ -25,6 +25,7 @@ export default function Techniques() {
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showTechniqueModal, setShowTechniqueModal] = useState(false)
+  const [detailTechnique, setDetailTechnique] = useState<TechniqueRecord | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -85,6 +86,7 @@ export default function Techniques() {
   }
 
   const openNewTechnique = () => {
+    setDetailTechnique(null)
     setEditingId(null)
     setForm(EMPTY_FORM)
     setShowTechniqueModal(true)
@@ -96,7 +98,9 @@ export default function Techniques() {
     setForm(EMPTY_FORM)
   }
 
-  const startEdit = (item: TechniqueRecord) => {
+  const startEdit = (e: React.MouseEvent, item: TechniqueRecord) => {
+    e.stopPropagation()
+    setDetailTechnique(null)
     setEditingId(item.db_id || null)
     setForm({
       id: item.id,
@@ -110,6 +114,16 @@ export default function Techniques() {
       combines_well_with: (item.compatibility?.combines_well_with || []).join(', '),
     })
     setShowTechniqueModal(true)
+  }
+
+  const downloadPattern = (t: TechniqueRecord) => {
+    const blob = new Blob([t.core_pattern || ''], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${t.id}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -145,6 +159,87 @@ export default function Techniques() {
           <option value="high">high</option>
         </select>
       </div>
+
+      {detailTechnique && (
+        <div className={styles.modalOverlay} onClick={() => setDetailTechnique(null)}>
+          <div className={styles.detailModalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>{detailTechnique.name || detailTechnique.id}</h3>
+              <button type="button" className={styles.modalClose} onClick={() => setDetailTechnique(null)} aria-label="Закрыть">
+                ×
+              </button>
+            </div>
+            <p className={styles.meta}>
+              <span className={styles.badges}>
+                <span>{detailTechnique.origin === 'custom' ? 'custom' : 'default'}</span>
+                {detailTechnique.editable ? <span>editable</span> : null}
+              </span>
+              {' · '}
+              <code>{detailTechnique.id}</code>
+            </p>
+            {detailTechnique.when_to_use?.task_types?.length ? (
+              <p className={styles.meta}><strong>Task types:</strong> {detailTechnique.when_to_use.task_types.join(', ')}</p>
+            ) : null}
+            {detailTechnique.when_to_use?.complexity?.length ? (
+              <p className={styles.meta}><strong>Complexity:</strong> {detailTechnique.when_to_use.complexity.join(', ')}</p>
+            ) : null}
+            {detailTechnique.why_it_works ? (
+              <section className={styles.detailSection}>
+                <h4>Почему работает</h4>
+                <p>{detailTechnique.why_it_works}</p>
+              </section>
+            ) : null}
+            {detailTechnique.good_example ? (
+              <section className={styles.detailSection}>
+                <h4>Пример</h4>
+                <p>{detailTechnique.good_example}</p>
+              </section>
+            ) : null}
+            {detailTechnique.core_pattern ? (
+              <section className={styles.detailSection}>
+                <h4>Core pattern</h4>
+                <pre className={styles.detailPre}>{detailTechnique.core_pattern}</pre>
+                <button type="button" className={styles.detailDownloadBtn} onClick={() => downloadPattern(detailTechnique)}>
+                  Скачать шаблон (.txt)
+                </button>
+              </section>
+            ) : null}
+            {detailTechnique.compatibility?.combines_well_with?.length ? (
+              <section className={styles.detailSection}>
+                <h4>Сочетается с</h4>
+                <p>{detailTechnique.compatibility.combines_well_with.join(', ')}</p>
+              </section>
+            ) : null}
+            {detailTechnique.anti_patterns?.length ? (
+              <section className={styles.detailSection}>
+                <h4>Anti-patterns</h4>
+                <ul className={styles.detailList}>
+                  {detailTechnique.anti_patterns.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {detailTechnique.variants?.length ? (
+              <section className={styles.detailSection}>
+                <h4>Варианты</h4>
+                {detailTechnique.variants.map((variant, idx) => (
+                  <div key={idx} className={styles.variant}>
+                    <p><strong>{variant.name || `Вариант ${idx + 1}`}</strong></p>
+                    {variant.use_when ? <p>{variant.use_when}</p> : null}
+                    {variant.pattern ? <pre className={styles.detailPre}>{variant.pattern}</pre> : null}
+                  </div>
+                ))}
+              </section>
+            ) : null}
+            {detailTechnique.editable && detailTechnique.db_id ? (
+              <div className={styles.detailFooter}>
+                <button type="button" onClick={(e) => startEdit(e, detailTechnique)}>Изменить</button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {showTechniqueModal && (
         <div className={styles.modalOverlay} onClick={closeTechniqueModal}>
@@ -190,7 +285,19 @@ export default function Techniques() {
       ) : (
         <div className={styles.grid}>
           {techniques.map((t) => (
-            <div key={t.id} className={styles.card}>
+            <div
+              key={t.id}
+              className={styles.card}
+              role="button"
+              tabIndex={0}
+              onClick={() => setDetailTechnique(t)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setDetailTechnique(t)
+                }
+              }}
+            >
               <div className={styles.cardHead}>
                 <div>
                   <h3>{t.name || t.id}</h3>
@@ -200,15 +307,20 @@ export default function Techniques() {
                   </p>
                 </div>
                 {t.editable && t.db_id ? (
-                  <div className={styles.cardActions}>
-                    <button onClick={() => startEdit(t)}>Изменить</button>
-                    <button onClick={async () => {
-                      await api.deleteTechnique(t.db_id as number)
-                      if (editingId === t.db_id) {
-                        closeTechniqueModal()
-                      }
-                      load()
-                    }}>
+                  <div className={styles.cardActions} onClick={(e) => e.stopPropagation()}>
+                    <button type="button" onClick={(e) => startEdit(e, t)}>Изменить</button>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await api.deleteTechnique(t.db_id as number)
+                        if (editingId === t.db_id) {
+                          closeTechniqueModal()
+                        }
+                        setDetailTechnique((cur) => (cur?.id === t.id ? null : cur))
+                        load()
+                      }}
+                    >
                       Удалить
                     </button>
                   </div>
@@ -220,47 +332,7 @@ export default function Techniques() {
               {t.core_pattern && (
                 <pre className={styles.pattern}>{t.core_pattern.slice(0, 150)}...</pre>
               )}
-              <details className={styles.details}>
-                <summary>Подробнее</summary>
-                {t.why_it_works && <p><strong>Почему работает:</strong> {t.why_it_works}</p>}
-                {t.good_example && <p><strong>Пример:</strong> {t.good_example}</p>}
-                {t.compatibility?.combines_well_with?.length ? (
-                  <p><strong>Хорошо сочетается с:</strong> {t.compatibility.combines_well_with.join(', ')}</p>
-                ) : null}
-                {t.anti_patterns?.length ? (
-                  <div>
-                    <strong>Anti-patterns</strong>
-                    <ul>
-                      {t.anti_patterns.map((item, idx) => <li key={idx}>{item}</li>)}
-                    </ul>
-                  </div>
-                ) : null}
-                {t.variants?.length ? (
-                  <div>
-                    <strong>Варианты</strong>
-                    {t.variants.map((variant, idx) => (
-                      <div key={idx} className={styles.variant}>
-                        <p><strong>{variant.name || `Вариант ${idx + 1}`}</strong></p>
-                        {variant.use_when && <p>{variant.use_when}</p>}
-                        {variant.pattern && <pre className={styles.pattern}>{variant.pattern}</pre>}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {t.core_pattern && (
-                  <button onClick={() => {
-                    const blob = new Blob([t.core_pattern || ''], { type: 'text/plain;charset=utf-8' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `${t.id}.txt`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }}>
-                    Скачать шаблон
-                  </button>
-                )}
-              </details>
+              <p className={styles.cardHint}>Нажмите карточку для полного описания</p>
             </div>
           ))}
         </div>

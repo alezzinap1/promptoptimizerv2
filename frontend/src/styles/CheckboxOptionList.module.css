@@ -1,0 +1,56 @@
+/* Shared checkbox rows (LLM question options, manual technique pickers) */
+.optionChecks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 8px;
+}
+
+.scrollable {
+  max-height: min(220px, 40vh);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Multi-column dense picker (Home / Compare manual techniques) */
+.gridWrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 4px 8px;
+  max-height: min(168px, 34vh);
+  overflow-y: auto;
+  margin: 4px 0 0;
+  padding: 6px 8px 8px 0;
+  align-content: start;
+}
+
+.optionCheck {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.optionCheck input[type='checkbox'] {
+  width: auto;
+  min-width: 0.9rem;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.optionCheck > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+[data-theme='light'] .optionCheck {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+}

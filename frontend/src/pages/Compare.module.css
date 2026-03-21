@@ -28,20 +28,18 @@
 .field select,
 .field textarea,
 .field input,
-.multi,
 .textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--select-surface);
   color: var(--text);
 }
 
 .field select:focus,
 .field textarea:focus,
 .field input:focus,
-.multi:focus,
 .textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.2);
@@ -51,10 +49,6 @@
 .radioRow {
   display: flex;
   gap: 12px;
-}
-
-.multi {
-  min-height: 120px;
 }
 
 .primaryBtn {

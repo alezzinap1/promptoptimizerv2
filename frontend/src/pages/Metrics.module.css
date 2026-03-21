@@ -1,5 +1,81 @@
 .metrics {
-  max-width: 1200px;
+  max-width: 1400px;
+}
+
+.pageColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.leftColumn {
+  min-width: 0;
+}
+
+.eventsColumn {
+  position: sticky;
+  top: 12px;
+  background: var(--secondary);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 10px 12px;
+  max-height: min(78vh, 900px);
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+.eventsTitle {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.console {
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  overflow: auto;
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.consoleEmpty {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.consoleLine {
+  display: grid;
+  grid-template-columns: 128px minmax(72px, 0.35fr) minmax(0, 1fr);
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  word-break: break-all;
+}
+
+.consoleLine:last-child {
+  border-bottom: none;
+}
+
+.consoleTime {
+  color: rgba(148, 163, 184, 0.95);
+  white-space: nowrap;
+}
+
+.consoleName {
+  color: #7dd3fc;
+  font-weight: 600;
+}
+
+.consolePayload {
+  color: rgba(226, 232, 240, 0.88);
+  opacity: 0.92;
 }
 
 .title {
@@ -135,8 +211,28 @@
   color: #ef4444;
 }
 
+@media (max-width: 1024px) {
+  .pageColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .eventsColumn {
+    position: static;
+    max-height: 420px;
+  }
+}
+
 @media (max-width: 900px) {
   .visualGrid {
     grid-template-columns: 1fr;
+  }
+
+  .consoleLine {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .consoleTime {
+    font-size: 9px;
   }
 }
