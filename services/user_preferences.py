@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from config.settings import MAX_INPUT_CHARS
+from core.simple_improve import normalize_preset
 from db.manager import DBManager
 from services.llm_client import PROVIDER_MODELS
 
@@ -72,6 +74,8 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         "font": str(prefs.get("font") or "jetbrains"),
         "preferred_generation_models": gen_models,
         "preferred_target_models": target_models,
+        "simple_improve_preset": normalize_preset(str(prefs.get("simple_improve_preset"))),
+        "simple_improve_meta": str(prefs.get("simple_improve_meta") or "")[:MAX_INPUT_CHARS],
         "openrouter_api_key_set": bool(user_key),
         "openrouter_api_key_masked": (user_key[:7] + "****") if len(user_key) > 7 else ("****" if user_key else ""),
     }
@@ -85,6 +89,8 @@ def update_user_preferences_payload(
     font: str | None = None,
     preferred_generation_models: list[str] | None = None,
     preferred_target_models: list[str] | None = None,
+    simple_improve_preset: str | None = None,
+    simple_improve_meta: str | None = None,
 ) -> dict:
     gen_models = None
     if preferred_generation_models is not None:
@@ -94,11 +100,19 @@ def update_user_preferences_payload(
         target_models = _normalize_models(preferred_target_models, allow_unknown=True) or list(DEFAULT_TARGET_MODELS)
         if "unknown" not in target_models:
             target_models.insert(0, "unknown")
+    sp = None
+    if simple_improve_preset is not None:
+        sp = normalize_preset(simple_improve_preset)
+    sm = None
+    if simple_improve_meta is not None:
+        sm = str(simple_improve_meta)[:MAX_INPUT_CHARS]
     db.upsert_user_preferences(
         user_id=user_id,
         theme=theme,
         font=font,
         preferred_generation_models=gen_models,
         preferred_target_models=target_models,
+        simple_improve_preset=sp,
+        simple_improve_meta=sm,
     )
     return get_user_preferences_payload(db, user_id)

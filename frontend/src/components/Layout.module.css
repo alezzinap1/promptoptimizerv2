@@ -42,6 +42,31 @@
   border-bottom-color: var(--primary);
 }
 
+.navLinkCta,
+.navLinkCtaActive {
+  padding: 10px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  text-decoration: none;
+  color: var(--text);
+  background: rgba(56, 189, 248, 0.12);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.navLinkCta:hover {
+  color: var(--primary);
+  border-color: rgba(110, 231, 183, 0.55);
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.navLinkCtaActive {
+  color: #0f172a;
+  background: linear-gradient(135deg, #38bdf8, #6ee7b7);
+  border-color: transparent;
+}
+
 .controls {
   display: flex;
   gap: 16px;

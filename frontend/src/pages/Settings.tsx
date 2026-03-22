@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type Settings } from '../api/client'
+import {
+  SIMPLE_PRESET_IDS,
+  SIMPLE_PRESET_LABELS,
+  type SimplePresetId,
+} from '../constants/simpleImprove'
 import { FONTS, THEMES, useTheme } from '../context/ThemeContext'
 import styles from './Settings.module.css'
 
@@ -31,6 +36,8 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [simplePreset, setSimplePreset] = useState<SimplePresetId>('balanced')
+  const [simpleMeta, setSimpleMeta] = useState('')
 
   useEffect(() => {
     api.getSettings()
@@ -38,6 +45,13 @@ export default function Settings() {
       .catch((e) => setMessage({ type: 'err', text: e instanceof Error ? e.message : 'Не удалось загрузить настройки' }))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!settings) return
+    const p = settings.simple_improve_preset as SimplePresetId
+    setSimplePreset(SIMPLE_PRESET_IDS.includes(p) ? p : 'balanced')
+    setSimpleMeta(settings.simple_improve_meta ?? '')
+  }, [settings])
 
   const handleSaveApiKey = async () => {
     setSaving(true)
@@ -47,6 +61,23 @@ export default function Settings() {
       setSettings(updated)
       setApiKey('')
       setMessage({ type: 'ok', text: 'API ключ сохранён' })
+    } catch (e) {
+      setMessage({ type: 'err', text: (e as Error).message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveSimpleImprove = async () => {
+    setSaving(true)
+    setMessage(null)
+    try {
+      const updated = await api.updateSettings({
+        simple_improve_preset: simplePreset,
+        simple_improve_meta: simpleMeta,
+      })
+      setSettings(updated)
+      setMessage({ type: 'ok', text: 'Настройки простого режима сохранены' })
     } catch (e) {
       setMessage({ type: 'err', text: (e as Error).message })
     } finally {
@@ -112,6 +143,50 @@ export default function Settings() {
             {message.text}
           </p>
         )}
+      </section>
+
+      <section className={styles.section}>
+        <h2>Простой режим (улучшение промпта)</h2>
+        <p className={styles.info}>
+          Пресет по умолчанию и дополнительный мета-промпт для экрана «Простой режим»: одна кнопка улучшает вставленный текст.
+          Подробнее — в <Link to="/help">справке</Link>.
+        </p>
+        <div className={styles.row}>
+          <label className={styles.fieldLabel}>
+            Пресет по умолчанию
+            <select
+              value={simplePreset}
+              onChange={(e) => setSimplePreset(e.target.value as SimplePresetId)}
+              className={styles.input}
+            >
+              {SIMPLE_PRESET_IDS.map((id) => (
+                <option key={id} value={id}>
+                  {SIMPLE_PRESET_LABELS[id]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className={styles.fieldLabel}>
+          Дополнительный мета-промпт (необязательно)
+          <textarea
+            className={styles.textarea}
+            value={simpleMeta}
+            onChange={(e) => setSimpleMeta(e.target.value)}
+            rows={5}
+            placeholder="Например: всегда добавляй критерии успеха; формат — маркированный список."
+          />
+        </label>
+        <div className={styles.row}>
+          <button
+            type="button"
+            onClick={handleSaveSimpleImprove}
+            disabled={saving || loading}
+            className={styles.btn}
+          >
+            {saving ? 'Сохранение…' : 'Сохранить простой режим'}
+          </button>
+        </div>
       </section>
 
       <section className={styles.section}>

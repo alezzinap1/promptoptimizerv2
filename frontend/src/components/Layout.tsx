@@ -4,14 +4,16 @@ import styles from './Layout.module.css'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home' },
+  { to: '/simple', label: 'Простой режим', cta: true },
   { to: '/compare', label: 'Сравнение' },
   { to: '/library', label: 'Библиотека' },
   { to: '/techniques', label: 'Техники' },
   { to: '/metrics', label: 'Метрики' },
   { to: '/workspaces', label: 'Workspaces' },
   { to: '/models', label: 'Модели' },
+  { to: '/help', label: 'Справка' },
   { to: '/user-info', label: 'User Info' },
-]
+] as const
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
@@ -21,19 +23,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className={styles.app}>
       <header className={styles.header}>
         <nav className={styles.nav}>
-          {NAV_ITEMS.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                isActive || (to === '/' && location.pathname === '/')
-                  ? styles.navLinkActive
-                  : styles.navLink
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const { to, label } = item
+            const cta = 'cta' in item && item.cta
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => {
+                  const active = isActive || (to === '/' && location.pathname === '/')
+                  if (cta) return active ? styles.navLinkCtaActive : styles.navLinkCta
+                  return active ? styles.navLinkActive : styles.navLink
+                }}
+              >
+                {label}
+              </NavLink>
+            )
+          })}
         </nav>
         <div className={styles.controls}>
           <div className={styles.userBox}>

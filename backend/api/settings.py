@@ -26,6 +26,8 @@ class SettingsUpdate(BaseModel):
     font: str | None = None
     preferred_generation_models: list[str] | None = None
     preferred_target_models: list[str] | None = None
+    simple_improve_preset: str | None = None
+    simple_improve_meta: str | None = None
 
 
 @router.patch("/settings")
@@ -44,5 +46,7 @@ def update_settings(
         font=req.font,
         preferred_generation_models=req.preferred_generation_models,
         preferred_target_models=req.preferred_target_models,
+        simple_improve_preset=req.simple_improve_preset,
+        simple_improve_meta=req.simple_improve_meta,
     )
     return prefs

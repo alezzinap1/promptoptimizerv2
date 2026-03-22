@@ -12,6 +12,8 @@ import Models from './pages/Models'
 import Settings from './pages/Settings'
 import UserInfo from './pages/UserInfo'
 import Workspaces from './pages/Workspaces'
+import SimpleImprove from './pages/SimpleImprove'
+import Help from './pages/Help'
 
 function AppShell() {
   const { user, loading } = useAuth()
@@ -23,6 +25,8 @@ function AppShell() {
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/simple" element={<SimpleImprove />} />
+        <Route path="/help" element={<Help />} />
         <Route path="/compare" element={<Compare />} />
         <Route path="/library" element={<Library />} />
         <Route path="/techniques" element={<Techniques />} />

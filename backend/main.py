@@ -33,6 +33,7 @@ from backend.api import (
     prompt_ide,
     sessions,
     settings,
+    simple_improve,
     techniques,
     user_info,
     workspaces,
@@ -62,6 +63,7 @@ app.include_router(metrics.router, prefix="/api", tags=["metrics"])
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(prompt_ide.router, prefix="/api", tags=["prompt-ide"])
 app.include_router(generate.router, prefix="/api", tags=["generate"])
+app.include_router(simple_improve.router, prefix="/api", tags=["simple-improve"])
 app.include_router(compare.router, prefix="/api", tags=["compare"])
 app.include_router(library.router, prefix="/api", tags=["library"])
 app.include_router(techniques.router, prefix="/api", tags=["techniques"])

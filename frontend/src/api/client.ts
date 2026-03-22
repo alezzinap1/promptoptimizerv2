@@ -144,6 +144,14 @@ export interface Settings {
   font: string
   preferred_generation_models: string[]
   preferred_target_models: string[]
+  simple_improve_preset: string
+  simple_improve_meta: string
+}
+
+export interface SimpleImproveResponse {
+  improved_text: string
+  preset_used: string
+  gen_model: string
 }
 
 export interface CompareVariant {
@@ -244,8 +252,13 @@ export const api = {
     font?: string
     preferred_generation_models?: string[]
     preferred_target_models?: string[]
+    simple_improve_preset?: string
+    simple_improve_meta?: string
   }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
+
+  simpleImprove: (req: { prompt_text: string; gen_model?: string; preset?: string }) =>
+    fetchApi<SimpleImproveResponse>('/simple-improve', { method: 'POST', body: JSON.stringify(req) }),
 
   previewPromptIde: (req: {
     task_input: string

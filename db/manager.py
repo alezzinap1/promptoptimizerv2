@@ -167,6 +167,7 @@ class DBManager:
             self._migrate_phase2(conn)
             self._migrate_phase3(conn)
             self._migrate_phase4_sessions_ttl(conn)
+            self._migrate_phase5_simple_improve(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -209,6 +210,13 @@ class DBManager:
             """,
             (now_sec,),
         )
+
+    def _migrate_phase5_simple_improve(self, conn: sqlite3.Connection) -> None:
+        """Simple mode: preset id + optional custom meta-instructions."""
+        self._safe_add_column(
+            conn, "user_preferences", "simple_improve_preset", "TEXT DEFAULT 'balanced'"
+        )
+        self._safe_add_column(conn, "user_preferences", "simple_improve_meta", "TEXT DEFAULT ''")
 
     def _safe_add_column(
         self,
@@ -300,6 +308,8 @@ class DBManager:
                 "font": "jetbrains",
                 "preferred_generation_models": [],
                 "preferred_target_models": [],
+                "simple_improve_preset": "balanced",
+                "simple_improve_meta": "",
             }
         data = dict(row)
         for source, target in (
@@ -311,6 +321,8 @@ class DBManager:
             except Exception:
                 data[target] = []
             data.pop(source, None)
+        data.setdefault("simple_improve_preset", "balanced")
+        data.setdefault("simple_improve_meta", "")
         return data
 
     def upsert_user_preferences(
@@ -320,6 +332,8 @@ class DBManager:
         font: str | None = None,
         preferred_generation_models: list[str] | None = None,
         preferred_target_models: list[str] | None = None,
+        simple_improve_preset: str | None = None,
+        simple_improve_meta: str | None = None,
     ) -> dict:
         current = self.get_user_preferences(user_id)
         next_theme = theme if theme is not None else str(current.get("theme") or "slate")
@@ -334,17 +348,30 @@ class DBManager:
             if preferred_target_models is not None
             else list(current.get("preferred_target_models") or [])
         )
+        next_simple_preset = (
+            simple_improve_preset
+            if simple_improve_preset is not None
+            else str(current.get("simple_improve_preset") or "balanced")
+        )
+        next_simple_meta = (
+            simple_improve_meta
+            if simple_improve_meta is not None
+            else str(current.get("simple_improve_meta") or "")
+        )
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO user_preferences
-                    (user_id, theme, font, gen_models_json, target_models_json, updated_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    (user_id, theme, font, gen_models_json, target_models_json,
+                     simple_improve_preset, simple_improve_meta, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id) DO UPDATE SET
                     theme = excluded.theme,
                     font = excluded.font,
                     gen_models_json = excluded.gen_models_json,
                     target_models_json = excluded.target_models_json,
+                    simple_improve_preset = excluded.simple_improve_preset,
+                    simple_improve_meta = excluded.simple_improve_meta,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -353,6 +380,8 @@ class DBManager:
                     next_font,
                     json.dumps(next_gen, ensure_ascii=False),
                     json.dumps(next_target, ensure_ascii=False),
+                    next_simple_preset,
+                    next_simple_meta,
                 ),
             )
         return self.get_user_preferences(user_id)

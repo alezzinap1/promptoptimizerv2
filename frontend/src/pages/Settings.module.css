@@ -1,5 +1,5 @@
 .settings {
-  max-width: 600px;
+  max-width: 720px;
 }
 
 .section {
@@ -33,6 +33,29 @@
   gap: 8px;
   align-items: center;
   margin-bottom: 0.5rem;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #444);
+  background: var(--color-bg-input, #222);
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  resize: vertical;
 }
 
 .input {
