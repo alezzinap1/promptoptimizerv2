@@ -69,6 +69,9 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         from services.openrouter_models import completion_price_per_m
         from config.settings import TRIAL_MAX_COMPLETION_PER_M
         target_models = ["unknown"] + [m for m in target_models if m != "unknown" and completion_price_per_m(m) <= TRIAL_MAX_COMPLETION_PER_M]
+    cls_mode = str(prefs.get("task_classification_mode") or "heuristic").lower()
+    if cls_mode not in ("heuristic", "llm"):
+        cls_mode = "heuristic"
     return {
         "theme": str(prefs.get("theme") or "slate"),
         "font": str(prefs.get("font") or "jetbrains"),
@@ -76,6 +79,8 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         "preferred_target_models": target_models,
         "simple_improve_preset": normalize_preset(str(prefs.get("simple_improve_preset"))),
         "simple_improve_meta": str(prefs.get("simple_improve_meta") or "")[:MAX_INPUT_CHARS],
+        "task_classification_mode": cls_mode,
+        "task_classifier_model": str(prefs.get("task_classifier_model") or "").strip()[:500],
         "openrouter_api_key_set": bool(user_key),
         "openrouter_api_key_masked": (user_key[:7] + "****") if len(user_key) > 7 else ("****" if user_key else ""),
     }
@@ -91,6 +96,8 @@ def update_user_preferences_payload(
     preferred_target_models: list[str] | None = None,
     simple_improve_preset: str | None = None,
     simple_improve_meta: str | None = None,
+    task_classification_mode: str | None = None,
+    task_classifier_model: str | None = None,
 ) -> dict:
     gen_models = None
     if preferred_generation_models is not None:
@@ -106,6 +113,13 @@ def update_user_preferences_payload(
     sm = None
     if simple_improve_meta is not None:
         sm = str(simple_improve_meta)[:MAX_INPUT_CHARS]
+    tcm = None
+    if task_classification_mode is not None:
+        v = str(task_classification_mode).strip().lower()
+        tcm = v if v in ("heuristic", "llm") else "heuristic"
+    tmod = None
+    if task_classifier_model is not None:
+        tmod = str(task_classifier_model).strip()[:500]
     db.upsert_user_preferences(
         user_id=user_id,
         theme=theme,
@@ -114,5 +128,7 @@ def update_user_preferences_payload(
         preferred_target_models=target_models,
         simple_improve_preset=sp,
         simple_improve_meta=sm,
+        task_classification_mode=tcm,
+        task_classifier_model=tmod,
     )
     return get_user_preferences_payload(db, user_id)

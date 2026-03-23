@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
@@ -7,7 +7,6 @@ import Home from './pages/Home'
 import Compare from './pages/Compare'
 import Library from './pages/Library'
 import Techniques from './pages/Techniques'
-import Metrics from './pages/Metrics'
 import Models from './pages/Models'
 import Settings from './pages/Settings'
 import UserInfo from './pages/UserInfo'
@@ -30,7 +29,7 @@ function AppShell() {
         <Route path="/compare" element={<Compare />} />
         <Route path="/library" element={<Library />} />
         <Route path="/techniques" element={<Techniques />} />
-        <Route path="/metrics" element={<Metrics />} />
+        <Route path="/metrics" element={<Navigate to="/user-info#product-metrics" replace />} />
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/models" element={<Models />} />
         <Route path="/settings" element={<Settings />} />

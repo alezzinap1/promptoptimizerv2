@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from config.abuse import check_input_size, check_rate_limit
 from config.settings import TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
 from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
+from core.compare_judge import run_compare_judge
 from core.context_builder import ContextBuilder
 from core.parsing import parse_reply
 from core.quality_metrics import analyze_prompt
@@ -159,4 +160,71 @@ def compare_prompts(
             "metrics": metrics_b,
         },
         "winner": winner,
+        "winner_heuristic_note": (
+            "Победитель по внутренней эвристике (полнота и метрики текста), не вердикт LLM. "
+            "Ниже можно вызвать LLM-судью."
+        ),
     }
+
+
+class CompareJudgeRequest(BaseModel):
+    task_input: str
+    prompt_a: str
+    prompt_b: str
+    judge_model: str = "gemini_flash"
+
+
+@router.post("/compare/judge")
+def compare_llm_judge(
+    req: CompareJudgeRequest,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+    auth_session_id: str | None = Depends(get_session_id),
+):
+    """Отдельный вызов LLM-as-judge для двух промптов."""
+    ok, err = check_input_size(req.task_input)
+    if not ok:
+        raise HTTPException(400, err)
+    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    if not ok:
+        raise HTTPException(429, err)
+
+    user_id = int(user["id"])
+    user_key = db.get_user_openrouter_api_key(user_id)
+    api_key = resolve_openrouter_api_key(user_key)
+    if not api_key:
+        raise HTTPException(500, "OpenRouter API key not set. Введите свой ключ в Настройках.")
+
+    using_host_key = not bool(user_key)
+    judge = (req.judge_model or "gemini_flash").strip()
+    if using_host_key:
+        usage = db.get_user_usage(user_id)
+        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+            raise HTTPException(402, "Пробный лимит токенов исчерпан. Введите свой API ключ.")
+        mid = _get_openrouter_model_id(judge)
+        if completion_price_per_m(mid) > TRIAL_MAX_COMPLETION_PER_M:
+            raise HTTPException(403, "Модель судьи недоступна в пробном режиме. Укажите дешёвую модель или свой ключ.")
+
+    llm = LLMClient(api_key)
+    result = run_compare_judge(
+        llm,
+        judge,
+        req.task_input,
+        req.prompt_a,
+        req.prompt_b,
+    )
+
+    if using_host_key:
+        model_id = _get_openrouter_model_id(judge)
+        inp = len(req.task_input) + len(req.prompt_a) + len(req.prompt_b) + 2000
+        out = len(result.get("reasoning") or "") + 200
+        pr, cp = get_model_pricing(model_id)
+        db.add_user_usage(user_id, (inp + out) // 4, ((inp + out) // 4) * (pr + cp))
+
+    db.log_event(
+        "compare_judge",
+        session_id=auth_session_id or "",
+        payload={"winner": result.get("winner"), "judge_model": judge},
+        user_id=user_id,
+    )
+    return result

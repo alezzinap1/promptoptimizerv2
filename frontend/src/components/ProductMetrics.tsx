@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-import styles from './Metrics.module.css'
+import styles from '../pages/Metrics.module.css'
 
 function formatEventPayload(payload: unknown): string {
   if (payload === null || payload === undefined) return ''
@@ -12,7 +12,8 @@ function formatEventPayload(payload: unknown): string {
   }
 }
 
-export default function Metrics() {
+/** Продуктовые метрики (раньше отдельная страница /metrics). */
+export default function ProductMetrics() {
   const [summary, setSummary] = useState<Record<string, unknown> | null>(null)
   const [events, setEvents] = useState<Record<string, unknown>[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +28,7 @@ export default function Metrics() {
   }, [])
 
   if (error) return <p className={styles.error}>{error}</p>
-  if (!summary) return <p>Загрузка...</p>
+  if (!summary) return <p className={styles.loadingMetrics}>Загрузка метрик…</p>
 
   const funnel = [
     { label: 'Generate', value: Number(summary.generate_requests || 0) },
@@ -40,9 +41,9 @@ export default function Metrics() {
   const latencyScore = Math.max(Number(summary.p95_generation_latency_ms || 0), Number(summary.avg_generation_latency_ms || 0), 1)
 
   return (
-    <div className={styles.metrics}>
-      <h1 className={styles.title}>Продуктовые метрики</h1>
-      <p className={styles.caption}>Локальная телеметрия usage и outcome сигналов для web-версии.</p>
+    <div className={styles.metrics} id="product-metrics">
+      <h2 className={styles.title}>Продуктовые метрики</h2>
+      <p className={styles.caption}>Локальная телеметрия usage и outcome для web-версии.</p>
 
       <div className={styles.pageColumns}>
         <div className={styles.leftColumn}>
@@ -62,7 +63,7 @@ export default function Metrics() {
 
           <div className={styles.visualGrid}>
             <div className={styles.section}>
-              <h2>Session funnel</h2>
+              <h3 className={styles.subsectionTitle}>Session funnel</h3>
               <div className={styles.funnel}>
                 {funnel.map((item) => (
                   <div key={item.label} className={styles.funnelRow}>
@@ -77,7 +78,7 @@ export default function Metrics() {
             </div>
 
             <div className={styles.section}>
-              <h2>Latency snapshot</h2>
+              <h3 className={styles.subsectionTitle}>Latency snapshot</h3>
               <div className={styles.latencyBox}>
                 <div>
                   <span>AVG</span>
@@ -112,7 +113,7 @@ export default function Metrics() {
         </div>
 
         <aside className={styles.eventsColumn}>
-          <h2 className={styles.eventsTitle}>Последние события</h2>
+          <h3 className={styles.eventsTitle}>Последние события</h3>
           {events.length === 0 ? (
             <p className={styles.consoleEmpty}>История пуста.</p>
           ) : (

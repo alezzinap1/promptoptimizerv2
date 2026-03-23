@@ -24,7 +24,7 @@
 
 .cardHint {
   margin: 10px 0 0;
-  font-size: 0.78rem;
+  font-size: 14px;
   opacity: 0.55;
 }
 
@@ -101,7 +101,7 @@
 
 .detailSection p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 14px;
   line-height: 1.45;
 }
 
@@ -111,7 +111,7 @@
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.82rem;
+  font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 280px;
@@ -121,7 +121,7 @@
 .detailList {
   margin: 6px 0 0;
   padding-left: 1.2rem;
-  font-size: 0.88rem;
+  font-size: 14px;
 }
 
 .detailDownloadBtn {
@@ -249,13 +249,13 @@
 }
 
 .meta {
-  font-size: 13px;
+  font-size: 14px;
   opacity: 0.7;
   margin-bottom: 12px;
 }
 
 .pattern {
-  font-size: 13px;
+  font-size: 14px;
   white-space: pre-wrap;
   overflow: hidden;
 }

@@ -120,4 +120,7 @@
   max-width: 1600px;
   margin: 0 auto;
   padding: 20px 24px 28px;
+  /* Единая база как на Home (body 14px + комфортный межстрочный) */
+  font-size: 14px;
+  line-height: 1.55;
 }

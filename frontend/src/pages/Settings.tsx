@@ -38,6 +38,8 @@ export default function Settings() {
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [simplePreset, setSimplePreset] = useState<SimplePresetId>('balanced')
   const [simpleMeta, setSimpleMeta] = useState('')
+  const [clsMode, setClsMode] = useState<'heuristic' | 'llm'>('heuristic')
+  const [clsModel, setClsModel] = useState('')
 
   useEffect(() => {
     api.getSettings()
@@ -51,6 +53,8 @@ export default function Settings() {
     const p = settings.simple_improve_preset as SimplePresetId
     setSimplePreset(SIMPLE_PRESET_IDS.includes(p) ? p : 'balanced')
     setSimpleMeta(settings.simple_improve_meta ?? '')
+    setClsMode(settings.task_classification_mode === 'llm' ? 'llm' : 'heuristic')
+    setClsModel(settings.task_classifier_model ?? '')
   }, [settings])
 
   const handleSaveApiKey = async () => {
@@ -78,6 +82,23 @@ export default function Settings() {
       })
       setSettings(updated)
       setMessage({ type: 'ok', text: 'Настройки простого режима сохранены' })
+    } catch (e) {
+      setMessage({ type: 'err', text: (e as Error).message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveClassification = async () => {
+    setSaving(true)
+    setMessage(null)
+    try {
+      const updated = await api.updateSettings({
+        task_classification_mode: clsMode,
+        task_classifier_model: clsModel.trim(),
+      })
+      setSettings(updated)
+      setMessage({ type: 'ok', text: 'Классификация задачи сохранена' })
     } catch (e) {
       setMessage({ type: 'err', text: (e as Error).message })
     } finally {
@@ -143,6 +164,43 @@ export default function Settings() {
             {message.text}
           </p>
         )}
+      </section>
+
+      <section className={styles.section}>
+        <h2>Классификация задачи (Home)</h2>
+        <p className={styles.info}>
+          Определяет тип задачи и сложность для подбора техник. <strong>Эвристика</strong> — быстро и бесплатно,
+          метка в запросе помечена как неточная. <strong>LLM</strong> — отдельный короткий вызов модели (токены);
+          в пробном режиме при слишком дорогой модели подставится дешёвая по умолчанию.
+        </p>
+        <div className={styles.row}>
+          <label className={styles.fieldLabel}>
+            Режим
+            <select
+              value={clsMode}
+              onChange={(e) => setClsMode(e.target.value as 'heuristic' | 'llm')}
+              className={styles.input}
+            >
+              <option value="heuristic">Эвристика (ключевые слова)</option>
+              <option value="llm">LLM-классификатор</option>
+            </select>
+          </label>
+        </div>
+        <label className={styles.fieldLabel}>
+          Модель для LLM-режима (OpenRouter id или короткий ключ, напр. gemini_flash). Пусто — по умолчанию на сервере.
+          <input
+            className={styles.input}
+            value={clsModel}
+            onChange={(e) => setClsModel(e.target.value)}
+            placeholder="google/gemini-flash-1.5"
+            disabled={clsMode !== 'llm'}
+          />
+        </label>
+        <div className={styles.row}>
+          <button type="button" onClick={handleSaveClassification} disabled={saving || loading} className={styles.btn}>
+            {saving ? 'Сохранение…' : 'Сохранить классификацию'}
+          </button>
+        </div>
       </section>
 
       <section className={styles.section}>

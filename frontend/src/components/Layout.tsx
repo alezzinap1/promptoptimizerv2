@@ -8,7 +8,6 @@ const NAV_ITEMS = [
   { to: '/compare', label: 'Сравнение' },
   { to: '/library', label: 'Библиотека' },
   { to: '/techniques', label: 'Техники' },
-  { to: '/metrics', label: 'Метрики' },
   { to: '/workspaces', label: 'Workspaces' },
   { to: '/models', label: 'Модели' },
   { to: '/help', label: 'Справка' },

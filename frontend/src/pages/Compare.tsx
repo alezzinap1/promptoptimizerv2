@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { api, type OpenRouterModel } from '../api/client'
+import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
@@ -10,7 +10,11 @@ export default function Compare() {
   const [taskInput, setTaskInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<{ a: { prompt: string; reasoning: string; techniques: { id: string; name: string }[]; metrics: Record<string, unknown> }; b: { prompt: string; reasoning: string; techniques: { id: string; name: string }[]; metrics: Record<string, unknown> }; winner: 'a' | 'b' | 'tie' } | null>(null)
+  const [result, setResult] = useState<CompareResponse | null>(null)
+  const [judgeModel, setJudgeModel] = useState('')
+  const [judgeLoading, setJudgeLoading] = useState(false)
+  const [judgeResult, setJudgeResult] = useState<CompareJudgeResponse | null>(null)
+  const [judgeError, setJudgeError] = useState<string | null>(null)
   const [genModel, setGenModel] = useState('')
   const [targetModel, setTargetModel] = useState('unknown')
   const [modelsMap, setModelsMap] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
@@ -35,7 +39,9 @@ export default function Compare() {
       setModelsMap(labels)
       setGenerationOptions(settings.preferred_generation_models)
       setTargetOptions(settings.preferred_target_models)
-      setGenModel(settings.preferred_generation_models[0] || '')
+      const gen0 = settings.preferred_generation_models[0] || ''
+      setGenModel(gen0)
+      setJudgeModel(gen0 || 'gemini_flash')
       setTargetModel(settings.preferred_target_models[0] || 'unknown')
       setTechniques(techniquesRes.techniques.map((item) => ({
         id: String(item.id),
@@ -48,6 +54,8 @@ export default function Compare() {
     if (!taskInput.trim()) return
     setLoading(true)
     setError(null)
+    setJudgeResult(null)
+    setJudgeError(null)
     try {
       const res = await api.compare({
         task_input: taskInput.trim(),
@@ -65,6 +73,25 @@ export default function Compare() {
       setError(e instanceof Error ? e.message : 'Ошибка')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleJudge = async () => {
+    if (!result || !taskInput.trim()) return
+    setJudgeLoading(true)
+    setJudgeError(null)
+    try {
+      const j = await api.compareJudge({
+        task_input: taskInput.trim(),
+        prompt_a: result.a.prompt,
+        prompt_b: result.b.prompt,
+        judge_model: judgeModel.trim() || undefined,
+      })
+      setJudgeResult(j)
+    } catch (e) {
+      setJudgeError(e instanceof Error ? e.message : 'Ошибка судьи')
+    } finally {
+      setJudgeLoading(false)
     }
   }
 
@@ -177,9 +204,44 @@ export default function Compare() {
 
       {result && (
         <>
+          {result.winner_heuristic_note && (
+            <p className={styles.heuristicNote}>{result.winner_heuristic_note}</p>
+          )}
           <div className={styles.winner}>
-            {result.winner === 'tie' ? 'Варианты равны по метрикам' : `По метрикам лидирует вариант ${result.winner.toUpperCase()}`}
+            {result.winner === 'tie' ? 'Варианты равны по внутренним метрикам' : `По внутренним метрикам лидирует ${result.winner.toUpperCase()}`}
           </div>
+          <div className={styles.judgeRow}>
+            <label className={styles.judgeLabel}>
+              Модель-судья (id OpenRouter или короткий ключ)
+              <input
+                type="text"
+                className={styles.judgeInput}
+                list="compare-judge-models"
+                value={judgeModel}
+                onChange={(e) => setJudgeModel(e.target.value)}
+                placeholder="напр. gemini_flash или google/gemini-flash-1.5"
+              />
+              <datalist id="compare-judge-models">
+                {generationOptions.map((id) => (
+                  <option key={id} value={id} label={modelsMap[id] || id} />
+                ))}
+              </datalist>
+            </label>
+            <button type="button" className={styles.secondaryBtn} onClick={handleJudge} disabled={judgeLoading}>
+              {judgeLoading ? 'Судья…' : 'LLM-судья'}
+            </button>
+          </div>
+          {judgeError && <p className={styles.error}>{judgeError}</p>}
+          {judgeResult && (
+            <div className={styles.judgeBox}>
+              <strong>Вердикт судьи:</strong>{' '}
+              {judgeResult.winner === 'tie' ? 'ничья' : judgeResult.winner.toUpperCase()}
+              {judgeResult.scores && (
+                <span className={styles.judgeScores}> · scores: {JSON.stringify(judgeResult.scores)}</span>
+              )}
+              <p className={styles.judgeReason}>{judgeResult.reasoning}</p>
+            </div>
+          )}
           <div className={styles.metricCompare}>
             <div>Completeness A: {String(result.a.metrics.completeness_score ?? result.a.metrics.quality_score ?? 0)}%</div>
             <div>Completeness B: {String(result.b.metrics.completeness_score ?? result.b.metrics.quality_score ?? 0)}%</div>

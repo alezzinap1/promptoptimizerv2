@@ -140,6 +140,21 @@ def classify_task(user_input: str) -> dict:
     }
 
 
+def heuristic_classification_confidence(classification: dict, user_input: str) -> float:
+    """Грубая оценка уверенности эвристики (0–1): general-only ниже, больше совпадений ключей — выше."""
+    types = classification.get("task_types") or []
+    lower = (user_input or "").lower()
+    if types == ["general"]:
+        base = 0.42
+    else:
+        base = 0.58
+    hits = 0
+    for keywords in TASK_KEYWORDS.values():
+        if any(kw in lower for kw in keywords):
+            hits += 1
+    return min(0.92, base + 0.04 * min(hits, 4))
+
+
 def get_complexity_label(complexity: str) -> str:
     return {"low": "простая", "medium": "средняя", "high": "сложная"}.get(complexity, "средняя")
 

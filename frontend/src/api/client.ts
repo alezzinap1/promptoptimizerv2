@@ -146,6 +146,10 @@ export interface Settings {
   preferred_target_models: string[]
   simple_improve_preset: string
   simple_improve_meta: string
+  /** heuristic | llm — классификация задачи на Home */
+  task_classification_mode?: string
+  /** OpenRouter id или короткий ключ для LLM-классификатора */
+  task_classifier_model?: string
 }
 
 export interface SimpleImproveResponse {
@@ -159,6 +163,20 @@ export interface CompareVariant {
   reasoning: string
   techniques: { id: string; name: string }[]
   metrics: Record<string, unknown>
+}
+
+export interface CompareResponse {
+  a: CompareVariant
+  b: CompareVariant
+  winner: 'a' | 'b' | 'tie'
+  winner_heuristic_note?: string
+}
+
+export interface CompareJudgeResponse {
+  winner: 'a' | 'b' | 'tie'
+  reasoning: string
+  scores: Record<string, unknown> | null
+  parse_error?: boolean
 }
 
 export interface LibraryItem {
@@ -254,6 +272,8 @@ export const api = {
     preferred_target_models?: string[]
     simple_improve_preset?: string
     simple_improve_meta?: string
+    task_classification_mode?: string
+    task_classifier_model?: string
   }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
 
@@ -286,7 +306,10 @@ export const api = {
     techs_a_manual?: string[]
     techs_b_mode?: string
     techs_b_manual?: string[]
-  }) => fetchApi<{ a: CompareVariant; b: CompareVariant; winner: 'a' | 'b' | 'tie' }>('/compare', { method: 'POST', body: JSON.stringify(req) }),
+  }) => fetchApi<CompareResponse>('/compare', { method: 'POST', body: JSON.stringify(req) }),
+
+  compareJudge: (req: { task_input: string; prompt_a: string; prompt_b: string; judge_model?: string }) =>
+    fetchApi<CompareJudgeResponse>('/compare/judge', { method: 'POST', body: JSON.stringify(req) }),
 
   getLibrary: (params?: { target_model?: string; task_type?: string; search?: string }) => {
     return fetchApi<{ items: LibraryItem[] }>(`/library${toQueryString(params)}`)

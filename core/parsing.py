@@ -30,14 +30,42 @@ def _normalize_protocol_markers(text: str) -> str:
 
 
 def _extract_block(text: str, open_tag: str, close_tag: str) -> tuple[str, str]:
-    """Extract block content. Returns (content, text_without_block)."""
-    if open_tag not in text or close_tag not in text:
+    """
+    Извлекает содержимое блока и текст без этого блока.
+
+    - Если открывающего тега нет — пустой контент, исходный text.
+    - Если закрывающего нет — весь хвост после открывающего (типичный сбой модели).
+    - Если оба есть — берём пару по *последнему* close_tag в хвосте, чтобы пережить
+      литеральное «[/TAG]» внутри примеров в тексте (реальный закрывающий чаще в конце).
+    """
+    if not text:
+        return "", ""
+    if open_tag not in text:
         return "", text
     before, rest = text.split(open_tag, 1)
     if close_tag not in rest:
         return rest.strip(), before.strip()
-    content, after = rest.split(close_tag, 1)
-    return content.strip(), (before.strip() + "\n" + after.strip()).strip()
+    close_idx = rest.rfind(close_tag)
+    content = rest[:close_idx].strip()
+    after = rest[close_idx + len(close_tag) :]
+    return content, (before.strip() + "\n" + after.strip()).strip()
+
+
+def _trim_before_line_start_marker(content: str, marker: str) -> str:
+    """
+    Отрезает хвост от первого вхождения marker, которое начинается с новой строки
+    (соседний протокольный блок). Не трогает marker внутри строки (например в JSON).
+    """
+    if not content or marker not in content:
+        return content
+    pos = 0
+    while True:
+        idx = content.find(marker, pos)
+        if idx < 0:
+            return content
+        if idx == 0 or content[idx - 1] in "\r\n":
+            return content[:idx].strip()
+        pos = idx + len(marker)
 
 
 def parse_reply(reply: str) -> dict:
@@ -45,19 +73,24 @@ def parse_reply(reply: str) -> dict:
     raw = _normalize_protocol_markers(reply or "")
 
     reasoning, text_without_reasoning = _extract_block(raw, REASONING_OPEN, REASONING_CLOSE)
-    prompt_block, text_without_prompt = _extract_block(text_without_reasoning, PROMPT_OPEN, PROMPT_CLOSE)
+    prompt_block, _text_without_prompt = _extract_block(text_without_reasoning, PROMPT_OPEN, PROMPT_CLOSE)
     questions_block, _ = _extract_block(raw, QUESTIONS_OPEN, QUESTIONS_CLOSE)
 
-    # Запасной путь: если после вырезания reasoning пара [PROMPT] не нашлась, но в полном ответе есть
-    if not (prompt_block and prompt_block.strip()) and PROMPT_OPEN in raw and PROMPT_CLOSE in raw:
+    # Запасной путь: после вырезания [REASONING] пара [PROMPT] могла не извлечься
+    # (например теги только в полном raw или сбой границы блоков).
+    if not (prompt_block and prompt_block.strip()) and PROMPT_OPEN in raw:
         fb, _ = _extract_block(raw, PROMPT_OPEN, PROMPT_CLOSE)
         if fb.strip():
             prompt_block = fb
 
-    if not (questions_block and questions_block.strip()) and QUESTIONS_OPEN in raw and QUESTIONS_CLOSE in raw:
+    if not (questions_block and questions_block.strip()) and QUESTIONS_OPEN in raw:
         qb, _ = _extract_block(raw, QUESTIONS_OPEN, QUESTIONS_CLOSE)
         if qb.strip():
             questions_block = qb
+
+    # Без [/PROMPT] весь хвост часто включает [QUESTIONS]… — оставляем только текст промпта.
+    if prompt_block and prompt_block.strip():
+        prompt_block = _trim_before_line_start_marker(prompt_block, QUESTIONS_OPEN)
 
     return {
         "reasoning": reasoning,

@@ -131,24 +131,24 @@ class TechniqueRegistry:
             tech = self._techniques.get(tid)
             if not tech:
                 continue
-            lines = [f"## Техника: {tech.get('name', tid)}"]
+            lines = [f"## **Техника:** {tech.get('name', tid)}"]
 
             why = tech.get("why_it_works", "")
             if why:
-                lines.append(f"Почему работает: {why.strip()}")
+                lines.append(f"**Почему работает:** {why.strip()}")
 
             core = tech.get("core_pattern", "")
             if core:
-                lines.append(f"Базовый шаблон:\n{core.strip()}")
+                lines.append(f"**Базовый шаблон:**\n{core.strip()}")
             else:
                 variants = tech.get("variants", [])
                 if variants:
                     v = variants[0]
-                    lines.append(f"Шаблон ({v.get('name', 'основной')}):\n{v.get('pattern', '').strip()}")
+                    lines.append(f"**Шаблон ({v.get('name', 'основной')}):**\n{v.get('pattern', '').strip()}")
 
             anti = tech.get("anti_patterns", [])
             if anti:
-                lines.append("Не применять когда: " + "; ".join(anti[:2]))
+                lines.append("**Не применять когда:** " + "; ".join(anti[:2]))
 
             parts.append("\n".join(lines))
 

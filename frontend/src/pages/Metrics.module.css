@@ -34,8 +34,8 @@
 
 .console {
   font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.4;
   overflow: auto;
   flex: 1;
   background: rgba(0, 0, 0, 0.35);
@@ -80,13 +80,21 @@
 
 .title {
   margin: 0 0 4px;
-  font-size: 1.4rem;
+  font-size: 2.2rem;
+  letter-spacing: -0.02em;
+  font-family: var(--font-display, inherit);
 }
 
 .caption {
   opacity: 0.8;
   margin-bottom: 12px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+}
+
+.loadingMetrics {
+  margin: 0;
+  opacity: 0.85;
+  font-size: 14px;
 }
 
 .grid {
@@ -111,13 +119,13 @@
 }
 
 .card strong {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 600;
   opacity: 0.9;
 }
 
 .card span {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 
@@ -129,6 +137,12 @@
 .section h2 {
   margin: 0 0 8px;
   font-size: 1rem;
+}
+
+.subsectionTitle {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .visualGrid {
@@ -150,7 +164,7 @@
   grid-template-columns: 80px 1fr 44px;
   gap: 8px;
   align-items: center;
-  font-size: 0.88rem;
+  font-size: 14px;
 }
 
 .funnelBar,

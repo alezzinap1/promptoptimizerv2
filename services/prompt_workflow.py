@@ -101,8 +101,9 @@ def build_preview_payload(
     registry: TechniqueRegistry,
     technique_mode: str = "auto",
     manual_techs: list[str] | None = None,
+    classification_override: dict | None = None,
 ) -> dict:
-    classification = classify_task(raw_input)
+    classification = classification_override if classification_override is not None else classify_task(raw_input)
     techniques = resolve_techniques(
         registry=registry,
         classification=classification,

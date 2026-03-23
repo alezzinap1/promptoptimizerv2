@@ -18,6 +18,8 @@ from core.quality_metrics import analyze_prompt
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
+from core.task_classifier import classify_task, heuristic_classification_confidence
+from core.task_llm_classifier import classify_task_with_llm
 from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
 from services.openrouter_models import get_model_pricing, completion_price_per_m
 from services.prompt_workflow import (
@@ -135,6 +137,29 @@ def generate_prompt(
         if not workspace:
             raise HTTPException(404, f"Workspace {req.workspace_id} not found")
 
+    prefs_row = db.get_user_preferences(user_id)
+    cls_mode = str(prefs_row.get("task_classification_mode") or "heuristic").lower()
+    cls_model_pref = str(prefs_row.get("task_classifier_model") or "").strip()
+    if cls_mode == "llm":
+        cls_provider = cls_model_pref or PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
+        if using_host_key:
+            cmid = _get_openrouter_model_id(cls_provider)
+            if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
+                cls_provider = PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
+        classification = classify_task_with_llm(llm, cls_provider, req.task_input)
+        if using_host_key:
+            c_raw = len(req.task_input) + 400
+            model_id = _get_openrouter_model_id(cls_provider)
+            pr, cp = get_model_pricing(model_id)
+            db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
+    else:
+        hc = classify_task(req.task_input)
+        classification = {
+            **hc,
+            "classification_source": "heuristic",
+            "classifier_confidence": heuristic_classification_confidence(hc, req.task_input),
+        }
+
     db.log_event(
         event_name="generate_requested",
         session_id=auth_session_id or "",
@@ -143,6 +168,7 @@ def generate_prompt(
             "questions_mode": req.questions_mode,
             "technique_mode": req.technique_mode,
             "workspace_id": req.workspace_id or 0,
+            "task_classification_mode": cls_mode,
         },
         user_id=int(user["id"]),
     )
@@ -157,8 +183,8 @@ def generate_prompt(
         registry=registry,
         technique_mode=req.technique_mode,
         manual_techs=req.manual_techs,
+        classification_override=classification,
     )
-    classification = preview["classification"]
     prompt_spec = preview["prompt_spec"]
     evidence = preview["evidence"]
     debug_issues = preview["debug_issues"]

@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 
 from aiogram import F, Router
@@ -39,18 +38,12 @@ from bot.handlers.keyboards import (
     get_techniques_list_keyboard,
 )
 from bot.services.llm_client import LLMService, PROVIDER_NAMES
+from core.parsing import PROMPT_CLOSE, PROMPT_OPEN, QUESTIONS_OPEN, parse_questions, parse_reply
 
 logger = logging.getLogger(__name__)
 router = Router()
 
 TELEGRAM_MAX = 4096
-
-PROMPT_OPEN = "[PROMPT]"
-PROMPT_CLOSE = "[/PROMPT]"
-QUESTIONS_OPEN = "[QUESTIONS]"
-QUESTIONS_CLOSE = "[/QUESTIONS]"
-REASONING_OPEN = "[REASONING]"
-REASONING_CLOSE = "[/REASONING]"
 
 
 # ─── FSM States ──────────────────────────────────────────────────────────────
@@ -73,78 +66,6 @@ class SettingsStates(StatesGroup):
 
 def _html_escape(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def _extract_block(text: str, open_tag: str, close_tag: str) -> tuple[str, str]:
-    """Извлекает содержимое блока (tag...tag) и возвращает (content, text_without_block)."""
-    if open_tag not in text or close_tag not in text:
-        return "", text
-    before, rest = text.split(open_tag, 1)
-    if close_tag not in rest:
-        return rest.strip(), before.strip()
-    content, after = rest.split(close_tag, 1)
-    return content.strip(), (before.strip() + "\n" + after.strip()).strip()
-
-
-def parse_reply(reply: str) -> dict:
-    """
-    Разбирает ответ агента на компоненты:
-    reasoning, intro, prompt_block, outro
-    """
-    reasoning, text_without_reasoning = _extract_block(reply, REASONING_OPEN, REASONING_CLOSE)
-    prompt_block, text_without_prompt = _extract_block(text_without_reasoning, PROMPT_OPEN, PROMPT_CLOSE)
-    questions_block, _ = _extract_block(reply, QUESTIONS_OPEN, QUESTIONS_CLOSE)
-
-    return {
-        "reasoning": reasoning,
-        "prompt_block": prompt_block,
-        "questions_raw": questions_block,
-        "text": text_without_reasoning,
-        "has_prompt": bool(prompt_block and prompt_block.strip()),
-        "has_questions": bool(questions_block and questions_block.strip()),
-    }
-
-
-def parse_questions(questions_raw: str) -> list[dict] | None:
-    """Парсит блок [QUESTIONS] → список вопросов с вариантами."""
-    if not questions_raw.strip():
-        return None
-    questions = []
-    current_q = None
-    for line in questions_raw.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        m = re.match(r"^\d+\.\s*(.+)$", line)
-        if m:
-            if current_q is not None:
-                if not current_q.get("options"):
-                    current_q["options"] = ["Пропустить"]
-                questions.append(current_q)
-            current_q = {"question": m.group(1).strip(), "options": []}
-        elif (line.startswith("-") or line.startswith("*")) and current_q is not None:
-            opt = line.lstrip("-*").strip()
-            if opt:
-                current_q["options"].append(opt)
-    if current_q is not None:
-        if not current_q.get("options"):
-            current_q["options"] = ["Пропустить"]
-        questions.append(current_q)
-
-    if not questions:
-        return None
-
-    # Нормализуем: 2-5 вариантов, макс 5 вопросов
-    normalized = []
-    for q in questions[:5]:
-        opts = q["options"][:5]
-        if len(opts) < 2:
-            opts.append("Пропустить")
-        if len(opts) == 1:
-            opts.append(opts[0])
-        q["options"] = opts
-        normalized.append(q)
-    return normalized
 
 
 # ─── Helpers для отправки ─────────────────────────────────────────────────────

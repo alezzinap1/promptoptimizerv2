@@ -82,6 +82,98 @@ class ParsingTests(unittest.TestCase):
         self.assertGreaterEqual(len(questions[0]["options"]), 2)
         self.assertIn("Пропустить", questions[0]["options"])
 
+    def test_parse_reply_prompt_without_closing_tag(self) -> None:
+        """Модель часто не пишет [/PROMPT] — блок всё равно извлекается."""
+        reply = """
+[REASONING]
+Кратко.
+[/REASONING]
+
+[PROMPT]
+Ты — эксперт. Верни JSON.
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertTrue(parsed["has_prompt"])
+        self.assertIn("эксперт", parsed["prompt_block"])
+        self.assertFalse(diagnose_generation_response(parsed, [])["format_failure"])
+
+    def test_parse_reply_unclosed_prompt_strips_trailing_questions_block(self) -> None:
+        """Хвост без [/PROMPT] не должен дублировать [QUESTIONS] в prompt_block."""
+        reply = """
+[REASONING]
+r
+[/REASONING]
+
+[PROMPT]
+Основной текст промпта.
+
+[QUESTIONS]
+1. Вопрос?
+- А
+- Б
+[/QUESTIONS]
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertTrue(parsed["has_prompt"])
+        self.assertIn("Основной текст", parsed["prompt_block"])
+        self.assertNotIn("1. Вопрос", parsed["prompt_block"])
+        self.assertTrue(parsed["has_questions"])
+
+    def test_parse_reply_last_closing_prompt_tag_wins(self) -> None:
+        """Литеральное [/PROMPT] в середине текста не обрезает промпт до мусора."""
+        reply = """
+[PROMPT]
+Пиши слово [/PROMPT] только в конце ответа.
+Реальный промпт продолжается.
+[/PROMPT]
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertTrue(parsed["has_prompt"])
+        self.assertIn("Реальный промпт", parsed["prompt_block"])
+        self.assertIn("[/PROMPT]", parsed["prompt_block"])
+
+    def test_parse_reply_reasoning_literal_close_inside_then_real_close(self) -> None:
+        """В reasoning может встретиться текст «[/REASONING]» — берём последний закрывающий тег."""
+        reply = """
+[REASONING]
+Упомянем тег [/REASONING] в примере.
+Дальше настоящее рассуждение.
+[/REASONING]
+
+[PROMPT]
+OK
+[/PROMPT]
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertIn("настоящее", parsed["reasoning"].lower())
+        self.assertIn("пример", parsed["reasoning"].lower())
+        self.assertEqual(parsed["prompt_block"].strip(), "OK")
+
+    def test_parse_reply_questions_without_close(self) -> None:
+        raw = """
+[PROMPT]
+P
+[/PROMPT]
+
+[QUESTIONS]
+1. Один?
+- Да
+""".strip()
+        parsed = parse_reply(raw)
+        self.assertTrue(parsed["has_questions"])
+        self.assertIn("Один", parsed["questions_raw"])
+
+    def test_trim_does_not_strip_json_line_with_questions_marker(self) -> None:
+        """[QUESTIONS] внутри строки (не с начала строки) не отрезает промпт."""
+        reply = """
+[PROMPT]
+Пример ключа "[QUESTIONS]" в JSON-строке.
+Ещё строка.
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertTrue(parsed["has_prompt"])
+        self.assertIn("[QUESTIONS]", parsed["prompt_block"])
+
 
 if __name__ == "__main__":
     unittest.main()

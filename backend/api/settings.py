@@ -28,6 +28,8 @@ class SettingsUpdate(BaseModel):
     preferred_target_models: list[str] | None = None
     simple_improve_preset: str | None = None
     simple_improve_meta: str | None = None
+    task_classification_mode: str | None = None  # heuristic | llm
+    task_classifier_model: str | None = None  # OpenRouter id or short key
 
 
 @router.patch("/settings")
@@ -48,5 +50,7 @@ def update_settings(
         preferred_target_models=req.preferred_target_models,
         simple_improve_preset=req.simple_improve_preset,
         simple_improve_meta=req.simple_improve_meta,
+        task_classification_mode=req.task_classification_mode,
+        task_classifier_model=req.task_classifier_model,
     )
     return prefs

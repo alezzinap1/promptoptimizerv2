@@ -13,6 +13,7 @@ from core.simple_improve import (
     build_simple_improve_system_prompt,
     build_simple_improve_user_message,
     normalize_preset,
+    strip_simple_improve_preamble,
 )
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -109,7 +110,7 @@ def simple_improve(
         temperature=0.35,
         top_p=0.95,
     )
-    improved = (improved or "").strip()
+    improved = strip_simple_improve_preamble((improved or "").strip())
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
 
     if using_host_key:

@@ -168,6 +168,7 @@ class DBManager:
             self._migrate_phase3(conn)
             self._migrate_phase4_sessions_ttl(conn)
             self._migrate_phase5_simple_improve(conn)
+            self._migrate_phase6_task_classifier_prefs(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -217,6 +218,13 @@ class DBManager:
             conn, "user_preferences", "simple_improve_preset", "TEXT DEFAULT 'balanced'"
         )
         self._safe_add_column(conn, "user_preferences", "simple_improve_meta", "TEXT DEFAULT ''")
+
+    def _migrate_phase6_task_classifier_prefs(self, conn: sqlite3.Connection) -> None:
+        """Task classification: heuristic vs LLM + optional classifier model id."""
+        self._safe_add_column(
+            conn, "user_preferences", "task_classification_mode", "TEXT DEFAULT 'heuristic'"
+        )
+        self._safe_add_column(conn, "user_preferences", "task_classifier_model", "TEXT DEFAULT ''")
 
     def _safe_add_column(
         self,
@@ -310,6 +318,8 @@ class DBManager:
                 "preferred_target_models": [],
                 "simple_improve_preset": "balanced",
                 "simple_improve_meta": "",
+                "task_classification_mode": "heuristic",
+                "task_classifier_model": "",
             }
         data = dict(row)
         for source, target in (
@@ -323,6 +333,8 @@ class DBManager:
             data.pop(source, None)
         data.setdefault("simple_improve_preset", "balanced")
         data.setdefault("simple_improve_meta", "")
+        data.setdefault("task_classification_mode", "heuristic")
+        data.setdefault("task_classifier_model", "")
         return data
 
     def upsert_user_preferences(
@@ -334,6 +346,8 @@ class DBManager:
         preferred_target_models: list[str] | None = None,
         simple_improve_preset: str | None = None,
         simple_improve_meta: str | None = None,
+        task_classification_mode: str | None = None,
+        task_classifier_model: str | None = None,
     ) -> dict:
         current = self.get_user_preferences(user_id)
         next_theme = theme if theme is not None else str(current.get("theme") or "slate")
@@ -358,13 +372,26 @@ class DBManager:
             if simple_improve_meta is not None
             else str(current.get("simple_improve_meta") or "")
         )
+        next_cls_mode = (
+            task_classification_mode
+            if task_classification_mode is not None
+            else str(current.get("task_classification_mode") or "heuristic")
+        )
+        if next_cls_mode not in ("heuristic", "llm"):
+            next_cls_mode = "heuristic"
+        next_cls_model = (
+            task_classifier_model
+            if task_classifier_model is not None
+            else str(current.get("task_classifier_model") or "")
+        )
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO user_preferences
                     (user_id, theme, font, gen_models_json, target_models_json,
-                     simple_improve_preset, simple_improve_meta, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     simple_improve_preset, simple_improve_meta,
+                     task_classification_mode, task_classifier_model, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id) DO UPDATE SET
                     theme = excluded.theme,
                     font = excluded.font,
@@ -372,6 +399,8 @@ class DBManager:
                     target_models_json = excluded.target_models_json,
                     simple_improve_preset = excluded.simple_improve_preset,
                     simple_improve_meta = excluded.simple_improve_meta,
+                    task_classification_mode = excluded.task_classification_mode,
+                    task_classifier_model = excluded.task_classifier_model,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -382,6 +411,8 @@ class DBManager:
                     json.dumps(next_target, ensure_ascii=False),
                     next_simple_preset,
                     next_simple_meta,
+                    next_cls_mode,
+                    next_cls_model.strip()[:500],
                 ),
             )
         return self.get_user_preferences(user_id)

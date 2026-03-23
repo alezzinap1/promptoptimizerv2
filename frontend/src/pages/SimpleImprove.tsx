@@ -122,14 +122,42 @@ export default function SimpleImprove() {
         )}
       </div>
 
-      <textarea
-        className={styles.textarea}
-        placeholder="Ваш промпт…"
-        value={promptText}
-        onChange={(e) => setPromptText(e.target.value)}
-        rows={12}
-        spellCheck
-      />
+      <div className={styles.pairGrid}>
+        <div className={styles.col}>
+          <h2 className={styles.colTitle}>Запрос</h2>
+          <p className={styles.colHint}>Исходный текст промпта</p>
+          <textarea
+            className={styles.textarea}
+            placeholder="Ваш промпт…"
+            value={promptText}
+            onChange={(e) => setPromptText(e.target.value)}
+            rows={14}
+            spellCheck
+          />
+        </div>
+        <div className={styles.col}>
+          <div className={styles.colHead}>
+            <div>
+              <h2 className={styles.colTitle}>Ответ</h2>
+              <p className={styles.colHint}>Улучшенный вариант от модели</p>
+            </div>
+            {result ? (
+              <button type="button" className={styles.secondaryBtn} onClick={copy}>
+                {copied ? 'Скопировано' : 'Копировать'}
+              </button>
+            ) : null}
+          </div>
+          <div className={styles.answerPanel}>
+            {result ? (
+              <pre className={styles.result}>{result}</pre>
+            ) : (
+              <p className={styles.answerPlaceholder}>
+                После нажатия «Улучшить промпт» результат появится здесь.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className={styles.actions}>
         <button type="button" className={styles.primaryBtn} onClick={run} disabled={loading}>
@@ -138,18 +166,6 @@ export default function SimpleImprove() {
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
-
-      {result && (
-        <section className={styles.output}>
-          <div className={styles.outputHead}>
-            <h2 className={styles.outputTitle}>Результат</h2>
-            <button type="button" className={styles.secondaryBtn} onClick={copy}>
-              {copied ? 'Скопировано' : 'Копировать'}
-            </button>
-          </div>
-          <pre className={styles.result}>{result}</pre>
-        </section>
-      )}
     </div>
   )
 }

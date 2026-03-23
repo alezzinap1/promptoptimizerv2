@@ -1,5 +1,12 @@
 .page {
   max-width: 800px;
+  margin: 0 auto;
+}
+
+.metricsWide {
+  max-width: 1400px;
+  margin: 8px auto 0;
+  padding-bottom: 32px;
 }
 
 .section {
@@ -12,7 +19,9 @@
 
 .section h2 {
   margin: 0 0 16px;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-family: var(--font-display, inherit);
 }
 
 .stats {
@@ -29,7 +38,7 @@
 }
 
 .statLabel {
-  font-size: 0.9rem;
+  font-size: 14px;
   opacity: 0.8;
 }
 

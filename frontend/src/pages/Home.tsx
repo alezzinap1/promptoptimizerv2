@@ -218,6 +218,7 @@ export default function Home() {
 
   const handleGenerate = async (questionAnswers?: { question: string; answers: string[] }[]) => {
     if (!taskInput.trim()) return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     lastQuestionAnswersRef.current = questionAnswers
     setIssueBannerDismissed(false)
     setLoading(true)
