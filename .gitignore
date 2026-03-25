@@ -43,6 +43,9 @@ docs/**/*.doc
 # Markdown-заметки в корне docs/ (остаются только локально; не docs/screenshots/*.md)
 docs/*.md
 
+# Явно: гайд по прод-деплою (VPS, Caddy, Cloud.ru, типовые ошибки) — не публиковать в репозитории
+docs/PRODUCTION_DEPLOY_AND_OPS.md
+
 # ОС
 .DS_Store
 Thumbs.db
