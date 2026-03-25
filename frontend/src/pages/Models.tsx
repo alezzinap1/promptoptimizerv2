@@ -206,21 +206,7 @@ export default function Models() {
   return (
     <div className={styles.models}>
       <div className={styles.header}>
-        <h1>Модели OpenRouter</h1>
-        <div className={styles.headerMeta}>
-          <span className={styles.metric}>
-            {models.length} моделей
-            {meta?.from_cache && <span className={styles.cacheBadge}> · кеш</span>}
-          </span>
-          {updatedStr && <span className={styles.updated}>Обновлено: {updatedStr}</span>}
-          <button
-            className={styles.refreshBtn}
-            onClick={() => load(true)}
-            disabled={refreshing || loading}
-          >
-            {refreshing ? 'Обновление…' : 'Обновить'}
-          </button>
-        </div>
+        <h1 className="pageTitleGradient">Модели OpenRouter</h1>
       </div>
 
       <p className={styles.subtitle}>
@@ -242,11 +228,28 @@ export default function Models() {
           onChange={(e) => setSearch(e.target.value)}
           className={styles.search}
         />
-        {settings && (
-          <div className={styles.selectionBar}>
-            <span>В генерации: {settings.preferred_generation_models.length}</span>
+        <div className={styles.toolbarEnd}>
+          <div className={styles.headerMeta}>
+            <span className={styles.metric}>
+              {models.length} моделей
+              {meta?.from_cache && <span className={styles.cacheBadge}> · кеш</span>}
+            </span>
+            {updatedStr && <span className={styles.updated}>Обновлено: {updatedStr}</span>}
+            <button
+              type="button"
+              className={styles.refreshBtn}
+              onClick={() => load(true)}
+              disabled={refreshing || loading}
+            >
+              {refreshing ? 'Обновление…' : 'Обновить'}
+            </button>
           </div>
-        )}
+          {settings && (
+            <div className={styles.selectionBar}>
+              <span>В генерации: {settings.preferred_generation_models.length}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}

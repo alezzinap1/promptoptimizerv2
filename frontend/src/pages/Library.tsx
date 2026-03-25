@@ -70,7 +70,7 @@ export default function Library() {
   return (
     <div className={styles.library}>
       <div className={styles.header}>
-        <h1>Библиотека промптов</h1>
+        <h1 className="pageTitleGradient">Библиотека промптов</h1>
         <span className={styles.metric}>Промптов: {stats.total}</span>
       </div>
 

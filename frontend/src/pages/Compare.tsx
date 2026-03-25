@@ -97,7 +97,7 @@ export default function Compare() {
       <div className={pageStyles.panel}>
         <div className={pageStyles.panelHeader}>
           <div>
-            <h1 className={pageStyles.panelTitle}>A/B Сравнение техник</h1>
+            <h1 className="pageTitleGradient">A/B Сравнение техник</h1>
             <p className={pageStyles.panelSubtitle}>Сгенерируй один промпт двумя разными наборами техник и сравни результат</p>
           </div>
           {loading && <span className={pageStyles.infoBadge}>Генерирую...</span>}

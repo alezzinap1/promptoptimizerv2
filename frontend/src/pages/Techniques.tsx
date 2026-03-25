@@ -128,7 +128,7 @@ export default function Techniques() {
 
   return (
     <div className={styles.techniques}>
-      <h1>База знаний техник промптинга</h1>
+      <h1 className="pageTitleGradient">База знаний техник промптинга</h1>
       <p className={styles.meta}>Дефолтные техники доступны каждому пользователю. Свои техники можно добавлять поверх базы.</p>
       <p className={styles.meta}>Сейчас доступно: {defaultCount} default / {customCount} custom.</p>
 

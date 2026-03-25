@@ -64,7 +64,7 @@ export default function SimpleImprove() {
     <div className={styles.root}>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Простой режим</h1>
+          <h1 className="pageTitleGradient">Простой режим</h1>
           <p className={styles.lead}>
             Вставьте промпт и нажмите кнопку — получите улучшенный текст.{' '}
             <Link to="/help">Справка</Link>

@@ -97,7 +97,7 @@ export default function Workspaces() {
 
   return (
     <div className={styles.page}>
-      <h1>Workspaces</h1>
+      <h1 className="pageTitleGradient">Workspaces</h1>
       <p className={styles.caption}>
         Workspace — это контекст проекта: правила, глоссарий, ограничения и примеры. Выберите workspace при генерации промптов.
       </p>

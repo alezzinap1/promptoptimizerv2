@@ -23,18 +23,6 @@
   gap: 10px;
 }
 
-.header h1 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  font-family: var(--font-display);
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--text), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
 .metric {
   display: inline-flex;
   align-items: center;
