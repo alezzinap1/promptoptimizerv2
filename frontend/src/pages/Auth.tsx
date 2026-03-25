@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import styles from './Auth.module.css'
 
 export default function AuthPage() {
-  const { login, register } = useAuth()
+  const { login, register, enterDemoMode } = useAuth()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -61,6 +61,18 @@ export default function AuthPage() {
           {error && <p className={styles.error}>{error}</p>}
           <button className={styles.primary} onClick={submit} disabled={loading || !username || !password}>
             {loading ? 'Подождите…' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+          </button>
+          
+          <div className={styles.divider}>
+            <span>или</span>
+          </div>
+          
+          <button 
+            className={styles.secondary} 
+            onClick={enterDemoMode}
+            type="button"
+          >
+            Войти как гость (Demo)
           </button>
         </div>
       </div>
