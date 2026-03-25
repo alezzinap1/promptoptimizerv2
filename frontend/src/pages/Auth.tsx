@@ -61,7 +61,7 @@ export default function AuthPage() {
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && username && password) {
       submit()
     }
@@ -153,7 +153,7 @@ export default function AuthPage() {
               />
             </div>
 
-            <div className={styles.form} onKeyPress={handleKeyPress}>
+            <div className={styles.form} onKeyDown={handleKeyDown}>
               <div className={`${styles.inputGroup} ${focusedField === 'username' ? styles.focused : ''}`}>
                 <div className={styles.inputIcon}>
                   <UserIcon />

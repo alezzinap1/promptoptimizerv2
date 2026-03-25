@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const enterDemoMode = () => {
-    setUser({ id: 'demo', username: 'demo_user' } as User)
+    setUser({ id: 0, username: 'demo_user' })
     setLoading(false)
   }
 
