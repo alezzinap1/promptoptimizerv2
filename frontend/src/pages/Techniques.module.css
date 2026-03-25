@@ -1,31 +1,46 @@
 .techniques {
   max-width: 1200px;
+  animation: pageEnter 0.5s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .card {
   padding: 20px;
-  background: var(--secondary);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
   border-color: rgba(56, 189, 248, 0.35);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(56, 189, 248, 0.1);
+  transform: translateY(-2px);
 }
 
 .card:focus-visible {
-  outline: 2px solid rgba(56, 189, 248, 0.6);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
 .cardHint {
-  margin: 10px 0 0;
-  font-size: 14px;
-  opacity: 0.55;
+  margin: 12px 0 0;
+  font-size: 13px;
+  opacity: 0.5;
 }
 
 .cardHead,
@@ -39,78 +54,118 @@
 }
 
 .createBtn {
-  padding: 12px 20px;
+  padding: 14px 24px;
   border-radius: 12px;
   border: none;
   background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa));
-  color: white;
-  font-weight: 600;
+  color: #041016;
+  font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.createBtn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.createBtn:hover::before {
+  opacity: 1;
 }
 
 .createBtn:hover {
-  opacity: 0.95;
+  transform: translateY(-2px);
+  box-shadow: var(--glow);
 }
 
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.52);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modalContent {
   background: var(--modal-surface);
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid var(--modal-border);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
   max-width: 720px;
   width: 100%;
   max-height: 90vh;
   overflow: auto;
-  padding: 20px;
+  padding: 24px;
+  animation: scaleIn 0.25s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .detailModalContent {
   background: var(--modal-surface);
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid var(--modal-border);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
   max-width: 760px;
   width: 100%;
   max-height: 90vh;
   overflow: auto;
-  padding: 20px;
+  padding: 24px;
+  animation: scaleIn 0.25s ease-out;
 }
 
 .detailSection {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .detailSection h4 {
-  margin: 0 0 8px;
-  font-size: 0.95rem;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
 }
 
 .detailSection p {
   margin: 0;
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.55;
 }
 
 .detailPre {
-  margin: 8px 0 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 10px 0 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -119,18 +174,32 @@
 }
 
 .detailList {
-  margin: 6px 0 0;
-  padding-left: 1.2rem;
+  margin: 8px 0 0;
+  padding-left: 1.25rem;
   font-size: 14px;
+  line-height: 1.7;
 }
 
 .detailDownloadBtn {
-  margin-top: 10px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.detailDownloadBtn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
 .detailFooter {
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 24px;
+  padding-top: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -138,44 +207,55 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  gap: 12px;
+  margin-bottom: 20px;
+  gap: 16px;
 }
 
 .modalHeader h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
+  font-family: var(--font-display, inherit);
 }
 
 .modalClose {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: transparent;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text);
   font-size: 1.5rem;
   cursor: pointer;
   line-height: 1;
   flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
 .modalClose:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .primaryBtn {
   background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa)) !important;
-  color: white !important;
+  color: #041016 !important;
   border: none !important;
-  padding: 12px 20px !important;
-  font-weight: 600 !important;
+  padding: 14px 24px !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.primaryBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--glow);
 }
 
 .createGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
   margin-top: 16px;
 }
 
@@ -187,18 +267,27 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 14px;
+  margin-bottom: 28px;
 }
 
 .search {
-  padding: 10px 16px;
+  padding: 12px 18px;
   width: 100%;
   max-width: 400px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.15);
+  outline: none;
 }
 
 .grid {
@@ -210,28 +299,59 @@
 .error {
   color: #ef4444;
   margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .empty {
-  padding: 32px;
+  padding: 48px;
   text-align: center;
-  opacity: 0.75;
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
 .createGrid input,
-.createGrid textarea,
+.createGrid textarea {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.createGrid input:focus,
+.createGrid textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.1);
+  outline: none;
+}
+
 .cardActions button,
 .formActions button {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: var(--bg);
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cardActions button:hover,
+.formActions button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .card h3 {
   margin: 0 0 8px;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-family: var(--font-display, inherit);
 }
 
 .badges {
@@ -242,22 +362,31 @@
 }
 
 .badges span {
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-radius: 999px;
-  font-size: 0.75rem;
-  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .meta {
   font-size: 14px;
-  opacity: 0.7;
+  opacity: 0.65;
   margin-bottom: 12px;
 }
 
 .pattern {
-  font-size: 14px;
+  font-size: 13px;
   white-space: pre-wrap;
   overflow: hidden;
+  opacity: 0.8;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-top: 12px;
 }
 
 .details {
@@ -265,10 +394,11 @@
 }
 
 .variant {
-  margin-top: 8px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 @media (max-width: 860px) {

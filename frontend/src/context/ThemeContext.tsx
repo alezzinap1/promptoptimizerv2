@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-const THEMES = ['slate', 'forest', 'light', 'midnight', 'amber', 'ocean'] as const
+const THEMES = ['slate', 'forest', 'light', 'midnight', 'amber', 'ocean', 'mono'] as const
 const FONTS = ['jetbrains', 'inter', 'ibmplex', 'plusjakarta', 'spacegrotesk', 'manrope', 'outfit', 'firacode'] as const
 
 type ThemeId = (typeof THEMES)[number]

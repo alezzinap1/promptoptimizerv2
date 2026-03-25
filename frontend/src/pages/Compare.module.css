@@ -1,5 +1,17 @@
 .compare {
   max-width: 1200px;
+  animation: pageEnter 0.5s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .subtitle {
@@ -21,8 +33,12 @@
 
 .field label {
   display: block;
-  margin-bottom: 4px;
-  font-size: 14px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
 }
 
 .field select,
@@ -30,11 +46,14 @@
 .field input,
 .textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: var(--select-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .field select:focus,
@@ -42,32 +61,83 @@
 .field input:focus,
 .textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.2);
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.15);
   outline: none;
 }
 
 .radioRow {
   display: flex;
-  gap: 12px;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.radioRow label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.radioRow label:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.radioRow input[type="radio"] {
+  width: auto;
+  accent-color: var(--primary);
 }
 
 .primaryBtn {
-  padding: 12px 24px;
+  padding: 14px 28px;
   background: linear-gradient(130deg, var(--primary-strong), var(--accent));
   color: #041016;
   border: none;
   border-radius: 12px;
   font-weight: 700;
+  font-size: 1rem;
   margin-bottom: 24px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.primaryBtn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.primaryBtn:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.primaryBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--glow);
 }
 
 .primaryBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .error {
   color: #ef4444;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  margin-bottom: 16px;
 }
 
 .results {
@@ -77,16 +147,36 @@
   margin-top: 24px;
 }
 
+.column {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  transition: border-color 0.3s ease;
+}
+
+.column:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .column h3 {
   margin: 0 0 12px;
+  font-family: var(--font-display, inherit);
+  background: linear-gradient(135deg, var(--text), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .prompt {
   white-space: pre-wrap;
   padding: 16px;
-  background: var(--secondary);
-  border-radius: 8px;
-  font-size: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
   overflow-x: auto;
 }
 
@@ -98,31 +188,42 @@
 }
 
 .meta {
-  opacity: 0.75;
+  opacity: 0.7;
+  font-size: 14px;
 }
 
 .winner,
 .metricCompare {
-  padding: 14px 16px;
-  border-radius: 10px;
-  background: var(--secondary);
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: 16px;
+}
+
+.winner {
+  font-weight: 600;
+  text-align: center;
+  color: var(--primary);
 }
 
 .metricCompare {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 16px;
+  gap: 12px 20px;
+  font-size: 14px;
 }
 
 .heuristicNote {
   margin: 12px 0 0;
-  padding: 10px 12px;
+  padding: 12px 16px;
   font-size: 0.88rem;
-  opacity: 0.88;
-  border-radius: 10px;
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.08);
+  opacity: 0.9;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
 }
 
 .judgeRow {
@@ -130,7 +231,7 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .judgeLabel {
@@ -138,27 +239,42 @@
   min-width: 220px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.9rem;
 }
 
 .judgeInput {
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: var(--select-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.judgeInput:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.15);
+  outline: none;
 }
 
 .secondaryBtn {
-  padding: 10px 16px;
+  padding: 12px 20px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: var(--text);
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
 
 .secondaryBtn:disabled {
@@ -167,21 +283,28 @@
 }
 
 .judgeBox {
-  margin-top: 14px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  margin-top: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0.04));
+  border: 1px solid rgba(56, 189, 248, 0.25);
   font-size: 0.95rem;
 }
 
 .judgeScores {
-  opacity: 0.85;
+  opacity: 0.8;
   font-size: 0.85rem;
 }
 
 .judgeReason {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   white-space: pre-wrap;
-  line-height: 1.5;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+@media (max-width: 800px) {
+  .results {
+    grid-template-columns: 1fr;
+  }
 }

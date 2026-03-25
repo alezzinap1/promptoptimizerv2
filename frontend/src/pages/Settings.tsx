@@ -16,6 +16,7 @@ const THEME_LABELS: Record<string, string> = {
   midnight: 'Midnight',
   amber: 'Amber',
   ocean: 'Ocean',
+  mono: 'Monochrome',
 }
 
 const FONT_LABELS: Record<string, string> = {

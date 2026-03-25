@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/techniques', label: 'Техники', icon: 'techniques' },
   { to: '/workspaces', label: 'Workspaces', icon: 'workspaces' },
   { to: '/models', label: 'Модели', icon: 'models' },
+  { to: '/user-info', label: 'User Info', icon: 'user' },
   { to: '/help', label: 'Справка', icon: 'help' },
 ] as const
 
