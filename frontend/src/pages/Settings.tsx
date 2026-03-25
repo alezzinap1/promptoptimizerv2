@@ -6,13 +6,12 @@ import {
   SIMPLE_PRESET_LABELS,
   type SimplePresetId,
 } from '../constants/simpleImprove'
-import { FONTS, THEMES, useTheme } from '../context/ThemeContext'
+import { FONTS, PALETTES, useTheme } from '../context/ThemeContext'
 import styles from './Settings.module.css'
 
-const THEME_LABELS: Record<string, string> = {
+const PALETTE_LABELS: Record<string, string> = {
   slate: 'Slate',
   forest: 'Forest',
-  light: 'Light',
   midnight: 'Midnight',
   amber: 'Amber',
   ocean: 'Ocean',
@@ -31,7 +30,7 @@ const FONT_LABELS: Record<string, string> = {
 }
 
 export default function Settings() {
-  const { theme, font, setTheme, setFont } = useTheme()
+  const { palette, font, setPalette, setFont } = useTheme()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
@@ -251,32 +250,35 @@ export default function Settings() {
       <section className={styles.section}>
         <h2>Оформление</h2>
         <p className={styles.info}>
-          Персональные визуальные настройки интерфейса.
+          Выбор цветовой палитры и шрифта. Переключение светлой/тёмной темы — в меню профиля (три полоски).
         </p>
         <div className={styles.row}>
-          <select value={theme} onChange={(e) => setTheme(e.target.value as (typeof THEMES)[number])} className={styles.input}>
-            {THEMES.map((item) => (
-              <option key={item} value={item}>{THEME_LABELS[item]}</option>
-            ))}
-          </select>
-          <select value={font} onChange={(e) => setFont(e.target.value as (typeof FONTS)[number])} className={styles.input}>
-            {FONTS.map((item) => (
-              <option key={item} value={item}>{FONT_LABELS[item]}</option>
-            ))}
-          </select>
+          <label className={styles.fieldLabel}>
+            Палитра
+            <select value={palette} onChange={(e) => setPalette(e.target.value as (typeof PALETTES)[number])} className={styles.input}>
+              {PALETTES.map((item) => (
+                <option key={item} value={item}>{PALETTE_LABELS[item]}</option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.fieldLabel}>
+            Шрифт
+            <select value={font} onChange={(e) => setFont(e.target.value as (typeof FONTS)[number])} className={styles.input}>
+              {FONTS.map((item) => (
+                <option key={item} value={item}>{FONT_LABELS[item]}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </section>
 
       <section className={styles.section}>
         <h2>Набор моделей пользователя</h2>
         <p className={styles.info}>
-          Выбранные модели используются в `Home` и `Compare` как доступные варианты генерации и target model.
+          Выбранные модели используются в Home и Compare как доступные варианты генерации.
         </p>
         <p className={styles.masked}>
           Для генерации: <strong>{settings?.preferred_generation_models?.length ?? 0}</strong> моделей
-        </p>
-        <p className={styles.masked}>
-          Target models: <strong>{settings?.preferred_target_models?.length ?? 0}</strong>
         </p>
         <Link to="/models" className={styles.btn}>Открыть каталог моделей</Link>
       </section>

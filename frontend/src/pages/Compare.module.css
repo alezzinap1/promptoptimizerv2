@@ -22,8 +22,8 @@
 .settings {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .field {
@@ -41,13 +41,31 @@
   opacity: 0.7;
 }
 
+.fieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fieldLabelRow label {
+  margin-bottom: 0;
+}
+
+.copyRow {
+  display: flex;
+  justify-content: flex-end;
+  margin: 4px 0 8px;
+}
+
 .field select,
 .field textarea,
 .field input,
 .textarea {
   width: 100%;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   backdrop-filter: blur(8px);
@@ -77,14 +95,22 @@
   gap: 8px;
   cursor: pointer;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s ease;
+  border: none;
+  transition: background 0.2s ease;
 }
 
 .radioRow label:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='light'] .radioRow label {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+[data-theme='light'] .radioRow label:hover {
+  background: rgba(15, 23, 42, 0.08);
 }
 
 .radioRow input[type="radio"] {
@@ -97,7 +123,7 @@
   background: linear-gradient(130deg, var(--primary-strong), var(--accent));
   color: #041016;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   font-weight: 700;
   font-size: 1rem;
   margin-bottom: 24px;
@@ -135,7 +161,7 @@
   color: #ef4444;
   padding: 12px 16px;
   background: rgba(239, 68, 68, 0.1);
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(239, 68, 68, 0.2);
   margin-bottom: 16px;
 }
@@ -143,17 +169,17 @@
 .results {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-top: 24px;
+  gap: 16px;
+  margin-top: 16px;
 }
 
 .column {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-radius: 16px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 20px;
+  padding: 14px;
   transition: border-color 0.3s ease;
 }
 
@@ -174,7 +200,7 @@
   white-space: pre-wrap;
   padding: 16px;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 13px;
   overflow-x: auto;
@@ -195,7 +221,7 @@
 .winner,
 .metricCompare {
   padding: 16px 20px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -221,7 +247,7 @@
   padding: 12px 16px;
   font-size: 0.88rem;
   opacity: 0.9;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(245, 158, 11, 0.3);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
 }
@@ -246,7 +272,7 @@
 .judgeInput {
   width: 100%;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   color: var(--text);
@@ -261,7 +287,7 @@
 
 .secondaryBtn {
   padding: 12px 20px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   backdrop-filter: blur(6px);
@@ -285,7 +311,7 @@
 .judgeBox {
   margin-top: 16px;
   padding: 16px 20px;
-  border-radius: 14px;
+  border-radius: 9px;
   background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0.04));
   border: 1px solid rgba(56, 189, 248, 0.25);
   font-size: 0.95rem;

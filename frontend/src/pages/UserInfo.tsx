@@ -1,8 +1,75 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import ProductMetrics from '../components/ProductMetrics'
 import styles from './UserInfo.module.css'
+
+function EmailSection() {
+  const { user, refresh } = useAuth()
+  const [editing, setEditing] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailSuccess, setEmailSuccess] = useState(false)
+
+  const currentEmail = user?.email
+
+  const handleSave = async () => {
+    setEmailError(null)
+    setEmailSuccess(false)
+    if (!emailInput.trim()) return
+    setSaving(true)
+    try {
+      await api.updateEmail(emailInput.trim())
+      await refresh()
+      setEditing(false)
+      setEmailInput('')
+      setEmailSuccess(true)
+      setTimeout(() => setEmailSuccess(false), 3000)
+    } catch (e) {
+      setEmailError(e instanceof Error ? e.message : 'Не удалось сохранить email')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className={styles.section}>
+      <h2>Электронная почта</h2>
+      <div className={styles.emailRow}>
+        {currentEmail ? (
+          <span className={styles.emailValue}>{currentEmail}</span>
+        ) : (
+          <span className={styles.emailEmpty}>Не указана</span>
+        )}
+        <button className={styles.editBtn} onClick={() => { setEditing(!editing); setEmailError(null) }}>
+          {currentEmail ? 'Изменить' : 'Добавить'}
+        </button>
+      </div>
+      {editing && (
+        <div className={styles.emailForm}>
+          <input
+            type="email"
+            className={styles.emailInput}
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            placeholder="your@email.com"
+            autoFocus
+          />
+          <button className={styles.saveBtn} onClick={handleSave} disabled={saving || !emailInput.trim()}>
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <button className={styles.cancelBtn} onClick={() => { setEditing(false); setEmailInput('') }}>
+            Отмена
+          </button>
+        </div>
+      )}
+      {emailError && <p className={styles.emailError}>{emailError}</p>}
+      {emailSuccess && <p className={styles.emailSuccess}>Email сохранён</p>}
+    </section>
+  )
+}
 
 export default function UserInfo() {
   const [info, setInfo] = useState<Awaited<ReturnType<typeof api.getUserInfo>> | null>(null)
@@ -64,6 +131,8 @@ export default function UserInfo() {
             </p>
           )}
         </section>
+
+        <EmailSection />
 
         <section className={styles.section}>
           <h2>О сервисе</h2>

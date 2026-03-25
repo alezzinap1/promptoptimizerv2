@@ -38,6 +38,12 @@ SESSION_TTL_SEC = max(3600, SESSION_TTL_HOURS * 3600)  # minimum 1 hour
 TRIAL_TOKENS_LIMIT = int(os.getenv("TRIAL_TOKENS_LIMIT", "50000"))
 TRIAL_MAX_COMPLETION_PER_M = float(os.getenv("TRIAL_MAX_COMPLETION_PER_M", "1.0"))  # $/1M tokens
 
+# ── GitHub OAuth ─────────────────────────────────────────────
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+# Frontend URL for post-OAuth redirect (auto-detect from CORS_ORIGINS if not set)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://metaprompt.online")
+
 # ── Observability ────────────────────────────────────────────
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if APP_ENV == "prod" else "DEBUG")

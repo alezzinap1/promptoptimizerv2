@@ -169,6 +169,7 @@ class DBManager:
             self._migrate_phase4_sessions_ttl(conn)
             self._migrate_phase5_simple_improve(conn)
             self._migrate_phase6_task_classifier_prefs(conn)
+            self._migrate_phase7_user_auth_extended(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -226,6 +227,20 @@ class DBManager:
         )
         self._safe_add_column(conn, "user_preferences", "task_classifier_model", "TEXT DEFAULT ''")
 
+    def _migrate_phase7_user_auth_extended(self, conn: sqlite3.Connection) -> None:
+        """Email + GitHub OAuth fields on users table."""
+        self._safe_add_column(conn, "users", "email", "TEXT")
+        self._safe_add_column(conn, "users", "github_id", "TEXT")
+        self._safe_add_column(conn, "users", "github_login", "TEXT")
+        self._safe_add_column(conn, "users", "avatar_url", "TEXT")
+        # password_hash may be empty string for GitHub-only accounts
+        # Allow it by not adding a constraint (existing NOT NULL is on DDL string, not enforced for existing rows)
+        try:
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL")
+        except sqlite3.OperationalError:
+            pass
+
     def _safe_add_column(
         self,
         conn: sqlite3.Connection,
@@ -242,14 +257,47 @@ class DBManager:
 
     # ─── Users / auth ─────────────────────────────────────────────────────────
 
-    def create_user(self, username: str, password_hash: str) -> int:
+    def create_user(self, username: str, password_hash: str, email: str | None = None) -> int:
         """Create a user account. Raises sqlite3.IntegrityError for duplicates."""
         with self._conn() as conn:
             cur = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username.strip().lower(), password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username.strip().lower(), password_hash, email),
             )
             return cur.lastrowid  # type: ignore[return-value]
+
+    def create_github_user(
+        self,
+        username: str,
+        github_id: str,
+        github_login: str,
+        email: str | None = None,
+        avatar_url: str | None = None,
+    ) -> int:
+        """Create user via GitHub OAuth (no password). Returns user_id."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """INSERT INTO users (username, password_hash, email, github_id, github_login, avatar_url)
+                   VALUES (?, '', ?, ?, ?, ?)""",
+                (username.strip().lower(), email, github_id, github_login, avatar_url),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def get_user_by_github_id(self, github_id: str) -> dict | None:
+        """Find user by GitHub ID."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE github_id = ?", (github_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_user_email(self, user_id: int, email: str) -> None:
+        """Update user email. Raises sqlite3.IntegrityError if email already taken."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE users SET email = ? WHERE id = ?",
+                (email.strip().lower(), user_id),
+            )
 
     def get_user_by_username(self, username: str) -> dict | None:
         """Find user by username."""

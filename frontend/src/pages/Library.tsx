@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type LibraryItem } from '../api/client'
+import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../components/PromptToolbarIcons'
 import styles from './Library.module.css'
 
 export default function Library() {
@@ -8,7 +9,6 @@ export default function Library() {
   const [items, setItems] = useState<LibraryItem[]>([])
   const [stats, setStats] = useState<{ total: number; models?: string[]; task_types?: string[] }>({ total: 0 })
   const [search, setSearch] = useState('')
-  const [targetModel, setTargetModel] = useState('all')
   const [taskType, setTaskType] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,17 +24,16 @@ export default function Library() {
     setError(null)
     api.getLibrary({
       search: search || undefined,
-      target_model: targetModel !== 'all' ? targetModel : undefined,
       task_type: taskType !== 'all' ? taskType : undefined,
     })
       .then((r) => setItems(r.items))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [search, targetModel, taskType])
+  }, [search, taskType])
 
   const exportText = useMemo(() => (
     items.map((item) => (
-      `# ${item.title}\n# model: ${item.target_model}\n# tags: ${item.tags.join(', ')}\n\n${item.prompt}`
+      `# ${item.title}\n# tags: ${item.tags.join(', ')}\n\n${item.prompt}`
     )).join('\n\n' + '='.repeat(60) + '\n\n')
   ), [items])
 
@@ -63,7 +62,6 @@ export default function Library() {
     setEditingId(null)
     const refreshed = await api.getLibrary({
       search: search || undefined,
-      target_model: targetModel !== 'all' ? targetModel : undefined,
       task_type: taskType !== 'all' ? taskType : undefined,
     })
     setItems(refreshed.items)
@@ -84,12 +82,6 @@ export default function Library() {
           onChange={(e) => setSearch(e.target.value)}
           className={styles.search}
         />
-        <select className={styles.search} value={targetModel} onChange={(e) => setTargetModel(e.target.value)}>
-          <option value="all">Все модели</option>
-          {(stats.models || []).map((item) => (
-            <option key={item} value={item}>{item}</option>
-          ))}
-        </select>
         <select className={styles.search} value={taskType} onChange={(e) => setTaskType(e.target.value)}>
           <option value="all">Все типы</option>
           {(stats.task_types || []).map((item) => (
@@ -123,29 +115,33 @@ export default function Library() {
           {items.map((item) => (
             <div key={item.id} className={styles.card}>
               <h3>{item.title}</h3>
-              <p className={styles.meta}>{item.task_type} · {item.target_model} · {item.rating}/5</p>
+              <p className={styles.meta}>{item.task_type} · {item.rating}/5</p>
               {item.tags.length > 0 && <p className={styles.tags}>{item.tags.join(', ')}</p>}
-              <pre className={styles.preview}>{item.prompt.slice(0, 200)}...</pre>
+              <div className={styles.promptBlock}>
+                <pre className={styles.preview}>{item.prompt.slice(0, 200)}{item.prompt.length > 200 ? '…' : ''}</pre>
+              </div>
               <div className={styles.cardActions}>
-                <button onClick={() => {
-                  const blob = new Blob([item.prompt], { type: 'text/plain;charset=utf-8' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `prompt_${item.id}.txt`
-                  a.click()
-                  URL.revokeObjectURL(url)
-                }}>Скачать</button>
-                <button onClick={() => navigate('/', { state: { prefillTask: `Улучши этот промпт:\n\n${item.prompt}`, clearResult: true } })}>
+                <button type="button" className={styles.textActionBtn} onClick={() => navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${item.prompt}`, clearResult: true } })}>
                   Открыть
                 </button>
-                <button onClick={() => startEdit(item)}>Редактировать</button>
-                <button onClick={async () => {
+                <CopyIconButton text={item.prompt} title="Копировать промпт" />
+                <DownloadIconButton
+                  title="Скачать промпт"
+                  onClick={() => {
+                    const blob = new Blob([item.prompt], { type: 'text/plain;charset=utf-8' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `prompt_${item.id}.txt`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                />
+                <PencilIconButton onClick={() => startEdit(item)} />
+                <TrashIconButton onClick={async () => {
                   await api.deleteLibrary(item.id)
                   setItems((prev) => prev.filter((x) => x.id !== item.id))
-                }}>
-                  Удалить
-                </button>
+                }} />
               </div>
               {editingId === item.id && drafts[item.id] && (
                 <div className={styles.editBox}>

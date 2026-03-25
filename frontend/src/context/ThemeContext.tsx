@@ -1,15 +1,25 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-const THEMES = ['slate', 'forest', 'light', 'midnight', 'amber', 'ocean', 'mono'] as const
+const PALETTES = ['slate', 'forest', 'midnight', 'amber', 'ocean', 'mono'] as const
 const FONTS = ['jetbrains', 'inter', 'ibmplex', 'plusjakarta', 'spacegrotesk', 'manrope', 'outfit', 'firacode'] as const
+const COLOR_MODES = ['dark', 'light'] as const
 
-type ThemeId = (typeof THEMES)[number]
+type PaletteId = (typeof PALETTES)[number]
 type FontId = (typeof FONTS)[number]
+type ColorMode = (typeof COLOR_MODES)[number]
+
+// Keep THEMES as alias for backward compat (used in Settings.tsx select)
+const THEMES = PALETTES
 
 interface ThemeContextType {
-  theme: ThemeId
+  palette: PaletteId
+  mode: ColorMode
   font: FontId
-  setTheme: (t: ThemeId) => void
+  // Legacy alias — some pages may still reference `theme`
+  theme: PaletteId
+  setPalette: (p: PaletteId) => void
+  setMode: (m: ColorMode) => void
+  setTheme: (p: PaletteId) => void
   setFont: (f: FontId) => void
 }
 
@@ -27,45 +37,85 @@ const FONT_STACKS: Record<FontId, string> = {
   firacode: "'Fira Code', monospace",
 }
 
-function loadPrefs(): { theme: ThemeId; font: FontId } {
+function loadPrefs(): { palette: PaletteId; font: FontId; mode: ColorMode } {
   try {
     const s = localStorage.getItem(STORAGE_KEY)
     if (s) {
       const p = JSON.parse(s)
-      if (THEMES.includes(p.theme as ThemeId) && FONTS.includes(p.font as FontId)) {
-        return { theme: p.theme, font: p.font }
+
+      // Migrate legacy `theme` field
+      let palette: PaletteId = 'slate'
+      let mode: ColorMode = 'dark'
+
+      if (p.palette && PALETTES.includes(p.palette as PaletteId)) {
+        palette = p.palette as PaletteId
+      } else if (p.theme) {
+        // Legacy: 'light' theme → slate palette + light mode
+        if (p.theme === 'light') {
+          palette = 'slate'
+          mode = 'light'
+        } else if (PALETTES.includes(p.theme as PaletteId)) {
+          palette = p.theme as PaletteId
+        }
       }
+
+      if (p.mode && COLOR_MODES.includes(p.mode as ColorMode)) {
+        mode = p.mode as ColorMode
+      }
+
+      const font: FontId = FONTS.includes(p.font as FontId) ? (p.font as FontId) : 'jetbrains'
+      return { palette, font, mode }
     }
   } catch {}
-  return { theme: 'slate', font: 'jetbrains' }
+  return { palette: 'slate', font: 'jetbrains', mode: 'dark' }
 }
 
-function savePrefs(theme: ThemeId, font: FontId) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme, font }))
+function savePrefs(palette: PaletteId, font: FontId, mode: ColorMode) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ palette, font, mode }))
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState(loadPrefs)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', prefs.theme)
+    document.documentElement.setAttribute('data-theme', prefs.palette)
+    document.documentElement.setAttribute('data-mode', prefs.mode)
     document.body.style.fontFamily = FONT_STACKS[prefs.font]
-  }, [prefs.theme, prefs.font])
+  }, [prefs.palette, prefs.mode, prefs.font])
 
-  const setTheme = (t: ThemeId) => {
-    setPrefs((p) => ({ ...p, theme: t }))
-    savePrefs(t, prefs.font)
+  const setPalette = (p: PaletteId) => {
+    setPrefs((prev) => {
+      savePrefs(p, prev.font, prev.mode)
+      return { ...prev, palette: p }
+    })
   }
+
+  const setMode = (m: ColorMode) => {
+    setPrefs((prev) => {
+      savePrefs(prev.palette, prev.font, m)
+      return { ...prev, mode: m }
+    })
+  }
+
   const setFont = (f: FontId) => {
-    setPrefs((p) => ({ ...p, font: f }))
-    savePrefs(prefs.theme, f)
+    setPrefs((prev) => {
+      savePrefs(prev.palette, f, prev.mode)
+      return { ...prev, font: f }
+    })
   }
 
-  return (
-    <ThemeContext.Provider value={{ ...prefs, setTheme, setFont }}>
-      {children}
-    </ThemeContext.Provider>
-  )
+  const value: ThemeContextType = {
+    palette: prefs.palette,
+    mode: prefs.mode,
+    font: prefs.font,
+    theme: prefs.palette,
+    setPalette,
+    setMode,
+    setTheme: setPalette,
+    setFont,
+  }
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {
@@ -74,5 +124,5 @@ export function useTheme() {
   return ctx
 }
 
-export { THEMES, FONTS }
-export type { ThemeId, FontId }
+export { THEMES, PALETTES, FONTS, COLOR_MODES }
+export type { PaletteId, FontId, ColorMode }

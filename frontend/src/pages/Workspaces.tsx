@@ -7,7 +7,6 @@ const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
 const WORKSPACE_FIELDS = [
   { key: 'name', label: 'Название', placeholder: 'Например: Fintech analytics', help: 'Короткое имя workspace для выбора в Home.' },
   { key: 'description', label: 'Описание', placeholder: 'Что хранит этот workspace', help: 'Человеческое описание сценария и контекста.' },
-  { key: 'preferred_target_model', label: 'Preferred target model', placeholder: 'openai/gpt-4o', help: 'Какая модель считается основной для этого контекста.' },
   { key: 'glossary', label: 'Глоссарий', placeholder: 'Один термин на строку', help: 'Термины и определения проекта, которые нужно учитывать в prompt.' },
   { key: 'style_rules', label: 'Style rules', placeholder: 'Одно правило на строку', help: 'Тон, стиль, форматирование и editorial-правила.' },
   { key: 'default_constraints', label: 'Default constraints', placeholder: 'Одно ограничение на строку', help: 'Ограничения, которые должны автоматически попадать в prompt.' },
@@ -25,7 +24,6 @@ export default function Workspaces() {
   const [createForm, setCreateForm] = useState({
     name: '',
     description: '',
-    preferred_target_model: 'unknown',
     glossary: '',
     style_rules: '',
     default_constraints: '',
@@ -54,7 +52,6 @@ export default function Workspaces() {
     setCreateForm({
       name: '',
       description: '',
-      preferred_target_model: 'unknown',
       glossary: '',
       style_rules: '',
       default_constraints: '',
@@ -136,7 +133,6 @@ export default function Workspaces() {
           const form = editing[workspace.id || 0] || {
             name: workspace.name,
             description: workspace.description,
-            preferred_target_model: cfg.preferred_target_model || 'unknown',
             glossary: (cfg.glossary || []).join('\n'),
             style_rules: (cfg.style_rules || []).join('\n'),
             default_constraints: (cfg.default_constraints || []).join('\n'),
@@ -175,7 +171,6 @@ export default function Workspaces() {
                       await api.updateWorkspace(workspace.id || 0, {
                         name: form.name,
                         description: form.description,
-                        preferred_target_model: form.preferred_target_model,
                         glossary: splitLines(form.glossary),
                         style_rules: splitLines(form.style_rules),
                         default_constraints: splitLines(form.default_constraints),

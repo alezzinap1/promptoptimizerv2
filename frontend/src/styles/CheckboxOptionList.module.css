@@ -30,9 +30,9 @@
   gap: 6px;
   cursor: pointer;
   padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
   font-size: 0.86rem;
   line-height: 1.25;
 }
@@ -51,6 +51,5 @@
 }
 
 [data-theme='light'] .optionCheck {
-  border-color: rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(15, 23, 42, 0.04);
 }

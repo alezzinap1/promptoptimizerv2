@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
+import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
@@ -16,11 +17,9 @@ export default function Compare() {
   const [judgeResult, setJudgeResult] = useState<CompareJudgeResponse | null>(null)
   const [judgeError, setJudgeError] = useState<string | null>(null)
   const [genModel, setGenModel] = useState('')
-  const [targetModel, setTargetModel] = useState('unknown')
   const [modelsMap, setModelsMap] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [techniques, setTechniques] = useState<{ id: string; name: string }[]>([])
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
-  const [targetOptions, setTargetOptions] = useState<string[]>(['unknown'])
   const [techsAMode, setTechsAMode] = useState<'auto' | 'manual'>('auto')
   const [techsBMode, setTechsBMode] = useState<'auto' | 'manual'>('auto')
   const [techsAManual, setTechsAManual] = useState<string[]>([])
@@ -38,11 +37,9 @@ export default function Compare() {
       }, { unknown: 'Неизвестно / Любая модель' })
       setModelsMap(labels)
       setGenerationOptions(settings.preferred_generation_models)
-      setTargetOptions(settings.preferred_target_models)
       const gen0 = settings.preferred_generation_models[0] || ''
       setGenModel(gen0)
       setJudgeModel(gen0 || 'gemini_flash')
-      setTargetModel(settings.preferred_target_models[0] || 'unknown')
       setTechniques(techniquesRes.techniques.map((item) => ({
         id: String(item.id),
         name: String(item.name || item.id),
@@ -60,7 +57,7 @@ export default function Compare() {
       const res = await api.compare({
         task_input: taskInput.trim(),
         gen_model: genModel,
-        target_model: targetModel,
+        target_model: 'unknown',
         temperature,
         top_p: topP,
         techs_a_mode: techsAMode,
@@ -116,14 +113,6 @@ export default function Compare() {
           </select>
         </div>
         <div className={styles.field}>
-          <label>Целевая модель</label>
-          <select value={targetModel} onChange={(e) => setTargetModel(e.target.value)}>
-            {targetOptions.map((id) => (
-              <option key={id} value={id}>{modelsMap[id] || id}</option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.field}>
           <label>Температура</label>
           <input type="range" min={0.1} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
         </div>
@@ -134,7 +123,10 @@ export default function Compare() {
       </div>
 
       <div className={styles.field}>
-        <label>Задача (одна для обоих вариантов)</label>
+        <div className={styles.fieldLabelRow}>
+          <label>Задача (одна для обоих вариантов)</label>
+          {taskInput.trim() ? <CopyIconButton text={taskInput} title="Копировать задачу" /> : null}
+        </div>
         <textarea
           value={taskInput}
           onChange={(e) => setTaskInput(e.target.value)}
@@ -255,9 +247,15 @@ export default function Compare() {
             {result.a.reasoning && (
               <details>
                 <summary>Reasoning A</summary>
+                <div className={styles.copyRow}>
+                  <CopyIconButton text={result.a.reasoning} title="Копировать reasoning A" />
+                </div>
                 <pre className={styles.prompt}>{result.a.reasoning}</pre>
               </details>
             )}
+            <div className={styles.copyRow}>
+              <CopyIconButton text={result.a.prompt} title="Копировать промпт A" />
+            </div>
             <textarea className={styles.textarea} value={result.a.prompt} readOnly rows={14} />
             <button onClick={() => {
               const blob = new Blob([result.a.prompt], { type: 'text/plain;charset=utf-8' })
@@ -275,9 +273,15 @@ export default function Compare() {
             {result.b.reasoning && (
               <details>
                 <summary>Reasoning B</summary>
+                <div className={styles.copyRow}>
+                  <CopyIconButton text={result.b.reasoning} title="Копировать reasoning B" />
+                </div>
                 <pre className={styles.prompt}>{result.b.reasoning}</pre>
               </details>
             )}
+            <div className={styles.copyRow}>
+              <CopyIconButton text={result.b.prompt} title="Копировать промпт B" />
+            </div>
             <textarea className={styles.textarea} value={result.b.prompt} readOnly rows={14} />
             <button onClick={() => {
               const blob = new Blob([result.b.prompt], { type: 'text/plain;charset=utf-8' })

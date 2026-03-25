@@ -23,7 +23,7 @@
   position: sticky;
   top: 20px;
   padding: 20px;
-  border-radius: 16px;
+  border-radius: 7px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -52,7 +52,7 @@
 .tocItemActive {
   text-align: left;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -82,9 +82,10 @@
 }
 
 .body h1 {
-  margin: 0 0 20px;
-  font-size: 2.2rem;
-  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   font-family: var(--font-display, inherit);
   background: linear-gradient(135deg, var(--text), var(--primary));
   -webkit-background-clip: text;
@@ -123,7 +124,7 @@
   border-collapse: collapse;
   margin: 16px 0 24px;
   font-size: 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -154,7 +155,7 @@
 
 .body pre {
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.06);
   overflow-x: auto;

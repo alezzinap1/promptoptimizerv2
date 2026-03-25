@@ -6,6 +6,7 @@ import {
   SIMPLE_PRESET_LABELS,
   type SimplePresetId,
 } from '../constants/simpleImprove'
+import { CopyIconButton } from '../components/PromptToolbarIcons'
 import styles from './SimpleImprove.module.css'
 
 export default function SimpleImprove() {
@@ -17,8 +18,6 @@ export default function SimpleImprove() {
   const [metaHint, setMetaHint] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-
   useEffect(() => {
     api
       .getSettings()
@@ -43,7 +42,6 @@ export default function SimpleImprove() {
     setLoading(true)
     setError(null)
     setResult('')
-    setCopied(false)
     try {
       const res = await api.simpleImprove({
         prompt_text: t,
@@ -59,17 +57,6 @@ export default function SimpleImprove() {
       setError(e instanceof Error ? e.message : 'Ошибка запроса')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const copy = async () => {
-    if (!result) return
-    try {
-      await navigator.clipboard.writeText(result)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setError('Не удалось скопировать в буфер')
     }
   }
 
@@ -124,8 +111,13 @@ export default function SimpleImprove() {
 
       <div className={styles.pairGrid}>
         <div className={styles.col}>
-          <h2 className={styles.colTitle}>Запрос</h2>
-          <p className={styles.colHint}>Исходный текст промпта</p>
+          <div className={styles.colHead}>
+            <div>
+              <h2 className={styles.colTitle}>Запрос</h2>
+              <p className={styles.colHint}>Исходный текст промпта</p>
+            </div>
+            {promptText.trim() ? <CopyIconButton text={promptText} title="Копировать исходный промпт" /> : null}
+          </div>
           <textarea
             className={styles.textarea}
             placeholder="Ваш промпт…"
@@ -141,11 +133,7 @@ export default function SimpleImprove() {
               <h2 className={styles.colTitle}>Ответ</h2>
               <p className={styles.colHint}>Улучшенный вариант от модели</p>
             </div>
-            {result ? (
-              <button type="button" className={styles.secondaryBtn} onClick={copy}>
-                {copied ? 'Скопировано' : 'Копировать'}
-              </button>
-            ) : null}
+            {result ? <CopyIconButton text={result} title="Копировать результат" /> : null}
           </div>
           <div className={styles.answerPanel}>
             {result ? (

@@ -4,6 +4,8 @@ const AUTH_STORAGE_KEY = 'prompt-engineer-auth-session'
 export interface User {
   id: number
   username: string
+  email?: string | null
+  avatar_url?: string | null
 }
 
 export interface AuthResponse {
@@ -256,12 +258,14 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  register: (req: { username: string; password: string }) =>
+  register: (req: { username: string; password: string; email?: string }) =>
     fetchApi<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(req) }),
   login: (req: { username: string; password: string }) =>
     fetchApi<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(req) }),
   logout: () => fetchApi<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => fetchApi<{ user: User }>('/auth/me'),
+  updateEmail: (email: string) =>
+    fetchApi<{ ok: boolean; email: string }>('/auth/me/email', { method: 'PATCH', body: JSON.stringify({ email }) }),
 
   getSettings: () => fetchApi<Settings>('/settings'),
   updateSettings: (req: {

@@ -18,8 +18,9 @@
 
 .home h1 {
   margin: 0 0 20px;
-  font-size: 2.2rem;
-  letter-spacing: -0.02em;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   font-family: var(--font-display);
   background: linear-gradient(135deg, var(--text), var(--primary));
   -webkit-background-clip: text;
@@ -31,7 +32,7 @@
   position: relative;
   height: 36px;
   margin: 0 0 18px;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(56, 189, 248, 0.35);
@@ -141,7 +142,7 @@
 .questionBox,
 .emptyStatePanel {
   background: var(--panel);
-  border-radius: 16px;
+  border-radius: 7px;
   border: 1px solid var(--stroke);
   box-shadow: var(--glow);
   backdrop-filter: blur(12px);
@@ -167,14 +168,15 @@
 }
 
 .settingsPanel {
-  margin-bottom: 18px;
-  padding: 14px;
+  margin-bottom: 14px;
+  padding: 12px;
 }
 
-.settingsPanel .panelHeader {
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 8px;
+.promptToolbar,
+.preToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
 }
 
 .settingsPanel .compactControls,
@@ -220,7 +222,7 @@
 .settingsPanel input[type="range"],
 .settingsPanel input[type="number"] {
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 7px;
   max-width: 100%;
   width: 100%;
 }
@@ -264,6 +266,39 @@
   margin-top: 12px;
 }
 
+.addModelLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: var(--radius-md, 7px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--primary);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.addModelLink:hover {
+  border-color: var(--primary);
+  background: rgba(110, 231, 183, 0.1);
+  color: var(--text);
+}
+
+[data-theme='light'] .addModelLink {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+[data-theme='light'] .addModelLink:hover {
+  background: rgba(14, 165, 233, 0.08);
+}
+
 .field label,
 .fieldWide label {
   font-size: 14px;
@@ -280,7 +315,7 @@
 .specGrid input,
 .specGrid select {
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: var(--select-surface);
   color: var(--text);
@@ -332,9 +367,14 @@
   gap: 8px;
   cursor: pointer;
   padding: 8px 10px;
-  border-radius: 999px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: none;
+}
+
+[data-theme='light'] .radioRow label,
+[data-theme='light'] .techRadio {
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .panel textarea,
@@ -346,7 +386,7 @@
 .questionItem select {
   width: 100%;
   padding: 13px 13px;
-  border-radius: 14px;
+  border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: var(--select-surface);
   color: var(--text);
@@ -360,7 +400,7 @@
   background: linear-gradient(130deg, var(--primary-strong), var(--accent));
   color: #041016;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   font-weight: 700;
   letter-spacing: 0.01em;
   box-shadow: 0 12px 30px rgba(56, 189, 248, 0.18);
@@ -373,7 +413,7 @@
 
 .secondaryBtn {
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: var(--text);
@@ -389,7 +429,7 @@
 .info {
   padding: 12px;
   background: rgba(56, 189, 248, 0.08);
-  border-radius: 12px;
+  border-radius: 8px;
   margin-bottom: 12px;
 }
 
@@ -397,14 +437,14 @@
   color: #ef4444;
   padding: 12px;
   background: rgba(239, 68, 68, 0.08);
-  border-radius: 10px;
+  border-radius: 7px;
 }
 
 .empty {
   padding: 30px 18px;
   text-align: center;
   border: 2px dashed var(--accent-2);
-  border-radius: 12px;
+  border-radius: 8px;
   opacity: 0.86;
   background: rgba(255, 255, 255, 0.02);
 }
@@ -415,7 +455,7 @@
   min-height: 320px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
+  border-radius: 9px;
   padding: 14px;
   color: var(--text);
 }
@@ -425,14 +465,14 @@
   font-size: 14px;
   padding: 12px;
   background: rgba(255, 255, 255, 0.04);
-  border-radius: 10px;
+  border-radius: 7px;
 }
 
 .issueBanner {
   position: relative;
   margin-bottom: 14px;
   padding: 14px 40px 14px 14px;
-  border-radius: 14px;
+  border-radius: 9px;
   border: 1px solid rgba(239, 68, 68, 0.45);
   background: rgba(239, 68, 68, 0.1);
 }
@@ -472,7 +512,7 @@
 .rawFallback {
   margin-top: 14px;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: 9px;
   border: 1px solid rgba(251, 191, 36, 0.35);
   background: rgba(251, 191, 36, 0.06);
 }
@@ -498,7 +538,7 @@
   padding: 12px;
   margin: 0;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -512,7 +552,7 @@
 .actions a,
 .actions button {
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 7px;
 }
 
 .checkboxRow {
@@ -520,7 +560,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -556,7 +596,7 @@
 .ideTab,
 .ideTabActive {
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.05);
 }
@@ -606,7 +646,7 @@
 .techPickerPanel {
   margin-top: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--stroke);
   background: rgba(0, 0, 0, 0.22);
 }
@@ -635,7 +675,7 @@
   max-height: 110px;
   padding: 8px 12px;
   font-size: 0.9rem;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
@@ -679,7 +719,7 @@
 .ideModalBtn {
   margin-top: 12px;
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
@@ -708,7 +748,7 @@
 
 .modalContent {
   background: var(--modal-surface);
-  border-radius: 16px;
+  border-radius: 7px;
   border: 1px solid var(--modal-border);
   max-width: 90vw;
   max-height: 90vh;
@@ -803,7 +843,7 @@
 .ideSection {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 7px;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -823,7 +863,7 @@
 .questionItem {
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.95rem;
 }
@@ -913,7 +953,7 @@
 .resultShell {
   border: 1px dashed rgba(245, 158, 11, 0.35);
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 14px;
   margin-top: 12px;
 }
@@ -928,7 +968,7 @@
 .step {
   position: relative;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   text-align: center;
@@ -970,21 +1010,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 0.9rem;
-}
-
-.focusToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
 }
 
 @media (max-width: 1280px) {

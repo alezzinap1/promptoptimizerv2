@@ -18,14 +18,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 2.2rem;
+  font-size: 16px;
+  font-weight: 600;
   font-family: var(--font-display);
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, var(--text), var(--primary));
@@ -53,7 +54,7 @@
   gap: 12px;
   margin-bottom: 24px;
   padding: 16px;
-  border-radius: 14px;
+  border-radius: 9px;
   background: var(--panel);
   border: 1px solid var(--stroke);
   backdrop-filter: blur(12px);
@@ -63,7 +64,7 @@
   padding: 10px 16px;
   width: 100%;
   max-width: 280px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: var(--select-surface);
   color: var(--text);
@@ -79,7 +80,7 @@
 .empty {
   padding: 60px 40px;
   text-align: center;
-  border-radius: 16px;
+  border-radius: 7px;
   border: 1px dashed rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.02);
   color: var(--muted);
@@ -91,7 +92,7 @@
   padding: 14px 16px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 12px;
+  border-radius: 8px;
   margin-bottom: 16px;
 }
 
@@ -104,7 +105,7 @@
 .card {
   padding: 20px;
   background: var(--panel);
-  border-radius: 14px;
+  border-radius: 9px;
   border: 1px solid var(--stroke);
   backdrop-filter: blur(12px);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -128,7 +129,7 @@
 
 .card h3 {
   margin: 0 0 10px;
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -142,6 +143,10 @@
   flex-wrap: wrap;
 }
 
+.promptBlock {
+  margin-top: 8px;
+}
+
 .preview {
   font-size: 13px;
   font-family: 'JetBrains Mono', monospace;
@@ -149,9 +154,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-height: 80px;
-  padding: 12px;
+  padding: 10px;
+  margin: 0;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 10px;
+  border-radius: 7px;
   color: var(--muted);
   line-height: 1.5;
 }
@@ -165,15 +171,16 @@
 .cardActions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.cardActions button {
-  padding: 8px 14px;
-  border-radius: 8px;
+.textActionBtn {
+  padding: 6px 12px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
@@ -182,7 +189,7 @@
   transition: all 0.2s ease;
 }
 
-.cardActions button:hover {
+.textActionBtn:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: var(--primary);
   color: var(--primary);
@@ -190,7 +197,7 @@
 
 .exportBtn {
   padding: 10px 18px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
@@ -223,7 +230,7 @@
 .editBox input,
 .editBox textarea {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: var(--select-surface);
   color: var(--text);

@@ -19,8 +19,8 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
 .header h1 {
@@ -53,7 +53,7 @@
 
 .refreshBtn {
   padding: 8px 16px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   backdrop-filter: blur(6px);
@@ -86,7 +86,7 @@
   margin-bottom: 24px;
   background: linear-gradient(135deg, rgba(251, 191, 36, 0.14), rgba(251, 191, 36, 0.05));
   border: 1px solid rgba(251, 191, 36, 0.25);
-  border-radius: 14px;
+  border-radius: 9px;
   font-size: 0.95rem;
   line-height: 1.5;
 }
@@ -109,7 +109,7 @@
   flex: 1;
   min-width: 200px;
   max-width: 400px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
   backdrop-filter: blur(6px);
@@ -146,7 +146,7 @@
   text-align: center;
   opacity: 0.7;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
+  border-radius: 7px;
   border: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
@@ -155,13 +155,13 @@
   margin-bottom: 16px;
   padding: 12px 16px;
   background: rgba(239, 68, 68, 0.1);
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .tableWrap {
   overflow-x: auto;
-  border-radius: 16px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
   backdrop-filter: blur(10px);
@@ -238,7 +238,7 @@
 .addBtn,
 .removeBtn {
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   cursor: pointer;
   color: var(--text);
@@ -267,4 +267,75 @@
   background: rgba(239, 68, 68, 0.25);
   border-color: rgba(239, 68, 68, 0.4);
   transform: translateY(-1px);
+}
+
+/* Provider group row */
+.providerRow {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.providerRow:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.providerCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.expandIcon {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.expandIconOpen {
+  transform: rotate(90deg);
+}
+
+.modelCount {
+  font-size: 12px;
+  opacity: 0.55;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.rangeCell {
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+/* Nested model row inside expanded provider */
+.nestedRow {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.nestedRow:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.nestedRow td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.nestedModelCell {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.nestedIndent {
+  display: inline-block;
+  width: 28px;
+  flex-shrink: 0;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+  height: 20px;
+  margin-right: 10px;
+  align-self: center;
 }

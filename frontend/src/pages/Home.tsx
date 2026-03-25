@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   api,
   type GenerateRequest,
@@ -9,6 +9,7 @@ import {
   type PromptIdePreviewResponse,
   type Workspace,
 } from '../api/client'
+import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import styles from './Home.module.css'
 
@@ -58,11 +59,9 @@ export default function Home() {
 
   const [modelLabels, setModelLabels] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
-  const [targetOptions, setTargetOptions] = useState<string[]>(['unknown'])
   const [techniques, setTechniques] = useState<Technique[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [genModel, setGenModel] = useState('')
-  const [targetModel, setTargetModel] = useState('unknown')
   const [techniqueMode, setTechniqueMode] = useState<'auto' | 'manual'>('auto')
   const [manualTechs, setManualTechs] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
@@ -71,7 +70,6 @@ export default function Home() {
   const [questionsMode, setQuestionsMode] = useState(true)
   const [workspaceId, setWorkspaceId] = useState<number>(Number(localStorage.getItem(ACTIVE_WORKSPACE_KEY) || 0))
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [showGenSettings, setShowGenSettings] = useState(true)
   const [preview, setPreview] = useState<PromptIdePreviewResponse | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [versions, setVersions] = useState<Record<string, unknown>[]>([])
@@ -90,7 +88,6 @@ export default function Home() {
   const [ideTab, setIdeTab] = useState<'spec' | 'intent' | 'issues' | 'evidence'>('spec')
   const [showIdeModal, setShowIdeModal] = useState(false)
   const [modelsData, setModelsData] = useState<OpenRouterModel[]>([])
-  const [focusMode, setFocusMode] = useState(false)
   const [splits, setSplits] = useState(() => loadHomeSplits())
   const splitRootRef = useRef<HTMLDivElement>(null)
   const [issueBannerDismissed, setIssueBannerDismissed] = useState(false)
@@ -116,9 +113,7 @@ export default function Home() {
         }, { unknown: 'Неизвестно / Любая модель' })
         setModelLabels(labels)
         setGenerationOptions(settings.preferred_generation_models)
-        setTargetOptions(settings.preferred_target_models)
         setGenModel((current) => current || settings.preferred_generation_models[0] || '')
-        setTargetModel((current) => current || settings.preferred_target_models[0] || 'unknown')
         const items = techniquesRes.techniques.map((item) => ({
           id: String(item.id),
           name: String(item.name || item.id),
@@ -176,7 +171,6 @@ export default function Home() {
 
     const seed = [
       taskInput,
-      targetModel,
       workspaceId,
       techniqueMode,
       manualTechs.join(','),
@@ -188,7 +182,7 @@ export default function Home() {
       try {
         const res = await api.previewPromptIde({
           task_input: taskInput,
-          target_model: targetModel,
+          target_model: 'unknown',
           workspace_id: workspaceId || null,
           previous_prompt: iterationMode ? result?.prompt_block : undefined,
           technique_mode: techniqueMode,
@@ -214,7 +208,7 @@ export default function Home() {
     }, 350)
 
     return () => window.clearTimeout(timer)
-  }, [taskInput, targetModel, workspaceId, techniqueMode, manualTechs, iterationMode, result?.prompt_block, ideOverrides, evidenceDecisions, previewSeed])
+  }, [taskInput, workspaceId, techniqueMode, manualTechs, iterationMode, result?.prompt_block, ideOverrides, evidenceDecisions, previewSeed])
 
   const handleGenerate = async (questionAnswers?: { question: string; answers: string[] }[]) => {
     if (!taskInput.trim()) return
@@ -228,7 +222,7 @@ export default function Home() {
         task_input: taskInput.trim(),
         feedback: iterationMode ? feedback : '',
         gen_model: genModel,
-        target_model: targetModel,
+        target_model: 'unknown',
         domain: 'auto',
         technique_mode: techniqueMode,
         manual_techs: techniqueMode === 'manual' ? manualTechs : [],
@@ -317,7 +311,7 @@ export default function Home() {
       title: saveTitle || taskInput.slice(0, 60) || 'Без названия',
       prompt: result.prompt_block,
       tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
-      target_model: result.target_model,
+      target_model: 'unknown',
       task_type: result.task_types?.[0] || 'general',
       techniques: result.technique_ids,
       notes: saveNotes,
@@ -332,26 +326,15 @@ export default function Home() {
     : ''
   const previewIssueCount = preview?.debug_issues?.length || 0
 
-  const TARGET_TO_OPENROUTER: Record<string, string> = {
-    gpt4o: 'openai/gpt-4o',
-    gpt4o_mini: 'openai/gpt-4o-mini',
-    claude_3_5: 'anthropic/claude-3.5-sonnet',
-    claude_3: 'anthropic/claude-3-haiku',
-    gemini_pro: 'google/gemini-pro-1.5',
-    gemini_flash: 'google/gemini-flash-1.5',
-    mistral: 'mistralai/mistral-large',
-    llama3: 'meta-llama/llama-3-70b-instruct',
-  }
-  const estimatePromptCost = (targetModel: string, tokenEst: number): string | null => {
-    const modelId = TARGET_TO_OPENROUTER[targetModel] || targetModel
+  const estimatePromptCost = (modelId: string, tokenEst: number): string | null => {
     const model = modelsData.find((m) => m.id === modelId)
     if (!model?.pricing?.prompt || tokenEst <= 0) return null
     const cost = (model.pricing.prompt * tokenEst) / 1_000_000
     if (cost < 0.0001) return '<$0.0001'
     return `~$${cost.toFixed(4)}`
   }
-  const promptCostStr = result?.target_model && result?.metrics?.token_estimate
-    ? estimatePromptCost(result.target_model, Number(result.metrics.token_estimate))
+  const promptCostStr = result?.gen_model && result?.metrics?.token_estimate
+    ? estimatePromptCost(result.gen_model, Number(result.metrics.token_estimate))
     : null
   const previewEvidenceCount = Object.keys(preview?.evidence || {}).length
   const previewIntentCount = preview?.intent_graph?.length || 0
@@ -370,6 +353,9 @@ export default function Home() {
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
           <h2>{iterationMode ? 'Итерация' : 'Задача'}</h2>
+          {(iterationMode ? feedback.trim() : taskInput.trim()) ? (
+            <CopyIconButton text={iterationMode ? feedback : taskInput} title="Копировать текст задачи" />
+          ) : null}
         </div>
         {iterationMode ? (
           <>
@@ -420,20 +406,7 @@ export default function Home() {
         </div>
       )}
 
-      
       <section className={`${styles.panel} ${styles.settingsPanel}`}>
-            <div className={styles.panelHeader}>
-              <h2>Генерация</h2>
-              <button className={styles.secondaryBtn} type="button" onClick={() => setShowGenSettings((v) => !v)}>
-                {showGenSettings ? 'Свернуть' : 'Развернуть'}
-              </button>
-              <button className={styles.focusToggle} type="button" onClick={() => setFocusMode((v) => !v)}>
-                {focusMode ? 'Показать IDE и результат' : 'Режим фокуса'}
-              </button>
-            </div>
-
-            {showGenSettings && (
-              <>
                 <div className={styles.compactControls}>
               <div className={styles.field}>
                 <label>Модель генерации</label>
@@ -444,12 +417,10 @@ export default function Home() {
                 </select>
               </div>
               <div className={styles.field}>
-                <label>Target model</label>
-                <select value={targetModel} onChange={(e) => setTargetModel(e.target.value)}>
-                  {targetOptions.map((id) => (
-                    <option key={id} value={id}>{modelLabels[id] || id}</option>
-                  ))}
-                </select>
+                <label>Модели</label>
+                <Link to="/models" className={styles.addModelLink} title="добавить модель" aria-label="добавить модель">
+                  +
+                </Link>
               </div>
               <div className={styles.field}>
                 <label>Workspace</label>
@@ -522,9 +493,7 @@ export default function Home() {
                 </label>
                   </div>
                 )}
-              </>
-            )}
-          </section>
+      </section>
 
       <div className={styles.stepper}>
         <div className={`${styles.step} ${stage >= 1 ? styles.done : ''} ${stage === 1 ? styles.active : ''}`}>Brief</div>
@@ -532,10 +501,7 @@ export default function Home() {
         <div className={`${styles.step} ${stage >= 3 ? styles.done : ''} ${stage === 3 ? styles.active : ''}`}>Prompt</div>
       </div>
 
-      {focusMode ? (
-        <div className={`${styles.mainGrid} ${styles.mainGridFocus}`}>{renderTaskColumn()}</div>
-      ) : (
-        <div ref={splitRootRef} className={styles.splitRoot}>
+      <div ref={splitRootRef} className={styles.splitRoot}>
           <div
             className={styles.splitPane}
             style={{ flex: `${splits.splitA} 1 0%`, minWidth: 0 }}
@@ -720,6 +686,9 @@ export default function Home() {
           )}
           {result?.has_prompt && (
             <>
+              <div className={styles.promptToolbar}>
+                <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
+              </div>
               <textarea
                 className={styles.resultPrompt}
                 value={result.prompt_block}
@@ -729,6 +698,9 @@ export default function Home() {
               {result.reasoning && (
                 <details>
                   <summary>Почему именно эти техники?</summary>
+                  <div className={styles.preToolbar}>
+                    <CopyIconButton text={result.reasoning} title="Копировать reasoning" />
+                  </div>
                   <pre className={styles.reasoning}>{result.reasoning}</pre>
                 </details>
               )}
@@ -874,6 +846,9 @@ export default function Home() {
               </p>
               <details open>
                 <summary>Текст ответа модели</summary>
+                <div className={styles.preToolbar}>
+                  <CopyIconButton text={result.llm_raw} title="Копировать ответ модели" />
+                </div>
                 <pre className={styles.llmRaw}>{result.llm_raw}</pre>
               </details>
             </div>
@@ -940,7 +915,6 @@ export default function Home() {
         </section>
           </div>
         </div>
-      )}
     </div>
   )
 }
