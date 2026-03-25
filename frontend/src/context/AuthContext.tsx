@@ -8,6 +8,7 @@ interface AuthContextType {
   register: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refresh: () => Promise<void>
+  enterDemoMode: () => void
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -53,8 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const enterDemoMode = () => {
+    setUser({ id: 0, username: 'demo_user' })
+    setLoading(false)
+  }
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, refresh }),
+    () => ({ user, loading, login, register, logout, refresh, enterDemoMode }),
     [user, loading],
   )
 

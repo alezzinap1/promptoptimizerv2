@@ -1,27 +1,45 @@
 .layout {
   display: grid;
   grid-template-columns: minmax(200px, 260px) 1fr;
-  gap: 28px;
+  gap: 32px;
   align-items: start;
   max-width: 1100px;
   margin: 0 auto;
+  animation: pageEnter 0.5s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .toc {
   position: sticky;
-  top: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  background: var(--secondary);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  top: 20px;
+  padding: 20px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .tocTitle {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   font-size: 1.35rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   font-family: var(--font-display, inherit);
+  background: linear-gradient(135deg, var(--text), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .tocNav {
@@ -33,14 +51,15 @@
 .tocItem,
 .tocItemActive {
   text-align: left;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
   border: none;
   background: transparent;
   color: var(--text);
   font-size: 0.95rem;
   cursor: pointer;
-  opacity: 0.75;
+  opacity: 0.7;
+  transition: all 0.2s ease;
 }
 
 .tocItem:hover {
@@ -50,68 +69,129 @@
 
 .tocItemActive {
   opacity: 1;
-  background: rgba(56, 189, 248, 0.15);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.08));
   color: var(--primary);
   font-weight: 600;
+  border: 1px solid rgba(56, 189, 248, 0.15);
 }
 
 .body {
   min-width: 0;
   padding: 8px 4px 48px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .body h1 {
-  margin: 0 0 16px;
+  margin: 0 0 20px;
   font-size: 2.2rem;
   letter-spacing: -0.02em;
   font-family: var(--font-display, inherit);
+  background: linear-gradient(135deg, var(--text), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .body h2 {
-  margin: 28px 0 12px;
-  font-size: 1.35rem;
+  margin: 32px 0 14px;
+  font-size: 1.4rem;
   font-weight: 600;
   font-family: var(--font-display, inherit);
 }
 
+.body h3 {
+  margin: 24px 0 12px;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
 .body p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
 }
 
 .body ul {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   padding-left: 1.25rem;
+}
+
+.body li {
+  margin-bottom: 6px;
 }
 
 .body table {
   width: 100%;
   border-collapse: collapse;
-  margin: 12px 0 20px;
+  margin: 16px 0 24px;
   font-size: 14px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .body th,
 .body td {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 14px;
   text-align: left;
   vertical-align: top;
 }
 
 .body th {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .body code {
-  font-size: 0.9em;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.88em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.body pre {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+.body pre code {
+  padding: 0;
+  background: none;
+  border: none;
 }
 
 .body strong {
   font-weight: 600;
+}
+
+.body blockquote {
+  margin: 16px 0;
+  padding: 14px 18px;
+  border-left: 4px solid var(--primary);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0 10px 10px 0;
+}
+
+.body blockquote p {
+  margin: 0;
+}
+
+.body a {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.body a:hover {
+  border-bottom-color: var(--primary);
 }
 
 @media (max-width: 720px) {
@@ -126,5 +206,12 @@
   .tocNav {
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tocItem,
+  .tocItemActive {
+    padding: 10px 14px;
+    font-size: 0.88rem;
   }
 }
