@@ -29,7 +29,7 @@
   --accent: #38bdf8;
   --accent-2: #f59e0b;
   --stroke: rgba(255, 255, 255, 0.055);
-  --glow: 0 10px 40px rgba(56, 189, 248, 0.07);
+  --glow: 0 6px 24px rgba(56, 189, 248, 0.04);
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
@@ -85,7 +85,7 @@
   --accent: #34d399;
   --accent-2: #a3e635;
   --stroke: rgba(255, 255, 255, 0.05);
-  --glow: 0 10px 38px rgba(52, 211, 153, 0.08);
+  --glow: 0 6px 22px rgba(52, 211, 153, 0.045);
   --font: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;

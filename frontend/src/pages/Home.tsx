@@ -9,8 +9,10 @@ import {
   type PromptIdePreviewResponse,
   type Workspace,
 } from '../api/client'
+import AutoTextarea from '../components/AutoTextarea'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
+import cb from '../styles/ComposerBar.module.css'
 import styles from './Home.module.css'
 
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
@@ -339,57 +341,200 @@ export default function Home() {
   const previewEvidenceCount = Object.keys(preview?.evidence || {}).length
   const previewIntentCount = preview?.intent_graph?.length || 0
   const tokenEstimate = Number(result?.metrics?.token_estimate ?? 0)
-  const stage = result?.has_prompt ? 3 : preview ? 2 : 1
 
-  const hintChips = [
-    'Начни с цели и конечного формата',
-    'Укажи аудиторию или канал',
-    'Добавь ограничения и стиль, если важны',
-    'Дай пример входа/выхода для точности',
-  ]
+  const taskPlaceholder =
+    'Опишите задачу: цель, формат ответа, аудитория, ограничения, пример входа/выхода…'
 
   const renderTaskColumn = () => (
     <div className={styles.columnStack}>
-      <section className={styles.panel}>
+      <section className={`${styles.panel} ${styles.taskPanel}`}>
         <div className={styles.panelHeader}>
           <h2>{iterationMode ? 'Итерация' : 'Задача'}</h2>
           {(iterationMode ? feedback.trim() : taskInput.trim()) ? (
             <CopyIconButton text={iterationMode ? feedback : taskInput} title="Копировать текст задачи" />
           ) : null}
         </div>
-        {iterationMode ? (
-          <>
-            <p className={styles.info}>Опиши что нужно изменить в текущем промпте.</p>
-            <textarea
+        <div className={cb.composer}>
+          {iterationMode ? (
+            <p className={`${styles.info} ${styles.composerIterationHint}`}>Опиши, что изменить в текущем промпте.</p>
+          ) : null}
+          {iterationMode ? (
+            <AutoTextarea
+              className={cb.composerTextarea}
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               placeholder="Добавить few-shot примеры, сократить на 30%..."
-              rows={8}
+              minHeightPx={72}
+              maxHeightPx={420}
+              spellCheck
             />
-          </>
-        ) : (
-          <textarea
-            value={taskInput}
-            onChange={(e) => setTaskInput(e.target.value)}
-            placeholder={hintChips.join('\n')}
-            rows={12}
-          />
-        )}
-        <div className={styles.primaryRow}>
-          <div className={styles.tokenBadge}>
-            <span>Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}</span>
-            {promptCostStr && <span>{promptCostStr}</span>}
+          ) : (
+            <AutoTextarea
+              className={cb.composerTextarea}
+              value={taskInput}
+              onChange={(e) => setTaskInput(e.target.value)}
+              placeholder={taskPlaceholder}
+              minHeightPx={88}
+              maxHeightPx={480}
+              spellCheck
+            />
+          )}
+          {!iterationMode ? (
+            <div className={styles.hintChips} aria-label="Подсказки к задаче">
+              {['Цель и формат', 'Аудитория', 'Ограничения', 'Пример в/в'].map((label) => (
+                <span key={label} className={styles.hintChip}>
+                  {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className={cb.composerFooter}>
+            <div className={cb.composerFooterRow}>
+              <div className={cb.composerFooterStart}>
+                <Link to="/models" className={cb.composerIconBtn} title="Каталог моделей" aria-label="Каталог моделей">
+                  +
+                </Link>
+              </div>
+              <div className={cb.composerFooterMid}>
+                <select
+                  className={cb.composerSelect}
+                  value={genModel}
+                  onChange={(e) => setGenModel(e.target.value)}
+                  aria-label="Модель генерации"
+                  title="Модель генерации"
+                >
+                  {generationOptions.map((id) => (
+                    <option key={id} value={id}>{modelLabels[id] || id}</option>
+                  ))}
+                </select>
+                <select
+                  className={cb.composerSelect}
+                  value={workspaceId}
+                  onChange={(e) => setWorkspaceId(Number(e.target.value))}
+                  aria-label="Workspace"
+                  title="Workspace"
+                >
+                  <option value={0}>Без workspace</option>
+                  {workspaces.map((ws) => (
+                    <option key={ws.id ?? 0} value={ws.id ?? 0}>{ws.name}</option>
+                  ))}
+                </select>
+                <div className={styles.techSegment} role="group" aria-label="Режим техник">
+                  <button
+                    type="button"
+                    className={`${styles.techSegmentBtn} ${techniqueMode === 'auto' ? styles.techSegmentBtnActive : ''}`}
+                    aria-pressed={techniqueMode === 'auto'}
+                    onClick={() => setTechniqueMode('auto')}
+                  >
+                    Авто
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.techSegmentBtn} ${techniqueMode === 'manual' ? styles.techSegmentBtnActive : ''}`}
+                    aria-pressed={techniqueMode === 'manual'}
+                    onClick={() => setTechniqueMode('manual')}
+                  >
+                    Вручную
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className={cb.composerGhostBtn}
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                >
+                  {showAdvanced ? 'Меньше' : 'Доп.'}
+                </button>
+              </div>
+              <div className={cb.composerFooterEnd}>
+                <button type="button" className={cb.composerLinkBtn} onClick={handleNewSession}>
+                  Новая сессия
+                </button>
+                <button
+                  type="button"
+                  className={cb.composerSend}
+                  onClick={() => handleGenerate()}
+                  disabled={!taskInput.trim() || loading}
+                  title={iterationMode ? 'Обновить промпт' : 'Создать промпт'}
+                  aria-label={iterationMode ? 'Обновить промпт' : 'Создать промпт'}
+                >
+                  {loading ? <span className={cb.composerSendSpinner} aria-hidden /> : <span aria-hidden>↑</span>}
+                </button>
+              </div>
+            </div>
+            <div className={cb.composerFooterMeta}>
+              <span className={cb.metaMuted}>
+                Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}
+                {promptCostStr ? ` · ${promptCostStr}` : ''}
+              </span>
+            </div>
           </div>
-          <button
-            className={styles.primaryBtn}
-            onClick={() => handleGenerate()}
-            disabled={!taskInput.trim() || loading}
-          >
-            {loading ? 'Генерирую...' : iterationMode ? 'Обновить промпт' : 'Создать промпт'}
-          </button>
-          <button className={styles.secondaryBtn} type="button" onClick={handleNewSession}>
-            Новая сессия
-          </button>
+          {techniqueMode === 'manual' && (
+            <div className={`${cb.composerInset} ${styles.techPickerInset}`}>
+              <div className={styles.techPickerHead}>
+                <span className={styles.techListLabel}>Техники</span>
+                {manualTechs.length > 0 ? (
+                  <span className={styles.techPickCount}>Выбрано: {manualTechs.length}</span>
+                ) : null}
+              </div>
+              <div className={checkboxList.gridWrap} role="group" aria-label="Выбор техник для генерации">
+                {techniques.map((t) => (
+                  <label key={t.id} className={checkboxList.optionCheck}>
+                    <input
+                      type="checkbox"
+                      checked={manualTechs.includes(t.id)}
+                      onChange={() => {
+                        setManualTechs((prev) =>
+                          prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                        )
+                      }}
+                    />
+                    <span>{t.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {showAdvanced && (
+            <div className={cb.composerInset}>
+              <div className={styles.advancedInline}>
+                <label className={styles.advancedInlineField}>
+                  Т° {temperature}
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={1}
+                    step={0.1}
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  />
+                </label>
+                <label className={styles.advancedInlineField}>
+                  Top-P {topP.toFixed(2)}
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={topP}
+                    onChange={(e) => setTopP(parseFloat(e.target.value))}
+                  />
+                </label>
+                <label className={styles.advancedInlineField}>
+                  Top-K
+                  <input
+                    type="number"
+                    value={topK}
+                    onChange={(e) => setTopK(e.target.value ? Number(e.target.value) : '')}
+                    className={styles.topKInput}
+                  />
+                </label>
+                <label className={styles.questionsCompact}>
+                  <input type="checkbox" checked={questionsMode} onChange={(e) => setQuestionsMode(e.target.checked)} />
+                  <span>Вопросы</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -405,101 +550,6 @@ export default function Home() {
           </span>
         </div>
       )}
-
-      <section className={`${styles.panel} ${styles.settingsPanel}`}>
-                <div className={styles.compactControls}>
-              <div className={styles.field}>
-                <label>Модель генерации</label>
-                <select value={genModel} onChange={(e) => setGenModel(e.target.value)}>
-                  {generationOptions.map((id) => (
-                    <option key={id} value={id}>{modelLabels[id] || id}</option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.field}>
-                <label>Модели</label>
-                <Link to="/models" className={styles.addModelLink} title="добавить модель" aria-label="добавить модель">
-                  +
-                </Link>
-              </div>
-              <div className={styles.field}>
-                <label>Workspace</label>
-                <select value={workspaceId} onChange={(e) => setWorkspaceId(Number(e.target.value))}>
-                  <option value={0}>Без workspace</option>
-                  {workspaces.map((ws) => (
-                    <option key={ws.id ?? 0} value={ws.id ?? 0}>{ws.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.field}>
-                <label>Техники</label>
-                <div className={styles.techRow}>
-                  <label className={styles.techRadio}><input type="radio" checked={techniqueMode === 'auto'} onChange={() => setTechniqueMode('auto')} /> Авто</label>
-                  <label className={styles.techRadio}><input type="radio" checked={techniqueMode === 'manual'} onChange={() => setTechniqueMode('manual')} /> Вручную</label>
-                </div>
-              </div>
-              <div className={styles.field}>
-                <label>&nbsp;</label>
-                <button className={styles.secondaryBtn} type="button" onClick={() => setShowAdvanced(!showAdvanced)}>
-                  {showAdvanced ? 'Скрыть доп.' : 'Доп. параметры'}
-                </button>
-              </div>
-                </div>
-
-                {techniqueMode === 'manual' && (
-                  <div className={styles.techPickerPanel}>
-                    <div className={styles.techPickerHead}>
-                      <span className={styles.techListLabel}>Техники вручную — отметьте нужные</span>
-                      {manualTechs.length > 0 ? (
-                        <span className={styles.techPickCount}>Выбрано: {manualTechs.length}</span>
-                      ) : null}
-                    </div>
-                    <div className={checkboxList.gridWrap} role="group" aria-label="Выбор техник для генерации">
-                      {techniques.map((t) => (
-                        <label key={t.id} className={checkboxList.optionCheck}>
-                          <input
-                            type="checkbox"
-                            checked={manualTechs.includes(t.id)}
-                            onChange={() => {
-                              setManualTechs((prev) =>
-                                prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                              )
-                            }}
-                          />
-                          <span>{t.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {showAdvanced && (
-                  <div className={styles.advancedGrid}>
-                <div className={styles.field}>
-                  <label>Температура: {temperature}</label>
-                  <input type="range" min={0.1} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
-                </div>
-                <div className={styles.field}>
-                  <label>Top-P: {topP.toFixed(2)}</label>
-                  <input type="range" min={0} max={1} step={0.05} value={topP} onChange={(e) => setTopP(parseFloat(e.target.value))} />
-                </div>
-                <div className={styles.fieldCompact}>
-                  <label>Top-K</label>
-                  <input type="number" value={topK} onChange={(e) => setTopK(e.target.value ? Number(e.target.value) : '')} className={styles.topKInput} />
-                </div>
-                <label className={styles.questionsCompact}>
-                  <input type="checkbox" checked={questionsMode} onChange={(e) => setQuestionsMode(e.target.checked)} />
-                  <span>Уточняющие вопросы</span>
-                </label>
-                  </div>
-                )}
-      </section>
-
-      <div className={styles.stepper}>
-        <div className={`${styles.step} ${stage >= 1 ? styles.done : ''} ${stage === 1 ? styles.active : ''}`}>Brief</div>
-        <div className={`${styles.step} ${stage >= 2 ? styles.done : ''} ${stage === 2 ? styles.active : ''}`}>Spec / IDE</div>
-        <div className={`${styles.step} ${stage >= 3 ? styles.done : ''} ${stage === 3 ? styles.active : ''}`}>Prompt</div>
-      </div>
 
       <div ref={splitRootRef} className={styles.splitRoot}>
           <div

@@ -38,12 +38,12 @@
 
 .hint {
   margin: 0 0 20px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 12px 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--stroke);
   font-size: 0.92rem;
-  color: var(--text);
+  color: var(--muted);
   animation: slideIn 0.3s ease-out;
 }
 
@@ -99,7 +99,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  align-items: stretch;
+  align-items: start;
 }
 
 @media (max-width: 900px) {
@@ -112,16 +112,16 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 18px;
-  border-radius: 9px;
+  padding: 16px;
+  border-radius: 7px;
   background: var(--panel);
   border: 1px solid var(--stroke);
-  backdrop-filter: blur(12px);
-  transition: all 0.25s ease;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease;
 }
 
 .col:hover {
-  border-color: rgba(110, 231, 183, 0.2);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 .colTitle {
@@ -171,12 +171,12 @@
 
 .answerPanel {
   flex: 1;
-  min-height: 280px;
+  min-height: 200px;
   box-sizing: border-box;
-  padding: 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  padding: 14px 16px;
+  border-radius: 7px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.16);
   overflow: auto;
 }
 
@@ -199,32 +199,16 @@
   font-size: 1.05rem;
   font-weight: 600;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   color: #0f172a;
   background: linear-gradient(135deg, var(--primary-strong), var(--accent));
-  box-shadow: 0 8px 28px rgba(56, 189, 248, 0.25);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.primaryBtn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.primaryBtn:hover:not(:disabled)::before {
-  opacity: 1;
+  box-shadow: none;
+  transition: filter 0.2s ease, opacity 0.2s ease;
 }
 
 .primaryBtn:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 36px rgba(56, 189, 248, 0.35);
+  filter: brightness(1.06);
 }
 
 .primaryBtn:disabled {

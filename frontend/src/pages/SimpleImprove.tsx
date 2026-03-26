@@ -6,7 +6,9 @@ import {
   SIMPLE_PRESET_LABELS,
   type SimplePresetId,
 } from '../constants/simpleImprove'
+import AutoTextarea from '../components/AutoTextarea'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import cb from '../styles/ComposerBar.module.css'
 import styles from './SimpleImprove.module.css'
 
 export default function SimpleImprove() {
@@ -76,39 +78,6 @@ export default function SimpleImprove() {
 
       {metaHint && <p className={styles.hint}>{metaHint}</p>}
 
-      <div className={styles.controls}>
-        <label className={styles.label}>
-          Пресет для этого запроса
-          <select
-            className={styles.select}
-            value={preset}
-            onChange={(e) => setPreset(e.target.value as SimplePresetId)}
-          >
-            {SIMPLE_PRESET_IDS.map((id) => (
-              <option key={id} value={id}>
-                {SIMPLE_PRESET_LABELS[id]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {models.length > 0 && (
-          <label className={styles.label}>
-            Модель
-            <select
-              className={styles.select}
-              value={genModel}
-              onChange={(e) => setGenModel(e.target.value)}
-            >
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
-
       <div className={styles.pairGrid}>
         <div className={styles.col}>
           <div className={styles.colHead}>
@@ -118,14 +87,62 @@ export default function SimpleImprove() {
             </div>
             {promptText.trim() ? <CopyIconButton text={promptText} title="Копировать исходный промпт" /> : null}
           </div>
-          <textarea
-            className={styles.textarea}
-            placeholder="Ваш промпт…"
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-            rows={14}
-            spellCheck
-          />
+          <div className={cb.composer}>
+            <AutoTextarea
+              className={cb.composerTextarea}
+              placeholder="Ваш промпт…"
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              minHeightPx={72}
+              maxHeightPx={400}
+              spellCheck
+            />
+            <div className={cb.composerFooter}>
+              <div className={cb.composerFooterRow}>
+                <div className={cb.composerFooterStart}>
+                  <Link to="/models" className={cb.composerIconBtn} title="Каталог моделей" aria-label="Каталог моделей">
+                    +
+                  </Link>
+                  <span className={cb.metaMuted}>Пресет и модель</span>
+                </div>
+                <div className={cb.composerFooterMid}>
+                  <select
+                    className={cb.composerSelect}
+                    value={preset}
+                    onChange={(e) => setPreset(e.target.value as SimplePresetId)}
+                    aria-label="Пресет"
+                    title="Пресет"
+                  >
+                    {SIMPLE_PRESET_IDS.map((id) => (
+                      <option key={id} value={id}>
+                        {SIMPLE_PRESET_LABELS[id]}
+                      </option>
+                    ))}
+                  </select>
+                  {models.length > 0 && (
+                    <select
+                      className={cb.composerSelect}
+                      value={genModel}
+                      onChange={(e) => setGenModel(e.target.value)}
+                      aria-label="Модель"
+                      title="Модель"
+                    >
+                      {models.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className={cb.composerFooterEnd}>
+                  <button type="button" className={cb.composerPrimary} onClick={run} disabled={loading}>
+                    {loading ? 'Улучшаем…' : 'Улучшить промпт'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div className={styles.col}>
           <div className={styles.colHead}>
@@ -145,12 +162,6 @@ export default function SimpleImprove() {
             )}
           </div>
         </div>
-      </div>
-
-      <div className={styles.actions}>
-        <button type="button" className={styles.primaryBtn} onClick={run} disabled={loading}>
-          {loading ? 'Улучшаем…' : 'Улучшить промпт'}
-        </button>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}

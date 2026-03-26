@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
+import AutoTextarea from '../components/AutoTextarea'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
+import cb from '../styles/ComposerBar.module.css'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
 
@@ -26,6 +28,7 @@ export default function Compare() {
   const [techsBManual, setTechsBManual] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
   const [topP, setTopP] = useState(1)
+  const [showCompareAdv, setShowCompareAdv] = useState(false)
 
   useEffect(() => {
     const state = location.state as { taskInput?: string } | null
@@ -103,36 +106,75 @@ export default function Compare() {
           {loading && <span className={pageStyles.infoBadge}>Генерирую...</span>}
         </div>
 
-      <div className={styles.settings}>
-        <div className={styles.field}>
-          <label>Модель генерации</label>
-          <select value={genModel} onChange={(e) => setGenModel(e.target.value)}>
-            {generationOptions.map((id) => (
-              <option key={id} value={id}>{modelsMap[id] || id}</option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.field}>
-          <label>Температура</label>
-          <input type="range" min={0.1} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
-        </div>
-        <div className={styles.field}>
-          <label>Top-P</label>
-          <input type="range" min={0} max={1} step={0.05} value={topP} onChange={(e) => setTopP(parseFloat(e.target.value))} />
-        </div>
-      </div>
-
-      <div className={styles.field}>
+      <div className={styles.taskComposerBlock}>
         <div className={styles.fieldLabelRow}>
           <label>Задача (одна для обоих вариантов)</label>
           {taskInput.trim() ? <CopyIconButton text={taskInput} title="Копировать задачу" /> : null}
         </div>
-        <textarea
-          value={taskInput}
-          onChange={(e) => setTaskInput(e.target.value)}
-          placeholder="Нужен промпт для извлечения ключевых метрик из финансового отчёта..."
-          rows={5}
-        />
+        <div className={cb.composer}>
+          <AutoTextarea
+            className={cb.composerTextarea}
+            value={taskInput}
+            onChange={(e) => setTaskInput(e.target.value)}
+            placeholder="Нужен промпт для извлечения ключевых метрик из финансового отчёта..."
+            minHeightPx={80}
+            maxHeightPx={400}
+            spellCheck
+          />
+          <div className={cb.composerFooter}>
+            <div className={cb.composerFooterRow}>
+              <div className={cb.composerFooterStart}>
+                <Link to="/models" className={cb.composerIconBtn} title="Каталог моделей" aria-label="Каталог моделей">
+                  +
+                </Link>
+              </div>
+              <div className={cb.composerFooterMid}>
+                <select
+                  className={cb.composerSelect}
+                  value={genModel}
+                  onChange={(e) => setGenModel(e.target.value)}
+                  aria-label="Модель генерации"
+                  title="Модель генерации"
+                >
+                  {generationOptions.map((id) => (
+                    <option key={id} value={id}>{modelsMap[id] || id}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={cb.composerGhostBtn}
+                  onClick={() => setShowCompareAdv((v) => !v)}
+                >
+                  {showCompareAdv ? 'Меньше' : 'Т° / Top-P'}
+                </button>
+              </div>
+              <div className={cb.composerFooterEnd}>
+                <button
+                  type="button"
+                  className={cb.composerPrimary}
+                  onClick={handleCompare}
+                  disabled={!taskInput.trim() || loading}
+                >
+                  {loading ? 'Генерирую…' : 'Сгенерировать оба'}
+                </button>
+              </div>
+            </div>
+          </div>
+          {showCompareAdv && (
+            <div className={cb.composerInset}>
+              <div className={styles.compareAdvRow}>
+                <label className={styles.compareAdvField}>
+                  Температура {temperature}
+                  <input type="range" min={0.1} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
+                </label>
+                <label className={styles.compareAdvField}>
+                  Top-P {topP.toFixed(2)}
+                  <input type="range" min={0} max={1} step={0.05} value={topP} onChange={(e) => setTopP(parseFloat(e.target.value))} />
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={styles.results}>
@@ -187,10 +229,6 @@ export default function Compare() {
           )}
         </div>
       </div>
-
-      <button className={styles.primaryBtn} onClick={handleCompare} disabled={!taskInput.trim() || loading}>
-        {loading ? 'Генерирую...' : 'Сгенерировать оба варианта'}
-      </button>
 
       {error && <p className={styles.error}>{error}</p>}
 

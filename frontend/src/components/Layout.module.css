@@ -10,7 +10,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
+  padding: 7px 16px;
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -39,27 +39,21 @@
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   text-decoration: none;
   color: var(--text);
 }
 
 .logoIcon {
-  width: 28px;
-  height: 28px;
+  width: 23px;
+  height: 23px;
   color: var(--primary);
-  filter: drop-shadow(0 0 8px var(--primary));
-  animation: pulse 3s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { filter: drop-shadow(0 0 8px var(--primary)); }
-  50% { filter: drop-shadow(0 0 16px var(--primary)); }
+  filter: none;
 }
 
 .logoText {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, var(--text), var(--primary));
@@ -70,20 +64,20 @@
 
 .nav {
   display: flex;
-  gap: 2px;
+  gap: 0;
   flex-wrap: wrap;
   justify-content: center;
   flex: 1;
-  padding: 0 12px;
+  padding: 0 8px;
 }
 
 .navLink,
 .navLinkActive {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
-  font-size: 13px;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text);
   opacity: 0.65;
@@ -103,10 +97,10 @@
 
 .navLinkActive {
   opacity: 1;
-  color: var(--primary);
+  color: var(--text);
   font-weight: 600;
-  background: rgba(110, 231, 183, 0.08);
-  border-color: rgba(110, 231, 183, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: transparent;
 }
 
 .navLinkActive::after {
@@ -115,18 +109,19 @@
   bottom: -1px;
   left: 50%;
   transform: translateX(-50%);
-  width: 20px;
+  width: 18px;
   height: 2px;
-  background: var(--primary);
-  border-radius: 2px;
+  background: var(--muted);
+  opacity: 0.5;
+  border-radius: 1px;
 }
 
 .navIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .navIcon svg {
@@ -142,9 +137,9 @@
 .navLinkCtaActive {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-size: 14px;
+  gap: 5px;
+  padding: 5px 11px;
+  font-size: 13px;
   font-weight: 600;
   border-radius: 7px;
   border: 1px solid rgba(56, 189, 248, 0.3);
@@ -198,8 +193,8 @@
 .userBox {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px 6px 6px;
+  gap: 8px;
+  padding: 4px 6px 4px 4px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -209,21 +204,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 27px;
+  height: 27px;
   border-radius: 8px;
   background: linear-gradient(135deg, rgba(110, 231, 183, 0.2), rgba(56, 189, 248, 0.15));
   color: var(--primary);
 }
 
 .userAvatar svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .userName {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
 }
 
@@ -252,7 +247,7 @@
 .main {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 16px 18px 24px;
+  padding: 14px 16px 22px;
   font-size: 14px;
   line-height: 1.55;
   animation: fadeIn 0.5s ease-out;

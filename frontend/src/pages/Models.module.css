@@ -70,13 +70,14 @@
 }
 
 .trialBanner {
-  padding: 16px 20px;
+  padding: 14px 16px;
   margin-bottom: 24px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.14), rgba(251, 191, 36, 0.05));
-  border: 1px solid rgba(251, 191, 36, 0.25);
-  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--stroke);
+  border-radius: 7px;
   font-size: 0.95rem;
   line-height: 1.5;
+  color: var(--muted);
 }
 
 .trialBanner a {
@@ -116,8 +117,8 @@
 }
 
 .search:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.15);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
   outline: none;
 }
 
