@@ -184,38 +184,54 @@
 }
 
 .taskPanel .panelHeader {
+  width: 100%;
   margin-bottom: 10px;
   padding: 0 2px;
+  align-items: center;
+  box-sizing: border-box;
 }
 
-.taskPanel .panelHeader h2 {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--muted);
+.panelHeaderEnd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.bareColumn {
+  padding: 0 0 4px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.bareColumn::before {
+  display: none !important;
+}
+
+.bareColumn .emptyStatePanel {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 2px 8px;
+}
+
+.bareColumn .emptyStatePanel::before {
+  display: none !important;
+}
+
+.bareColumn > h2.pageTitleGradient,
+.bareColumn h3.pageTitleGradient {
+  margin-bottom: 12px;
 }
 
 .composerIterationHint {
   margin: 0;
   padding: 10px 18px 0;
   font-size: 0.88rem;
-}
-
-.hintChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  padding: 0 18px 10px;
-}
-
-.hintChip {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-  padding: 4px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--stroke);
-  background: transparent;
 }
 
 .techSegment {
@@ -343,7 +359,8 @@
 
 .panelHeader {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   margin-bottom: 12px;
@@ -945,6 +962,11 @@
 
 .specWide {
   grid-column: 1 / -1;
+}
+
+.specSelectDrop {
+  width: 100%;
+  margin-top: 2px;
 }
 
 .ideGrid {

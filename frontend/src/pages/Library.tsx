@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type LibraryItem } from '../api/client'
+import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../components/PromptToolbarIcons'
 import styles from './Library.module.css'
 
@@ -36,6 +37,14 @@ export default function Library() {
       `# ${item.title}\n# tags: ${item.tags.join(', ')}\n\n${item.prompt}`
     )).join('\n\n' + '='.repeat(60) + '\n\n')
   ), [items])
+
+  const taskTypeOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Все типы' },
+      ...(stats.task_types || []).map((item) => ({ value: item, label: item })),
+    ],
+    [stats.task_types],
+  )
 
   const startEdit = (item: LibraryItem) => {
     setEditingId(item.id)
@@ -82,12 +91,14 @@ export default function Library() {
           onChange={(e) => setSearch(e.target.value)}
           className={styles.search}
         />
-        <select className={styles.search} value={taskType} onChange={(e) => setTaskType(e.target.value)}>
-          <option value="all">Все типы</option>
-          {(stats.task_types || []).map((item) => (
-            <option key={item} value={item}>{item}</option>
-          ))}
-        </select>
+        <SelectDropdown
+          value={taskType}
+          options={taskTypeOptions}
+          onChange={setTaskType}
+          aria-label="Тип задачи"
+          variant="toolbar"
+          className={styles.toolbarSelect}
+        />
         <button
           className={styles.exportBtn}
           onClick={() => {

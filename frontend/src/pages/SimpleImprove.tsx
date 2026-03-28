@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import {
@@ -7,9 +7,16 @@ import {
   type SimplePresetId,
 } from '../constants/simpleImprove'
 import AutoTextarea from '../components/AutoTextarea'
+import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import cb from '../styles/ComposerBar.module.css'
+import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import styles from './SimpleImprove.module.css'
+
+const PRESET_SELECT_OPTIONS = SIMPLE_PRESET_IDS.map((id) => ({
+  value: id,
+  label: SIMPLE_PRESET_LABELS[id],
+}))
 
 export default function SimpleImprove() {
   const [promptText, setPromptText] = useState('')
@@ -34,6 +41,11 @@ export default function SimpleImprove() {
       })
       .catch(() => {})
   }, [])
+
+  const modelOptions = useMemo(
+    () => models.map((m) => ({ value: m, label: shortGenerationModelLabel(m), title: m })),
+    [models],
+  )
 
   const run = async () => {
     const t = promptText.trim()
@@ -100,40 +112,24 @@ export default function SimpleImprove() {
             <div className={cb.composerFooter}>
               <div className={cb.composerFooterRow}>
                 <div className={cb.composerFooterStart}>
-                  <Link to="/models" className={cb.composerIconBtn} title="Каталог моделей" aria-label="Каталог моделей">
-                    +
-                  </Link>
                   <span className={cb.metaMuted}>Пресет и модель</span>
                 </div>
                 <div className={cb.composerFooterMid}>
-                  <select
-                    className={cb.composerSelect}
+                  <SelectDropdown
                     value={preset}
-                    onChange={(e) => setPreset(e.target.value as SimplePresetId)}
+                    options={PRESET_SELECT_OPTIONS}
+                    onChange={(v) => setPreset(v as SimplePresetId)}
                     aria-label="Пресет"
-                    title="Пресет"
-                  >
-                    {SIMPLE_PRESET_IDS.map((id) => (
-                      <option key={id} value={id}>
-                        {SIMPLE_PRESET_LABELS[id]}
-                      </option>
-                    ))}
-                  </select>
-                  {models.length > 0 && (
-                    <select
-                      className={cb.composerSelect}
-                      value={genModel}
-                      onChange={(e) => setGenModel(e.target.value)}
-                      aria-label="Модель"
-                      title="Модель"
-                    >
-                      {models.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                    variant="composer"
+                  />
+                  <SelectDropdown
+                    value={genModel}
+                    options={modelOptions}
+                    onChange={setGenModel}
+                    aria-label="Модель"
+                    variant="composer"
+                    footerLink={{ to: '/models', label: 'Добавить модель' }}
+                  />
                 </div>
                 <div className={cb.composerFooterEnd}>
                   <button type="button" className={cb.composerPrimary} onClick={run} disabled={loading}>

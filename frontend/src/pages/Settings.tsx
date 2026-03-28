@@ -7,6 +7,7 @@ import {
   type SimplePresetId,
 } from '../constants/simpleImprove'
 import { FONTS, PALETTES, useTheme } from '../context/ThemeContext'
+import SelectDropdown from '../components/SelectDropdown'
 import styles from './Settings.module.css'
 
 const PALETTE_LABELS: Record<string, string> = {
@@ -28,6 +29,16 @@ const FONT_LABELS: Record<string, string> = {
   outfit: 'Outfit',
   firacode: 'Fira Code',
 }
+
+const CLS_MODE_OPTIONS = [
+  { value: 'heuristic', label: 'Эвристика (ключевые слова)' },
+  { value: 'llm', label: 'LLM-классификатор' },
+] as const
+
+const SIMPLE_PRESET_FORM_OPTIONS = SIMPLE_PRESET_IDS.map((id) => ({
+  value: id,
+  label: SIMPLE_PRESET_LABELS[id],
+}))
 
 export default function Settings() {
   const { palette, font, setPalette, setFont } = useTheme()
@@ -176,14 +187,13 @@ export default function Settings() {
         <div className={styles.row}>
           <label className={styles.fieldLabel}>
             Режим
-            <select
+            <SelectDropdown
               value={clsMode}
-              onChange={(e) => setClsMode(e.target.value as 'heuristic' | 'llm')}
-              className={styles.input}
-            >
-              <option value="heuristic">Эвристика (ключевые слова)</option>
-              <option value="llm">LLM-классификатор</option>
-            </select>
+              options={[...CLS_MODE_OPTIONS]}
+              onChange={(v) => setClsMode(v as 'heuristic' | 'llm')}
+              aria-label="Режим классификации"
+              variant="field"
+            />
           </label>
         </div>
         <label className={styles.fieldLabel}>
@@ -212,17 +222,13 @@ export default function Settings() {
         <div className={styles.row}>
           <label className={styles.fieldLabel}>
             Пресет по умолчанию
-            <select
+            <SelectDropdown
               value={simplePreset}
-              onChange={(e) => setSimplePreset(e.target.value as SimplePresetId)}
-              className={styles.input}
-            >
-              {SIMPLE_PRESET_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {SIMPLE_PRESET_LABELS[id]}
-                </option>
-              ))}
-            </select>
+              options={SIMPLE_PRESET_FORM_OPTIONS}
+              onChange={(v) => setSimplePreset(v as SimplePresetId)}
+              aria-label="Пресет простого режима"
+              variant="field"
+            />
           </label>
         </div>
         <label className={styles.fieldLabel}>
@@ -255,19 +261,23 @@ export default function Settings() {
         <div className={styles.row}>
           <label className={styles.fieldLabel}>
             Палитра
-            <select value={palette} onChange={(e) => setPalette(e.target.value as (typeof PALETTES)[number])} className={styles.input}>
-              {PALETTES.map((item) => (
-                <option key={item} value={item}>{PALETTE_LABELS[item]}</option>
-              ))}
-            </select>
+            <SelectDropdown
+              value={palette}
+              options={PALETTES.map((item) => ({ value: item, label: PALETTE_LABELS[item] || item }))}
+              onChange={(v) => setPalette(v as (typeof PALETTES)[number])}
+              aria-label="Цветовая палитра"
+              variant="field"
+            />
           </label>
           <label className={styles.fieldLabel}>
             Шрифт
-            <select value={font} onChange={(e) => setFont(e.target.value as (typeof FONTS)[number])} className={styles.input}>
-              {FONTS.map((item) => (
-                <option key={item} value={item}>{FONT_LABELS[item]}</option>
-              ))}
-            </select>
+            <SelectDropdown
+              value={font}
+              options={FONTS.map((item) => ({ value: item, label: FONT_LABELS[item] || item }))}
+              onChange={(v) => setFont(v as (typeof FONTS)[number])}
+              aria-label="Шрифт"
+              variant="field"
+            />
           </label>
         </div>
       </section>

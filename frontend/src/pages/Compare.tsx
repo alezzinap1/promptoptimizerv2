@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
+import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
+import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
 
@@ -49,6 +51,15 @@ export default function Compare() {
       })))
     }).catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
   }, [location.state])
+
+  const genModelSelectOptions = useMemo(
+    () =>
+      generationOptions.map((id) => {
+        const full = modelsMap[id] || id
+        return { value: id, label: shortGenerationModelLabel(full), title: full }
+      }),
+    [generationOptions, modelsMap],
+  )
 
   const handleCompare = async () => {
     if (!taskInput.trim()) return
@@ -97,14 +108,13 @@ export default function Compare() {
 
   return (
     <div className={`${pageStyles.page} ${styles.compare}`}>
-      <div className={pageStyles.panel}>
-        <div className={pageStyles.panelHeader}>
-          <div>
-            <h1 className="pageTitleGradient">A/B Сравнение техник</h1>
-            <p className={pageStyles.panelSubtitle}>Сгенерируй один промпт двумя разными наборами техник и сравни результат</p>
-          </div>
-          {loading && <span className={pageStyles.infoBadge}>Генерирую...</span>}
+      <div className={pageStyles.panelHeader}>
+        <div>
+          <h1 className="pageTitleGradient">A/B Сравнение техник</h1>
+          <p className={pageStyles.panelSubtitle}>Сгенерируй один промпт двумя разными наборами техник и сравни результат</p>
         </div>
+        {loading && <span className={pageStyles.infoBadge}>Генерирую...</span>}
+      </div>
 
       <div className={styles.taskComposerBlock}>
         <div className={styles.fieldLabelRow}>
@@ -123,23 +133,15 @@ export default function Compare() {
           />
           <div className={cb.composerFooter}>
             <div className={cb.composerFooterRow}>
-              <div className={cb.composerFooterStart}>
-                <Link to="/models" className={cb.composerIconBtn} title="Каталог моделей" aria-label="Каталог моделей">
-                  +
-                </Link>
-              </div>
               <div className={cb.composerFooterMid}>
-                <select
-                  className={cb.composerSelect}
+                <SelectDropdown
                   value={genModel}
-                  onChange={(e) => setGenModel(e.target.value)}
+                  options={genModelSelectOptions}
+                  onChange={setGenModel}
                   aria-label="Модель генерации"
-                  title="Модель генерации"
-                >
-                  {generationOptions.map((id) => (
-                    <option key={id} value={id}>{modelsMap[id] || id}</option>
-                  ))}
-                </select>
+                  variant="composer"
+                  footerLink={{ to: '/models', label: 'Добавить модель' }}
+                />
                 <button
                   type="button"
                   className={cb.composerGhostBtn}
@@ -334,7 +336,6 @@ export default function Compare() {
           </div>
         </>
       )}
-      </div>
     </div>
   )
 }

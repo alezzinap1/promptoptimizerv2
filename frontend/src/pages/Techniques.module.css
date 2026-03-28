@@ -290,6 +290,12 @@
   outline: none;
 }
 
+.toolbarFilter {
+  flex: 1 1 200px;
+  max-width: 280px;
+  min-width: 180px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));

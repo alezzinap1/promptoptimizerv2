@@ -1,6 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type TechniqueRecord } from '../api/client'
+import SelectDropdown from '../components/SelectDropdown'
 import styles from './Techniques.module.css'
+
+const TASK_TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'Все task types' },
+  { value: 'code', label: 'code' },
+  { value: 'analysis', label: 'analysis' },
+  { value: 'research', label: 'research' },
+  { value: 'structured_output', label: 'structured_output' },
+  { value: 'debugging', label: 'debugging' },
+  { value: 'general', label: 'general' },
+]
+
+const COMPLEXITY_FILTER_OPTIONS = [
+  { value: '', label: 'Все уровни сложности' },
+  { value: 'low', label: 'low' },
+  { value: 'medium', label: 'medium' },
+  { value: 'high', label: 'high' },
+]
 
 const EMPTY_FORM = {
   id: '',
@@ -143,21 +161,22 @@ export default function Techniques() {
           onChange={(e) => setSearch(e.target.value)}
           className={styles.search}
         />
-        <select className={styles.search} value={taskType} onChange={(e) => setTaskType(e.target.value)}>
-          <option value="">Все task types</option>
-          <option value="code">code</option>
-          <option value="analysis">analysis</option>
-          <option value="research">research</option>
-          <option value="structured_output">structured_output</option>
-          <option value="debugging">debugging</option>
-          <option value="general">general</option>
-        </select>
-        <select className={styles.search} value={complexity} onChange={(e) => setComplexity(e.target.value)}>
-          <option value="">Все уровни сложности</option>
-          <option value="low">low</option>
-          <option value="medium">medium</option>
-          <option value="high">high</option>
-        </select>
+        <SelectDropdown
+          value={taskType}
+          options={TASK_TYPE_FILTER_OPTIONS}
+          onChange={setTaskType}
+          aria-label="Фильтр по типу задачи"
+          variant="toolbar"
+          className={styles.toolbarFilter}
+        />
+        <SelectDropdown
+          value={complexity}
+          options={COMPLEXITY_FILTER_OPTIONS}
+          onChange={setComplexity}
+          aria-label="Фильтр по сложности"
+          variant="toolbar"
+          className={styles.toolbarFilter}
+        />
       </div>
 
       {detailTechnique && (

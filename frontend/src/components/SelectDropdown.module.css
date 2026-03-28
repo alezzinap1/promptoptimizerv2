@@ -1,0 +1,94 @@
+.wrap {
+  position: relative;
+  min-width: 0;
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  border: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.triggerLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.chevron {
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
+/* Как старый composerSelect: компактная строка в футере композера */
+.triggerComposer {
+  max-width: min(220px, 44vw);
+  padding: 4px 4px 4px 0;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.triggerComposer:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* Как .search в тулбарах Techniques/Library */
+.triggerToolbar {
+  padding: 10px 14px;
+  min-height: 42px;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)) !important;
+  color: var(--text);
+  font-size: 0.95rem;
+  flex: 1 1 160px;
+}
+
+[data-theme='light'] .triggerToolbar {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.triggerToolbar:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* Полная ширина в формах Settings */
+.triggerField {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 7px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: var(--select-surface) !important;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+[data-theme='light'] .triggerField {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+.triggerField:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   api,
   type GenerateRequest,
@@ -10,7 +10,10 @@ import {
   type Workspace,
 } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
+import SelectDropdown from '../components/SelectDropdown'
+import WorkspacePicker from '../components/WorkspacePicker'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
 import styles from './Home.module.css'
@@ -298,15 +301,6 @@ export default function Home() {
     [splits.splitA, splits.splitB],
   )
 
-  const handleNewSession = () => {
-    setResult(null)
-    setSessionId(null)
-    setIterationMode(false)
-    setShowSaveDialog(false)
-    setQuestionState({})
-    setIssueBannerDismissed(false)
-  }
-
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
     await api.saveToLibrary({
@@ -342,17 +336,42 @@ export default function Home() {
   const previewIntentCount = preview?.intent_graph?.length || 0
   const tokenEstimate = Number(result?.metrics?.token_estimate ?? 0)
 
-  const taskPlaceholder =
-    'Опишите задачу: цель, формат ответа, аудитория, ограничения, пример входа/выхода…'
+  const taskPlaceholder = 'Опишите задачу подробно'
+  const genModelSelectOptions = useMemo(
+    () =>
+      generationOptions.map((id) => {
+        const full = modelLabels[id] || id
+        return { value: id, label: shortGenerationModelLabel(full), title: full }
+      }),
+    [generationOptions, modelLabels],
+  )
+  const ideOutputFormatOptions = useMemo(
+    () => [
+      { value: '', label: 'Автоопределение' },
+      { value: 'json', label: 'json' },
+      { value: 'xml', label: 'xml' },
+      { value: 'yaml', label: 'yaml' },
+      { value: 'markdown', label: 'markdown' },
+      { value: 'table', label: 'table' },
+      { value: 'list', label: 'list' },
+    ],
+    [],
+  )
 
   const renderTaskColumn = () => (
     <div className={styles.columnStack}>
       <section className={`${styles.panel} ${styles.taskPanel}`}>
         <div className={styles.panelHeader}>
-          <h2>{iterationMode ? 'Итерация' : 'Задача'}</h2>
-          {(iterationMode ? feedback.trim() : taskInput.trim()) ? (
-            <CopyIconButton text={iterationMode ? feedback : taskInput} title="Копировать текст задачи" />
-          ) : null}
+          <h2 className="pageTitleGradient">{iterationMode ? 'Итерация' : 'Задача'}</h2>
+          <div className={styles.panelHeaderEnd}>
+            <span className={cb.metaMuted} title="Оценка по последней генерации">
+              Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}
+              {promptCostStr ? ` · ${promptCostStr}` : ''}
+            </span>
+            {(iterationMode ? feedback.trim() : taskInput.trim()) ? (
+              <CopyIconButton text={iterationMode ? feedback : taskInput} title="Копировать текст задачи" />
+            ) : null}
+          </div>
         </div>
         <div className={cb.composer}>
           {iterationMode ? (
@@ -379,46 +398,18 @@ export default function Home() {
               spellCheck
             />
           )}
-          {!iterationMode ? (
-            <div className={styles.hintChips} aria-label="Подсказки к задаче">
-              {['Цель и формат', 'Аудитория', 'Ограничения', 'Пример в/в'].map((label) => (
-                <span key={label} className={styles.hintChip}>
-                  {label}
-                </span>
-              ))}
-            </div>
-          ) : null}
           <div className={cb.composerFooter}>
             <div className={cb.composerFooterRow}>
-              <div className={cb.composerFooterStart}>
-                <Link to="/models" className={cb.composerIconBtn} title="Каталог моделей" aria-label="Каталог моделей">
-                  +
-                </Link>
-              </div>
               <div className={cb.composerFooterMid}>
-                <select
-                  className={cb.composerSelect}
+                <SelectDropdown
                   value={genModel}
-                  onChange={(e) => setGenModel(e.target.value)}
+                  options={genModelSelectOptions}
+                  onChange={setGenModel}
                   aria-label="Модель генерации"
-                  title="Модель генерации"
-                >
-                  {generationOptions.map((id) => (
-                    <option key={id} value={id}>{modelLabels[id] || id}</option>
-                  ))}
-                </select>
-                <select
-                  className={cb.composerSelect}
-                  value={workspaceId}
-                  onChange={(e) => setWorkspaceId(Number(e.target.value))}
-                  aria-label="Workspace"
-                  title="Workspace"
-                >
-                  <option value={0}>Без workspace</option>
-                  {workspaces.map((ws) => (
-                    <option key={ws.id ?? 0} value={ws.id ?? 0}>{ws.name}</option>
-                  ))}
-                </select>
+                  variant="composer"
+                  footerLink={{ to: '/models', label: 'Добавить модель' }}
+                />
+                <WorkspacePicker workspaces={workspaces} workspaceId={workspaceId} onSelect={setWorkspaceId} />
                 <div className={styles.techSegment} role="group" aria-label="Режим техник">
                   <button
                     type="button"
@@ -446,9 +437,6 @@ export default function Home() {
                 </button>
               </div>
               <div className={cb.composerFooterEnd}>
-                <button type="button" className={cb.composerLinkBtn} onClick={handleNewSession}>
-                  Новая сессия
-                </button>
                 <button
                   type="button"
                   className={cb.composerSend}
@@ -460,12 +448,6 @@ export default function Home() {
                   {loading ? <span className={cb.composerSendSpinner} aria-hidden /> : <span aria-hidden>↑</span>}
                 </button>
               </div>
-            </div>
-            <div className={cb.composerFooterMeta}>
-              <span className={cb.metaMuted}>
-                Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}
-                {promptCostStr ? ` · ${promptCostStr}` : ''}
-              </span>
             </div>
           </div>
           {techniqueMode === 'manual' && (
@@ -569,12 +551,12 @@ export default function Home() {
             className={styles.splitPane}
             style={{ flex: `${splits.splitB - splits.splitA} 1 0%`, minWidth: 0 }}
           >
-        <section className={`${styles.panel} ${styles.ideColumn}`}>
+        <section className={`${styles.panel} ${styles.ideColumn} ${styles.bareColumn}`}>
           {preview ? (
             <div className={styles.ideBox}>
               <div className={styles.ideHeader}>
                 <div>
-                  <h3>IDE-анализ</h3>
+                  <h3 className="pageTitleGradient">IDE-анализ</h3>
                   <p className={styles.ideHint}>
                     {taskSummary || 'Анализ структуры задачи'}
                     {preview.techniques.length > 0 ? ` · ${preview.techniques.map((t) => t.name).join(', ')}` : ''}
@@ -613,15 +595,14 @@ export default function Home() {
                     </label>
                     <label>
                       Формат вывода
-                      <select value={ideOutputFormat} onChange={(e) => setIdeOutputFormat(e.target.value)}>
-                        <option value="">Автоопределение</option>
-                        <option value="json">json</option>
-                        <option value="xml">xml</option>
-                        <option value="yaml">yaml</option>
-                        <option value="markdown">markdown</option>
-                        <option value="table">table</option>
-                        <option value="list">list</option>
-                      </select>
+                      <SelectDropdown
+                        value={ideOutputFormat}
+                        options={ideOutputFormatOptions}
+                        onChange={setIdeOutputFormat}
+                        aria-label="Формат вывода"
+                        variant="field"
+                        className={styles.specSelectDrop}
+                      />
                     </label>
                     <label>
                       Источник истины
@@ -693,7 +674,7 @@ export default function Home() {
             </div>
           ) : (
             <div className={styles.emptyStatePanel}>
-              <h3>IDE-анализ</h3>
+              <h3 className="pageTitleGradient">IDE-анализ</h3>
               <p>Здесь появятся intent map, issues и evidence после того, как задача станет достаточно конкретной.</p>
             </div>
           )}
@@ -710,8 +691,8 @@ export default function Home() {
             className={styles.splitPane}
             style={{ flex: `${1 - splits.splitB} 1 0%`, minWidth: 0 }}
           >
-        <section className={`${styles.panel} ${styles.resultColumn}`}>
-          <h2>Результат</h2>
+        <section className={`${styles.panel} ${styles.resultColumn} ${styles.bareColumn}`}>
+          <h2 className="pageTitleGradient">Результат</h2>
           {result?.generation_issue && !issueBannerDismissed && (
             <div className={styles.issueBanner} role="alert">
               <button

@@ -65,6 +65,12 @@
   outline: none;
 }
 
+.toolbarSelect {
+  flex: 1 1 200px;
+  max-width: 280px;
+  min-width: 160px;
+}
+
 .empty {
   padding: 60px 40px;
   text-align: center;

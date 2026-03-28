@@ -21,22 +21,23 @@
 .headerMeta {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .metric {
-  font-size: 1rem;
+  font-size: 0.8rem;
   font-weight: 500;
+  color: var(--muted);
 }
 
 .cacheBadge {
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 .updated {
-  font-size: 14px;
-  opacity: 0.6;
+  font-size: 0.75rem;
+  opacity: 0.65;
 }
 
 .refreshBtn {

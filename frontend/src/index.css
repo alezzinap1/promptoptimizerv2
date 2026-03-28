@@ -470,7 +470,9 @@ body::after {
 }
 
 /* Главные заголовки страниц: градиент text → primary, 21px */
-h1.pageTitleGradient {
+h1.pageTitleGradient,
+h2.pageTitleGradient,
+h3.pageTitleGradient {
   margin: 0 0 16px;
   font-size: 21px;
   font-weight: 600;
@@ -481,6 +483,11 @@ h1.pageTitleGradient {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+h2.pageTitleGradient,
+h3.pageTitleGradient {
+  margin: 0;
 }
 
 a {

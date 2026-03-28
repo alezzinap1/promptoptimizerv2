@@ -1,0 +1,69 @@
+/* Общая панель выпадающего меню (портал к document.body) */
+.dropdownPanel {
+  max-width: min(360px, calc(100vw - 16px));
+  max-height: min(320px, calc(100vh - 24px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 9px;
+  padding: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.12);
+  animation: menuIn 0.12s ease-out;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  margin: 0;
+  border: none !important;
+  border-radius: 7px;
+  background: transparent !important;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease;
+  box-shadow: none !important;
+  transform: none !important;
+  line-height: 1.35;
+}
+
+.menuItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='light'] .menuItem:hover,
+[data-mode='light'] .menuItem:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.menuItemActive {
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--stroke);
+  margin: 6px 8px;
+}
+
+.menuAddLink {
+  color: var(--primary);
+  font-weight: 500;
+}
