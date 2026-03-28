@@ -79,11 +79,11 @@ export default function Landing() {
         <div className={styles.hero}>
           <div className={styles.logoWrap}>
             <div className={styles.logoIcon}>
-              <SparklesIcon />
+              <span className={styles.heroLogoGlyph} aria-hidden />
             </div>
           </div>
 
-          <h1 className={styles.title}>Prompt Optimizer</h1>
+          <h1 className={styles.title}>MetaPrompt</h1>
           <p className={styles.subtitle}>
             Инструмент для инженерии промптов. Создавай, тестируй и улучшай промпты с помощью AI.
           </p>

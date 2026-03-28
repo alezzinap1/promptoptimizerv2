@@ -58,7 +58,7 @@
   min-height: 42px;
   border-radius: 8px !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   color: var(--text);
   font-size: 0.95rem;
   flex: 1 1 160px;

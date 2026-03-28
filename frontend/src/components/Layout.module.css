@@ -44,11 +44,19 @@
   color: var(--text);
 }
 
-.logoIcon {
-  width: 23px;
-  height: 23px;
-  color: var(--primary);
-  filter: none;
+.logoGlyph {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  background-color: var(--primary);
+  -webkit-mask-image: url(/brand-logo-mask.png);
+  mask-image: url(/brand-logo-mask.png);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .logoText {
@@ -56,10 +64,7 @@
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--text), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .nav {
@@ -157,7 +162,7 @@
   width: 27px;
   height: 27px;
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(110, 231, 183, 0.2), rgba(56, 189, 248, 0.15));
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
   color: var(--primary);
 }
 
@@ -178,7 +183,7 @@
   padding: 8px 18px;
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text);
   font-size: 14px;
   font-weight: 500;
@@ -189,7 +194,7 @@
 
 .loginBtn:hover {
   border-color: var(--primary);
-  background: rgba(110, 231, 183, 0.1);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
   color: var(--primary);
   transform: translateY(-1px);
 }

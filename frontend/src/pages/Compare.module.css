@@ -131,30 +131,24 @@
 
 .columnVariantA {
   border: 1px solid rgba(56, 189, 248, 0.45);
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0.02));
+  background: rgba(56, 189, 248, 0.08);
   box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08) inset;
 }
 
 .columnVariantB {
   border: 1px solid rgba(167, 139, 250, 0.5);
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.12), rgba(245, 158, 11, 0.04));
+  background: rgba(167, 139, 250, 0.1);
   box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.08) inset;
 }
 
 .columnTitleA {
   margin: 0 0 12px !important;
-  background: linear-gradient(135deg, #38bdf8, #7dd3fc) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
+  color: #38bdf8 !important;
 }
 
 .columnTitleB {
   margin: 0 0 12px !important;
-  background: linear-gradient(135deg, #c4b5fd, #fbbf24) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
+  color: #c4b5fd !important;
 }
 
 .radioRowA input[type='radio'] {
@@ -238,7 +232,7 @@
   padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--text);
@@ -291,7 +285,7 @@
 
 .primaryBtn {
   padding: 14px 28px;
-  background: linear-gradient(130deg, var(--primary-strong), var(--accent));
+  background: var(--primary);
   color: #041016;
   border: none;
   border-radius: 8px;
@@ -308,7 +302,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  background: rgba(255, 255, 255, 0.12);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -345,7 +339,7 @@
 }
 
 .column {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-radius: 7px;
@@ -361,10 +355,7 @@
 .column h3 {
   margin: 0 0 12px;
   font-family: var(--font-display, inherit);
-  background: linear-gradient(135deg, var(--text), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .prompt {
@@ -402,7 +393,7 @@
 .metricCompare {
   padding: 16px 20px;
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.055);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -429,7 +420,7 @@
   opacity: 0.9;
   border-radius: 8px;
   border: 1px solid rgba(245, 158, 11, 0.3);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
+  background: rgba(245, 158, 11, 0.09);
 }
 
 .judgeRow {
@@ -454,7 +445,7 @@
   padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -469,7 +460,7 @@
   padding: 12px 20px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.055);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--text);
@@ -492,7 +483,7 @@
   margin-top: 16px;
   padding: 16px 20px;
   border-radius: 9px;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0.04));
+  background: rgba(56, 189, 248, 0.08);
   border: 1px solid rgba(56, 189, 248, 0.25);
   font-size: 0.95rem;
 }

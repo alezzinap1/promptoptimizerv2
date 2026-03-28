@@ -49,6 +49,33 @@
   opacity: 0.92;
 }
 
+.cardDescMd {
+  margin: 0 0 10px;
+  max-height: 7.6em;
+  overflow: hidden;
+}
+
+.cardDescProse {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cardDescProse :global(p) {
+  margin: 0 0 0.35em;
+}
+
+.cardDescProse :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.cardDescProse :global(strong) {
+  font-weight: 600;
+}
+
+.detailMd {
+  font-size: 14px;
+}
+
 .tagMeta {
   margin: 0 0 8px;
   font-size: 11px;
@@ -108,7 +135,7 @@
   padding: 14px 24px;
   border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa));
+  background: var(--primary);
   color: #041016;
   font-weight: 700;
   cursor: pointer;
@@ -122,7 +149,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  background: rgba(255, 255, 255, 0.12);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -236,7 +263,7 @@
   padding: 10px 16px;
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.055);
   color: var(--text);
   font-size: 14px;
   cursor: pointer;
@@ -288,7 +315,7 @@
 }
 
 .primaryBtn {
-  background: linear-gradient(135deg, var(--primary, #22d3ee), var(--accent, #a78bfa)) !important;
+  background: var(--primary) !important;
   color: #041016 !important;
   border: none !important;
   padding: 14px 24px !important;
@@ -328,7 +355,7 @@
   max-width: 400px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--text);

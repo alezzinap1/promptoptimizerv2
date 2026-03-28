@@ -20,10 +20,7 @@
   font-family: var(--font-display);
   letter-spacing: -0.01em;
   margin: 0 0 18px;
-  background: linear-gradient(135deg, var(--text), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .section {
@@ -43,7 +40,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 55%);
+  background: rgba(255, 255, 255, 0.025);
   pointer-events: none;
 }
 
@@ -118,19 +115,19 @@
 }
 
 .paletteSwatch[data-palette-swatch='amber'] {
-  background: linear-gradient(135deg, #d97b45 0%, #3d2418 100%);
+  background: #d97b45;
 }
 
 .paletteSwatch[data-palette-swatch='obsidian'] {
-  background: linear-gradient(135deg, #8b7cf8 0%, #1a1530 100%);
+  background: #8b7cf8;
 }
 
 .paletteSwatch[data-palette-swatch='aurora'] {
-  background: linear-gradient(135deg, #22c4e8 0%, #0a1e2e 100%);
+  background: #22c4e8;
 }
 
 .paletteSwatch[data-palette-swatch='dune'] {
-  background: linear-gradient(135deg, #c4956a 0%, #3d2a1c 100%);
+  background: #c4956a;
 }
 
 .paletteName {

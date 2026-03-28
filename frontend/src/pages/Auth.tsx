@@ -123,9 +123,9 @@ export default function AuthPage() {
     <div className={styles.authPage}>
       {/* Background Effects */}
       <div className={styles.bgEffects}>
-        <div className={styles.gradientOrb1} />
-        <div className={styles.gradientOrb2} />
-        <div className={styles.gradientOrb3} />
+        <div className={styles.bgOrb1} />
+        <div className={styles.bgOrb2} />
+        <div className={styles.bgOrb3} />
         <div className={styles.gridPattern} />
       </div>
 
@@ -135,10 +135,10 @@ export default function AuthPage() {
           <div className={styles.brandingContent}>
             <div className={styles.logoWrapper}>
               <div className={styles.logo}>
-                <SparklesIcon />
+                <span className={styles.brandLogoGlyph} aria-hidden />
               </div>
             </div>
-            <h1 className={styles.brandTitle}>Prompt Engineer</h1>
+            <h1 className={styles.brandTitle}>MetaPrompt</h1>
             <p className={styles.brandSubtitle}>
               Оптимизируй промпты с помощью AI. Создавай, тестируй и улучшай свои промпты в одном месте.
             </p>

@@ -36,7 +36,11 @@ const emptyDraft = {
   body: '',
 }
 
-export default function SkillsPanel() {
+type SkillsPanelProps = {
+  onCountChange?: (n: number) => void
+}
+
+export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
   const [items, setItems] = useState<SkillItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
@@ -45,6 +49,10 @@ export default function SkillsPanel() {
   useEffect(() => {
     setItems(loadSkills())
   }, [])
+
+  useEffect(() => {
+    onCountChange?.(items.length)
+  }, [items.length, onCountChange])
 
   const persist = (next: SkillItem[]) => {
     setItems(next)

@@ -14,6 +14,7 @@ import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
@@ -304,8 +305,9 @@ export default function Home() {
 
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
+    const title = saveTitle.trim() || suggestLibraryTitle(taskInput)
     await api.saveToLibrary({
-      title: saveTitle || taskInput.slice(0, 60) || 'Без названия',
+      title,
       prompt: result.prompt_block,
       tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
       target_model: 'unknown',
@@ -841,15 +843,32 @@ export default function Home() {
                 </button>
                 <button type="button" className={`${styles.iterateBtn} btn-primary`} onClick={() => setIterationMode(true)}>Итерировать</button>
                 <button type="button" className="btn-secondary" onClick={() => navigate('/compare', { state: { taskInput: result.task_input || taskInput } })}>Сравнить</button>
-                <button type="button" className={`${styles.libraryBtn} btn-secondary`} onClick={() => {
-                  setSaveTitle(taskInput.slice(0, 60))
-                  setShowSaveDialog((v) => !v)
-                }}>В библиотеку</button>
+                <button
+                  type="button"
+                  className={`${styles.libraryBtn} btn-secondary`}
+                  onClick={() => {
+                    setShowSaveDialog((prev) => {
+                      if (!prev) setSaveTitle(suggestLibraryTitle(taskInput))
+                      return !prev
+                    })
+                  }}
+                >В библиотеку</button>
               </div>
               {showSaveDialog && (
                 <div className={styles.saveBox}>
                   <h3>Сохранить в библиотеку</h3>
-                  <input value={saveTitle} onChange={(e) => setSaveTitle(e.target.value)} placeholder="Название" />
+                  <label className={styles.saveFieldLabel}>
+                    Название в библиотеке
+                    <input
+                      value={saveTitle}
+                      onChange={(e) => setSaveTitle(e.target.value)}
+                      placeholder="Краткое имя записи"
+                      aria-describedby="save-title-hint"
+                    />
+                  </label>
+                  <p id="save-title-hint" className={styles.saveHint}>
+                    Показывается в списке карточек. Если оставить пустым — подставим первые слова задачи (не весь текст).
+                  </p>
                   <input value={saveTags} onChange={(e) => setSaveTags(e.target.value)} placeholder="Теги через запятую" />
                   <textarea value={saveNotes} onChange={(e) => setSaveNotes(e.target.value)} rows={3} placeholder="Заметки" />
                   <div className={styles.actions}>

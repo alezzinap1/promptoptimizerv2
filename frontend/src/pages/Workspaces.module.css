@@ -35,7 +35,7 @@
 
 .section,
 .card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.045);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-radius: 7px;

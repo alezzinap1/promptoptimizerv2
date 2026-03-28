@@ -36,19 +36,26 @@
 
 .seg,
 .segActive {
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 7px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font);
+  font-family: var(--font-ui, var(--font));
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  line-height: 1.2;
 }
 
 .seg {
   background: transparent;
   color: var(--muted);
+  border: 1px solid transparent;
 }
 
 .seg:hover {
@@ -56,10 +63,44 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+[data-theme='light'] .seg:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
 .segActive {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(110, 231, 183, 0.12));
-  color: var(--text);
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.12);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent);
+  box-shadow: none;
+}
+
+.segLabel {
+  flex-shrink: 0;
+}
+
+.tabBadge {
+  min-width: 1.4em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+.segActive .tabBadge {
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
+  color: var(--primary);
+}
+
+[data-theme='light'] .tabBadge {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .segActive .tabBadge {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--primary-strong);
 }
 
 .viewport {
@@ -89,7 +130,7 @@
 @media (max-width: 640px) {
   .seg,
   .segActive {
-    padding: 8px 12px;
+    padding: 8px 10px;
     font-size: 13px;
   }
 }

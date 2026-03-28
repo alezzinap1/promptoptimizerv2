@@ -1,8 +1,7 @@
 /* 4 palettes × 2 modes. html[data-palette][data-theme] — палитра и освещение отдельно. */
 
 [data-palette="amber"][data-theme="dark"] {
-  --bg: radial-gradient(circle at 18% 20%, rgba(217, 123, 69, 0.08), transparent 32%),
-    linear-gradient(145deg, #0a0806, #100c08 52%, #060504);
+  --bg: #100c08;
   --panel: rgba(255, 255, 255, 0.032);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.065);
@@ -34,8 +33,7 @@
 }
 
 [data-palette="amber"][data-theme="light"] {
-  --bg: radial-gradient(circle at 18% 22%, rgba(217, 123, 69, 0.09), transparent 36%),
-    linear-gradient(145deg, #fff9f3, #fceee4 55%, #faf4ec);
+  --bg: #fceee4;
   --panel: rgba(255, 255, 255, 0.9);
   --secondary: var(--panel);
   --panel-strong: rgba(61, 37, 22, 0.06);
@@ -67,8 +65,7 @@
 }
 
 [data-palette="obsidian"][data-theme="dark"] {
-  --bg: radial-gradient(circle at 82% 8%, rgba(139, 124, 248, 0.07), transparent 30%),
-    linear-gradient(145deg, #050508, #090a10 50%, #030306);
+  --bg: #090a10;
   --panel: rgba(255, 255, 255, 0.026);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.055);
@@ -100,8 +97,7 @@
 }
 
 [data-palette="obsidian"][data-theme="light"] {
-  --bg: radial-gradient(circle at 78% 12%, rgba(139, 124, 248, 0.08), transparent 34%),
-    linear-gradient(145deg, #f7f5ff, #eee9fc 52%, #f3f0ff);
+  --bg: #eee9fc;
   --panel: rgba(255, 255, 255, 0.92);
   --secondary: var(--panel);
   --panel-strong: rgba(30, 24, 56, 0.05);
@@ -133,8 +129,7 @@
 }
 
 [data-palette="aurora"][data-theme="dark"] {
-  --bg: radial-gradient(circle at 12% 18%, rgba(34, 196, 232, 0.09), transparent 32%),
-    linear-gradient(145deg, #030a10, #061218 52%, #02070c);
+  --bg: #061218;
   --panel: rgba(255, 255, 255, 0.028);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.058);
@@ -166,8 +161,7 @@
 }
 
 [data-palette="aurora"][data-theme="light"] {
-  --bg: radial-gradient(circle at 14% 20%, rgba(34, 196, 232, 0.1), transparent 36%),
-    linear-gradient(145deg, #effcff, #e0f6fd 52%, #eaf9ff);
+  --bg: #e0f6fd;
   --panel: rgba(255, 255, 255, 0.9);
   --secondary: var(--panel);
   --panel-strong: rgba(6, 40, 54, 0.05);
@@ -199,8 +193,7 @@
 }
 
 [data-palette="dune"][data-theme="dark"] {
-  --bg: radial-gradient(circle at 22% 24%, rgba(196, 149, 106, 0.08), transparent 34%),
-    linear-gradient(145deg, #0b0907, #100d0a 52%, #080605);
+  --bg: #100d0a;
   --panel: rgba(255, 255, 255, 0.028);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.055);
@@ -232,8 +225,7 @@
 }
 
 [data-palette="dune"][data-theme="light"] {
-  --bg: radial-gradient(circle at 20% 22%, rgba(196, 149, 106, 0.1), transparent 36%),
-    linear-gradient(145deg, #fdf9f4, #f6ece0 52%, #faf4eb);
+  --bg: #f6ece0;
   --panel: rgba(255, 255, 255, 0.9);
   --secondary: var(--panel);
   --panel-strong: rgba(62, 42, 28, 0.05);

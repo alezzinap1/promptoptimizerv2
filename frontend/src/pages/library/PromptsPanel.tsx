@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { api, type LibraryItem } from '../../api/client'
 import SelectDropdown from '../../components/SelectDropdown'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
+import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
 import styles from '../Library.module.css'
 
 function ratingLabel(rating: number | undefined | null) {
@@ -11,7 +12,11 @@ function ratingLabel(rating: number | undefined | null) {
   return `★ ${r}/5`
 }
 
-export default function PromptsPanel() {
+type Props = {
+  onPromptCountChanged?: () => void
+}
+
+export default function PromptsPanel({ onPromptCountChanged }: Props) {
   const navigate = useNavigate()
   const [items, setItems] = useState<LibraryItem[]>([])
   const [stats, setStats] = useState<{ total: number; models?: string[]; task_types?: string[] }>({ total: 0 })
@@ -88,12 +93,6 @@ export default function PromptsPanel() {
     <div className={styles.library}>
       <div className={styles.header}>
         <h2 className="pageTitleGradient">Промпты</h2>
-        <div className={styles.headerMeta}>
-          <span className={styles.metric}>Промптов: {stats.total}</span>
-          <Link to="/library?tab=techniques" className={styles.techLink}>
-            Каталог техник
-          </Link>
-        </div>
       </div>
 
       <div className={styles.toolbar}>
@@ -140,7 +139,10 @@ export default function PromptsPanel() {
         <div className={styles.grid}>
           {items.map((item) => (
             <div key={item.id} className={styles.card}>
-              <h3>{item.title}</h3>
+              <h3 className={styles.cardTitle}>{item.title}</h3>
+              {item.created_at ? (
+                <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
+              ) : null}
               <p className={styles.meta}>
                 <span className={styles.taskTypeLabel} title="Тип задачи при сохранении">
                   {item.task_type}
@@ -186,6 +188,8 @@ export default function PromptsPanel() {
                   onClick={async () => {
                     await api.deleteLibrary(item.id)
                     setItems((prev) => prev.filter((x) => x.id !== item.id))
+                    api.getLibraryStats().then(setStats)
+                    onPromptCountChanged?.()
                   }}
                 />
               </div>

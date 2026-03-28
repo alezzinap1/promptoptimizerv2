@@ -44,7 +44,7 @@
   padding: 8px 16px;
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.055);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--text);
@@ -110,7 +110,7 @@
   max-width: 420px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--text);
@@ -134,7 +134,7 @@
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.055);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -169,7 +169,7 @@
   overflow-x: auto;
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  background: rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -254,7 +254,7 @@
 }
 
 .addBtn {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05));
+  background: rgba(34, 197, 94, 0.12);
   border-color: rgba(34, 197, 94, 0.2);
 }
 
@@ -265,7 +265,7 @@
 }
 
 .removeBtn {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+  background: rgba(239, 68, 68, 0.12);
   border-color: rgba(239, 68, 68, 0.2);
 }
 

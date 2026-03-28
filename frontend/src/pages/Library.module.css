@@ -123,7 +123,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 55%);
+  background: rgba(255, 255, 255, 0.022);
   pointer-events: none;
 }
 
@@ -138,6 +138,22 @@
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.card h3.cardTitle {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.cardDates {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .meta {
@@ -174,18 +190,23 @@
 }
 
 .preview {
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-mono);
   white-space: pre-wrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 80px;
-  padding: 10px;
+  max-height: 72px;
+  padding: 8px 10px;
   margin: 0;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 7px;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+[data-theme='light'] .preview {
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .tags {

@@ -188,11 +188,11 @@
 .funnelFill,
 .eventBarFill,
 .latencyAvg {
-  background: linear-gradient(90deg, #22d3ee, #3b82f6);
+  background: #22d3ee;
 }
 
 .latencyP95 {
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  background: #f59e0b;
 }
 
 .eventList {

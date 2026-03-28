@@ -23,7 +23,7 @@
 }
 
 .section {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.055);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 7px;
@@ -43,10 +43,7 @@
   font-size: 1.35rem;
   font-weight: 600;
   font-family: var(--font-display, inherit);
-  background: linear-gradient(135deg, var(--text), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .stats {
@@ -89,7 +86,7 @@
 
 .trialHint {
   padding: 14px 18px;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(34, 211, 238, 0.05));
+  background: rgba(34, 211, 238, 0.09);
   border-radius: 8px;
   border: 1px solid rgba(34, 211, 238, 0.25);
   font-size: 0.95rem;
@@ -200,7 +197,7 @@
   padding: 9px 18px;
   border-radius: 7px;
   border: 1px solid var(--primary);
-  background: linear-gradient(135deg, rgba(110, 231, 183, 0.2), rgba(110, 231, 183, 0.05));
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
   color: var(--primary);
   font-size: 13px;
   cursor: pointer;

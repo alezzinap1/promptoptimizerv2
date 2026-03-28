@@ -41,7 +41,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 60%);
+  background: rgba(255, 255, 255, 0.018);
   pointer-events: none;
 }
 
@@ -60,10 +60,7 @@
   font-weight: 600;
   font-family: var(--font-display);
   letter-spacing: -0.01em;
-  background: linear-gradient(135deg, var(--text), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .panelSubtitle {
@@ -137,7 +134,7 @@
   padding: 12px 20px;
   border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, var(--primary-strong), var(--accent));
+  background: var(--primary);
   color: #0f172a;
   font-weight: 600;
   box-shadow: 0 8px 24px rgba(56, 189, 248, 0.2);
@@ -151,7 +148,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+  background: rgba(255, 255, 255, 0.12);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -209,7 +206,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 60%);
+  background: rgba(255, 255, 255, 0.02);
   pointer-events: none;
 }
 
@@ -420,10 +417,7 @@
   font-size: 2rem;
   font-weight: 700;
   font-family: var(--font-display);
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--primary);
 }
 
 .statLabel {
@@ -454,12 +448,12 @@
 .latencyFill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--primary), var(--accent));
+  background: var(--primary);
   transition: width 0.5s ease-out;
 }
 
 .latencyFill.alt {
-  background: linear-gradient(90deg, #fb7185, #f97316);
+  background: #fb7185;
 }
 
 .cardList {

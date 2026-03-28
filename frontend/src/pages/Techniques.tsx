@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type TechniqueRecord } from '../api/client'
+import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import styles from './Techniques.module.css'
 
@@ -47,7 +48,13 @@ const EMPTY_FORM = {
   combines_well_with: '',
 }
 
-export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'embedded' }) {
+export default function Techniques({
+  variant = 'page',
+  onCatalogChanged,
+}: {
+  variant?: 'page' | 'embedded'
+  onCatalogChanged?: () => void
+}) {
   const [techniques, setTechniques] = useState<TechniqueRecord[]>([])
   const [search, setSearch] = useState('')
   const [taskType, setTaskType] = useState('')
@@ -60,10 +67,15 @@ export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'e
   const [showTechniqueModal, setShowTechniqueModal] = useState(false)
   const [detailTechnique, setDetailTechnique] = useState<TechniqueRecord | null>(null)
 
-  const load = () => {
+  const load = (): Promise<void> => {
     setLoading(true)
     setError(null)
-    api.getTechniques({ search: search || undefined, task_type: taskType || undefined, complexity: complexity || undefined })
+    return api
+      .getTechniques({
+        search: search || undefined,
+        task_type: taskType || undefined,
+        complexity: complexity || undefined,
+      })
       .then((r) => setTechniques(r.techniques))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
@@ -110,7 +122,8 @@ export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'e
       setForm(EMPTY_FORM)
       setEditingId(null)
       setShowTechniqueModal(false)
-      load()
+      await load()
+      onCatalogChanged?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить технику')
     } finally {
@@ -235,13 +248,13 @@ export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'e
             {detailTechnique.why_it_works ? (
               <section className={styles.detailSection}>
                 <h4>Почему работает</h4>
-                <p>{detailTechnique.why_it_works}</p>
+                <MarkdownOutput className={styles.detailMd}>{detailTechnique.why_it_works}</MarkdownOutput>
               </section>
             ) : null}
             {detailTechnique.good_example ? (
               <section className={styles.detailSection}>
                 <h4>Пример</h4>
-                <p>{detailTechnique.good_example}</p>
+                <MarkdownOutput className={styles.detailMd}>{detailTechnique.good_example}</MarkdownOutput>
               </section>
             ) : null}
             {detailTechnique.core_pattern ? (
@@ -275,7 +288,9 @@ export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'e
                 {detailTechnique.variants.map((variant, idx) => (
                   <div key={idx} className={styles.variant}>
                     <p><strong>{variant.name || `Вариант ${idx + 1}`}</strong></p>
-                    {variant.use_when ? <p>{variant.use_when}</p> : null}
+                    {variant.use_when ? (
+                      <MarkdownOutput className={styles.detailMd}>{variant.use_when}</MarkdownOutput>
+                    ) : null}
                     {variant.pattern ? <pre className={styles.detailPre}>{variant.pattern}</pre> : null}
                   </div>
                 ))}
@@ -370,7 +385,8 @@ export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'e
                           closeTechniqueModal()
                         }
                         setDetailTechnique((cur) => (cur?.id === t.id ? null : cur))
-                        load()
+                        await load()
+                        onCatalogChanged?.()
                       }}
                     >
                       Удалить
@@ -378,7 +394,13 @@ export default function Techniques({ variant = 'page' }: { variant?: 'page' | 'e
                   </div>
                 ) : null}
               </div>
-              <p className={styles.cardDesc}>{techniqueLeadText(t)}</p>
+              <div className={styles.cardDescMd}>
+                {t.why_it_works ? (
+                  <MarkdownOutput className={styles.cardDescProse}>{t.why_it_works}</MarkdownOutput>
+                ) : (
+                  <p className={styles.cardDesc}>{techniqueLeadText(t)}</p>
+                )}
+              </div>
               {t.when_to_use?.task_types && t.when_to_use.task_types.length > 0 && (
                 <p className={styles.tagMeta} title={t.when_to_use.task_types.join(', ')}>
                   Типы задач: {t.when_to_use.task_types.join(', ')}
