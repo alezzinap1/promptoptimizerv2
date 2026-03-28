@@ -24,6 +24,7 @@ class SettingsUpdate(BaseModel):
     openrouter_api_key: str | None = None
     theme: str | None = None
     font: str | None = None
+    color_mode: str | None = None  # dark | light
     preferred_generation_models: list[str] | None = None
     preferred_target_models: list[str] | None = None
     simple_improve_preset: str | None = None
@@ -46,6 +47,7 @@ def update_settings(
         int(user["id"]),
         theme=req.theme,
         font=req.font,
+        color_mode=req.color_mode,
         preferred_generation_models=req.preferred_generation_models,
         preferred_target_models=req.preferred_target_models,
         simple_improve_preset=req.simple_improve_preset,

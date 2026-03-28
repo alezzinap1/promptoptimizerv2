@@ -7,6 +7,7 @@ import {
   type SimplePresetId,
 } from '../constants/simpleImprove'
 import AutoTextarea from '../components/AutoTextarea'
+import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import cb from '../styles/ComposerBar.module.css'
@@ -150,7 +151,9 @@ export default function SimpleImprove() {
           </div>
           <div className={styles.answerPanel}>
             {result ? (
-              <pre className={styles.result}>{result}</pre>
+              <div className={styles.resultMarkdown}>
+                <MarkdownOutput>{result}</MarkdownOutput>
+              </div>
             ) : (
               <p className={styles.answerPlaceholder}>
                 После нажатия «Улучшить промпт» результат появится здесь.

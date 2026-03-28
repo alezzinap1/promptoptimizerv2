@@ -79,6 +79,7 @@
   min-width: 0;
   padding: 8px 4px 48px;
   line-height: 1.7;
+  font-family: var(--font, system-ui, sans-serif);
 }
 
 .body h1 {

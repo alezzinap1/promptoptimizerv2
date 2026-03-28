@@ -6,28 +6,23 @@ import {
   SIMPLE_PRESET_LABELS,
   type SimplePresetId,
 } from '../constants/simpleImprove'
-import { FONTS, PALETTES, useTheme } from '../context/ThemeContext'
+import { FONTS, PALETTES, useTheme, type PaletteId } from '../context/ThemeContext'
 import SelectDropdown from '../components/SelectDropdown'
+import LabelWithHint from '../components/LabelWithHint'
 import styles from './Settings.module.css'
 
-const PALETTE_LABELS: Record<string, string> = {
-  slate: 'Slate',
-  forest: 'Forest',
-  midnight: 'Midnight',
-  amber: 'Amber',
-  ocean: 'Ocean',
-  mono: 'Monochrome',
+const PALETTE_LABELS: Record<PaletteId, string> = {
+  amber: 'Янтарь',
+  obsidian: 'Обсидиан',
+  aurora: 'Аврора',
+  dune: 'Дюна',
 }
 
 const FONT_LABELS: Record<string, string> = {
-  jetbrains: 'JetBrains Mono',
-  inter: 'Inter',
-  ibmplex: 'IBM Plex Sans',
   plusjakarta: 'Plus Jakarta Sans',
-  spacegrotesk: 'Space Grotesk',
-  manrope: 'Manrope',
-  outfit: 'Outfit',
-  firacode: 'Fira Code',
+  inter: 'Inter',
+  dmsans: 'DM Sans',
+  geist: 'Geist',
 }
 
 const CLS_MODE_OPTIONS = [
@@ -39,6 +34,21 @@ const SIMPLE_PRESET_FORM_OPTIONS = SIMPLE_PRESET_IDS.map((id) => ({
   value: id,
   label: SIMPLE_PRESET_LABELS[id],
 }))
+
+const HINT_OPENROUTER =
+  'Персональный ключ OpenRouter. Без ключа доступен пробный режим с лимитом токенов и дешёвыми моделями. Ключ хранится на сервере, привязан к аккаунту.'
+
+const HINT_CLASSIFICATION =
+  'Эвристика — быстро и без отдельного запроса к LLM; точность ограничена. LLM-классификатор — отдельный короткий вызов модели (токены; в пробном режиме слишком дорогая модель может быть заменена на доступную по умолчанию).'
+
+const HINT_SIMPLE =
+  'Пресет и дополнительные инструкции для экрана «Простой режим». Подробнее в разделе Справка → Простой режим.'
+
+const HINT_APPEARANCE =
+  'Палитра задаёт оттенки интерфейса. Светлая/тёмная тема переключается в меню профиля (иконка ☰). Шрифт применяется ко всему интерфейсу; моноширинный шрифт промптов не меняется.'
+
+const HINT_MODELS =
+  'Список моделей для выпадающих списков на главной и в сравнении. Управление — в каталоге моделей.'
 
 export default function Settings() {
   const { palette, font, setPalette, setFont } = useTheme()
@@ -53,7 +63,8 @@ export default function Settings() {
   const [clsModel, setClsModel] = useState('')
 
   useEffect(() => {
-    api.getSettings()
+    api
+      .getSettings()
       .then(setSettings)
       .catch((e) => setMessage({ type: 'err', text: e instanceof Error ? e.message : 'Не удалось загрузить настройки' }))
       .finally(() => setLoading(false))
@@ -109,7 +120,7 @@ export default function Settings() {
         task_classifier_model: clsModel.trim(),
       })
       setSettings(updated)
-      setMessage({ type: 'ok', text: 'Классификация задачи сохранена' })
+      setMessage({ type: 'ok', text: 'Настройки классификации сохранены' })
     } catch (e) {
       setMessage({ type: 'err', text: (e as Error).message })
     } finally {
@@ -134,13 +145,14 @@ export default function Settings() {
   return (
     <div className={styles.settings}>
       <h1>Настройки</h1>
+      {message && (
+        <p className={message.type === 'ok' ? styles.msgOk : styles.msgErr}>{message.text}</p>
+      )}
 
       <section className={styles.section}>
-        <h2>OpenRouter API</h2>
-        <p className={styles.info}>
-          Ваш персональный API ключ OpenRouter. Без ключа доступен пробный режим (50 000 токенов, модели ≤$1/1M).
-          Ключ хранится на сервере и привязан к вашему аккаунту.
-        </p>
+        <LabelWithHint label={<>OpenRouter API</>} hint={HINT_OPENROUTER}>
+          <p className={styles.fieldHint}>Без ключа — пробный режим. Ключ хранится на сервере.</p>
+        </LabelWithHint>
         {settings?.openrouter_api_key_set && (
           <p className={styles.masked}>
             Текущий ключ: <code>{settings.openrouter_api_key_masked}</code>
@@ -156,48 +168,38 @@ export default function Settings() {
             className={styles.input}
           />
           <button
+            type="button"
             onClick={handleSaveApiKey}
             disabled={saving || !apiKey.trim()}
-            className={styles.btn}
+            className={`${styles.btn} btn-primary`}
           >
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
           <button
+            type="button"
             onClick={handleClearApiKey}
             disabled={saving || !settings?.openrouter_api_key_set}
-            className={styles.btn}
+            className={`${styles.btn} btn-danger`}
           >
             Очистить
           </button>
         </div>
-        {message && (
-          <p className={message.type === 'ok' ? styles.msgOk : styles.msgErr}>
-            {message.text}
-          </p>
-        )}
       </section>
 
       <section className={styles.section}>
-        <h2>Классификация задачи (Home)</h2>
-        <p className={styles.info}>
-          Определяет тип задачи и сложность для подбора техник. <strong>Эвристика</strong> — быстро и бесплатно,
-          метка в запросе помечена как неточная. <strong>LLM</strong> — отдельный короткий вызов модели (токены);
-          в пробном режиме при слишком дорогой модели подставится дешёвая по умолчанию.
-        </p>
-        <div className={styles.row}>
-          <label className={styles.fieldLabel}>
-            Режим
-            <SelectDropdown
-              value={clsMode}
-              options={[...CLS_MODE_OPTIONS]}
-              onChange={(v) => setClsMode(v as 'heuristic' | 'llm')}
-              aria-label="Режим классификации"
-              variant="field"
-            />
-          </label>
-        </div>
+        <h2>Классификация задач</h2>
+        <p className={styles.sectionLead}>Влияет на главный экран.</p>
+        <LabelWithHint label="Режим" hint={HINT_CLASSIFICATION}>
+          <SelectDropdown
+            value={clsMode}
+            options={[...CLS_MODE_OPTIONS]}
+            onChange={(v) => setClsMode(v as 'heuristic' | 'llm')}
+            aria-label="Режим классификации"
+            variant="field"
+          />
+        </LabelWithHint>
         <label className={styles.fieldLabel}>
-          Модель для LLM-режима (OpenRouter id или короткий ключ, напр. gemini_flash). Пусто — по умолчанию на сервере.
+          Модель для LLM-режима
           <input
             className={styles.input}
             value={clsModel}
@@ -206,19 +208,24 @@ export default function Settings() {
             disabled={clsMode !== 'llm'}
           />
         </label>
+        <p className={styles.fieldHint}>Пусто — значение по умолчанию на сервере.</p>
         <div className={styles.row}>
-          <button type="button" onClick={handleSaveClassification} disabled={saving || loading} className={styles.btn}>
-            {saving ? 'Сохранение…' : 'Сохранить классификацию'}
+          <button
+            type="button"
+            onClick={handleSaveClassification}
+            disabled={saving || loading}
+            className={`${styles.btn} btn-primary`}
+          >
+            {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
       </section>
 
       <section className={styles.section}>
-        <h2>Простой режим (улучшение промпта)</h2>
-        <p className={styles.info}>
-          Пресет по умолчанию и дополнительный мета-промпт для экрана «Простой режим»: одна кнопка улучшает вставленный текст.
-          Подробнее — в <Link to="/help">справке</Link>.
-        </p>
+        <LabelWithHint label={<>Простой режим</>} hint={HINT_SIMPLE}>
+          <p className={styles.fieldHint}>Пресет и мета-инструкции для экрана «Простой режим». Подробнее — в{' '}
+            <Link to="/help">справке</Link>.</p>
+        </LabelWithHint>
         <div className={styles.row}>
           <label className={styles.fieldLabel}>
             Пресет по умолчанию
@@ -246,51 +253,55 @@ export default function Settings() {
             type="button"
             onClick={handleSaveSimpleImprove}
             disabled={saving || loading}
-            className={styles.btn}
+            className={`${styles.btn} btn-primary`}
           >
-            {saving ? 'Сохранение…' : 'Сохранить простой режим'}
+            {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
       </section>
 
       <section className={styles.section}>
-        <h2>Оформление</h2>
-        <p className={styles.info}>
-          Выбор цветовой палитры и шрифта. Переключение светлой/тёмной темы — в меню профиля (три полоски).
-        </p>
-        <div className={styles.row}>
-          <label className={styles.fieldLabel}>
-            Палитра
-            <SelectDropdown
-              value={palette}
-              options={PALETTES.map((item) => ({ value: item, label: PALETTE_LABELS[item] || item }))}
-              onChange={(v) => setPalette(v as (typeof PALETTES)[number])}
-              aria-label="Цветовая палитра"
-              variant="field"
-            />
-          </label>
-          <label className={styles.fieldLabel}>
-            Шрифт
-            <SelectDropdown
-              value={font}
-              options={FONTS.map((item) => ({ value: item, label: FONT_LABELS[item] || item }))}
-              onChange={(v) => setFont(v as (typeof FONTS)[number])}
-              aria-label="Шрифт"
-              variant="field"
-            />
-          </label>
+        <LabelWithHint label={<>Оформление</>} hint={HINT_APPEARANCE}>
+          <p className={styles.fieldHint}>Тёмная/светлая тема — в меню профиля (☰).</p>
+        </LabelWithHint>
+        <p className={styles.fieldLabel}>Палитра</p>
+        <div className={styles.paletteGrid} role="group" aria-label="Цветовая палитра">
+          {PALETTES.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`${styles.paletteCard} ${palette === id ? styles.paletteCardActive : ''}`}
+              onClick={() => setPalette(id)}
+              aria-pressed={palette === id}
+            >
+              <span className={styles.paletteSwatch} data-palette-swatch={id} aria-hidden />
+              <span className={styles.paletteName}>{PALETTE_LABELS[id]}</span>
+            </button>
+          ))}
         </div>
+        <label className={styles.fieldLabel}>
+          Шрифт интерфейса
+          <SelectDropdown
+            value={font}
+            options={FONTS.map((item) => ({ value: item, label: FONT_LABELS[item] || item }))}
+            onChange={(v) => setFont(v as (typeof FONTS)[number])}
+            aria-label="Шрифт интерфейса"
+            variant="field"
+          />
+        </label>
+        <p className={styles.fieldHint}>Моноширинный шрифт блоков с промптом не меняется.</p>
       </section>
 
       <section className={styles.section}>
-        <h2>Набор моделей пользователя</h2>
-        <p className={styles.info}>
-          Выбранные модели используются в Home и Compare как доступные варианты генерации.
-        </p>
+        <LabelWithHint label={<>Набор моделей</>} hint={HINT_MODELS}>
+          <p className={styles.fieldHint}>Модели для главной и сравнения.</p>
+        </LabelWithHint>
         <p className={styles.masked}>
           Для генерации: <strong>{settings?.preferred_generation_models?.length ?? 0}</strong> моделей
         </p>
-        <Link to="/models" className={styles.btn}>Открыть каталог моделей</Link>
+        <Link to="/models" className={`${styles.btn} btn-secondary`}>
+          Открыть каталог моделей
+        </Link>
       </section>
     </div>
   )

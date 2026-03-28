@@ -8,7 +8,6 @@ import Landing from './pages/Landing'
 import Home from './pages/Home'
 import Compare from './pages/Compare'
 import Library from './pages/Library'
-import Techniques from './pages/Techniques'
 import Models from './pages/Models'
 import Settings from './pages/Settings'
 import UserInfo from './pages/UserInfo'
@@ -47,7 +46,7 @@ function AppShell() {
         <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
         <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
         <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
-        <Route path="/techniques" element={<RequireAuth><Techniques /></RequireAuth>} />
+        <Route path="/techniques" element={<RequireAuth><Navigate to="/library?tab=techniques" replace /></RequireAuth>} />
         <Route path="/workspaces" element={<RequireAuth><Workspaces /></RequireAuth>} />
         <Route path="/models" element={<RequireAuth><Models /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
@@ -66,10 +65,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <AppShell />
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }

@@ -33,6 +33,41 @@ TRIAL_DEFAULT_TARGET_MODELS = [
     PROVIDER_MODELS["mistral"],
 ]
 
+VALID_PALETTES = frozenset({"amber", "obsidian", "aurora", "dune"})
+LEGACY_PALETTE_MAP = {
+    "slate": "obsidian",
+    "forest": "dune",
+    "midnight": "obsidian",
+    "ocean": "aurora",
+    "mono": "obsidian",
+}
+VALID_UI_FONTS = frozenset({"plusjakarta", "inter", "dmsans", "geist"})
+LEGACY_FONT_MAP = {
+    "jetbrains": "plusjakarta",
+    "firacode": "plusjakarta",
+    "ibmplex": "inter",
+    "spacegrotesk": "geist",
+    "manrope": "inter",
+    "outfit": "geist",
+}
+
+
+def _normalize_palette(raw: str | None) -> str:
+    v = str(raw or "amber").strip().lower()
+    v = LEGACY_PALETTE_MAP.get(v, v)
+    return v if v in VALID_PALETTES else "amber"
+
+
+def _normalize_ui_font(raw: str | None) -> str:
+    v = str(raw or "plusjakarta").strip().lower()
+    v = LEGACY_FONT_MAP.get(v, v)
+    return v if v in VALID_UI_FONTS else "plusjakarta"
+
+
+def _normalize_color_mode(raw: str | None) -> str:
+    v = str(raw or "dark").strip().lower()
+    return v if v in ("dark", "light") else "dark"
+
 
 def _normalize_models(values: list[str] | None, *, allow_unknown: bool = False) -> list[str]:
     seen: set[str] = set()
@@ -73,8 +108,9 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
     if cls_mode not in ("heuristic", "llm"):
         cls_mode = "heuristic"
     return {
-        "theme": str(prefs.get("theme") or "slate"),
-        "font": str(prefs.get("font") or "jetbrains"),
+        "theme": _normalize_palette(str(prefs.get("theme") or "")),
+        "font": _normalize_ui_font(str(prefs.get("font") or "")),
+        "color_mode": _normalize_color_mode(str(prefs.get("color_mode") or "")),
         "preferred_generation_models": gen_models,
         "preferred_target_models": target_models,
         "simple_improve_preset": normalize_preset(str(prefs.get("simple_improve_preset"))),
@@ -92,6 +128,7 @@ def update_user_preferences_payload(
     *,
     theme: str | None = None,
     font: str | None = None,
+    color_mode: str | None = None,
     preferred_generation_models: list[str] | None = None,
     preferred_target_models: list[str] | None = None,
     simple_improve_preset: str | None = None,
@@ -120,10 +157,16 @@ def update_user_preferences_payload(
     tmod = None
     if task_classifier_model is not None:
         tmod = str(task_classifier_model).strip()[:500]
+    cm = None
+    if color_mode is not None:
+        cm = _normalize_color_mode(color_mode)
+    next_theme = _normalize_palette(theme) if theme is not None else None
+    next_font = _normalize_ui_font(font) if font is not None else None
     db.upsert_user_preferences(
         user_id=user_id,
-        theme=theme,
-        font=font,
+        theme=next_theme if theme is not None else None,
+        font=next_font if font is not None else None,
+        color_mode=cm,
         preferred_generation_models=gen_models,
         preferred_target_models=target_models,
         simple_improve_preset=sp,

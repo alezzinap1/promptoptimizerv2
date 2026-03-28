@@ -144,6 +144,8 @@ export interface Settings {
   openrouter_api_key_masked: string
   theme: string
   font: string
+  /** dark | light — освещение интерфейса */
+  color_mode?: string
   preferred_generation_models: string[]
   preferred_target_models: string[]
   simple_improve_preset: string
@@ -272,6 +274,7 @@ export const api = {
     openrouter_api_key?: string
     theme?: string
     font?: string
+    color_mode?: string
     preferred_generation_models?: string[]
     preferred_target_models?: string[]
     simple_improve_preset?: string

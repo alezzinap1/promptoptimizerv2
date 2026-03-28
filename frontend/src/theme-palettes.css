@@ -1,0 +1,265 @@
+/* 4 palettes × 2 modes. html[data-palette][data-theme] — палитра и освещение отдельно. */
+
+[data-palette="amber"][data-theme="dark"] {
+  --bg: radial-gradient(circle at 18% 20%, rgba(217, 123, 69, 0.08), transparent 32%),
+    linear-gradient(145deg, #0a0806, #100c08 52%, #060504);
+  --panel: rgba(255, 255, 255, 0.032);
+  --secondary: var(--panel);
+  --panel-strong: rgba(255, 255, 255, 0.065);
+  --text: #fff5eb;
+  --muted: rgba(255, 245, 235, 0.64);
+  --primary: #d97b45;
+  --primary-strong: #c46a3a;
+  --accent: #e8a066;
+  --accent-2: #f4c89a;
+  --stroke: rgba(255, 255, 255, 0.06);
+  --glow: 0 8px 32px rgba(217, 123, 69, 0.12);
+  color-scheme: dark;
+  --option-bg: #120d09;
+  --option-text: #fff5eb;
+  --select-surface: #120d09;
+  --modal-surface: rgba(14, 10, 8, 0.99);
+  --modal-border: rgba(255, 255, 255, 0.07);
+  --orb-1: rgba(217, 123, 69, 0.09);
+  --orb-2: rgba(232, 160, 102, 0.06);
+  --orb-3: rgba(196, 149, 106, 0.05);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 38%, transparent);
+  --accent-hover: #e9955c;
+  --accent-dim: color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+[data-palette="amber"][data-theme="light"] {
+  --bg: radial-gradient(circle at 18% 22%, rgba(217, 123, 69, 0.09), transparent 36%),
+    linear-gradient(145deg, #fff9f3, #fceee4 55%, #faf4ec);
+  --panel: rgba(255, 255, 255, 0.9);
+  --secondary: var(--panel);
+  --panel-strong: rgba(61, 37, 22, 0.06);
+  --text: #2d1a0f;
+  --muted: rgba(45, 26, 15, 0.62);
+  --primary: #c45f28;
+  --primary-strong: #a34d1f;
+  --accent: #d97b45;
+  --accent-2: #b8732f;
+  --stroke: rgba(45, 26, 15, 0.11);
+  --glow: 0 12px 40px rgba(196, 95, 40, 0.12);
+  color-scheme: light;
+  --option-bg: #ffffff;
+  --option-text: #2d1a0f;
+  --select-surface: #ffffff;
+  --modal-surface: rgba(255, 255, 255, 0.98);
+  --modal-border: rgba(45, 26, 15, 0.11);
+  --orb-1: rgba(217, 123, 69, 0.1);
+  --orb-2: rgba(196, 95, 40, 0.07);
+  --orb-3: rgba(184, 115, 47, 0.06);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 45%, transparent);
+  --accent-hover: #d97b45;
+  --accent-dim: color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+[data-palette="obsidian"][data-theme="dark"] {
+  --bg: radial-gradient(circle at 82% 8%, rgba(139, 124, 248, 0.07), transparent 30%),
+    linear-gradient(145deg, #050508, #090a10 50%, #030306);
+  --panel: rgba(255, 255, 255, 0.026);
+  --secondary: var(--panel);
+  --panel-strong: rgba(255, 255, 255, 0.055);
+  --text: #ececf4;
+  --muted: rgba(236, 236, 244, 0.62);
+  --primary: #8b7cf8;
+  --primary-strong: #7c6ae8;
+  --accent: #a5b4fc;
+  --accent-2: #c4b5fd;
+  --stroke: rgba(255, 255, 255, 0.055);
+  --glow: 0 10px 36px rgba(139, 124, 248, 0.14);
+  color-scheme: dark;
+  --option-bg: #0a0a12;
+  --option-text: #ececf4;
+  --select-surface: #0a0a12;
+  --modal-surface: rgba(8, 8, 14, 0.99);
+  --modal-border: rgba(255, 255, 255, 0.07);
+  --orb-1: rgba(139, 124, 248, 0.08);
+  --orb-2: rgba(165, 180, 252, 0.05);
+  --orb-3: rgba(196, 181, 253, 0.04);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 38%, transparent);
+  --accent-hover: #9f8ffc;
+  --accent-dim: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+[data-palette="obsidian"][data-theme="light"] {
+  --bg: radial-gradient(circle at 78% 12%, rgba(139, 124, 248, 0.08), transparent 34%),
+    linear-gradient(145deg, #f7f5ff, #eee9fc 52%, #f3f0ff);
+  --panel: rgba(255, 255, 255, 0.92);
+  --secondary: var(--panel);
+  --panel-strong: rgba(30, 24, 56, 0.05);
+  --text: #1e1638;
+  --muted: rgba(30, 22, 56, 0.62);
+  --primary: #6d56d9;
+  --primary-strong: #5b48c4;
+  --accent: #8b7cf8;
+  --accent-2: #7c6ae8;
+  --stroke: rgba(30, 22, 56, 0.1);
+  --glow: 0 12px 42px rgba(109, 86, 217, 0.14);
+  color-scheme: light;
+  --option-bg: #ffffff;
+  --option-text: #1e1638;
+  --select-surface: #ffffff;
+  --modal-surface: rgba(255, 255, 255, 0.98);
+  --modal-border: rgba(30, 22, 56, 0.11);
+  --orb-1: rgba(139, 124, 248, 0.1);
+  --orb-2: rgba(109, 86, 217, 0.07);
+  --orb-3: rgba(165, 180, 252, 0.06);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 44%, transparent);
+  --accent-hover: #7c6ae8;
+  --accent-dim: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+[data-palette="aurora"][data-theme="dark"] {
+  --bg: radial-gradient(circle at 12% 18%, rgba(34, 196, 232, 0.09), transparent 32%),
+    linear-gradient(145deg, #030a10, #061218 52%, #02070c);
+  --panel: rgba(255, 255, 255, 0.028);
+  --secondary: var(--panel);
+  --panel-strong: rgba(255, 255, 255, 0.058);
+  --text: #e4f8ff;
+  --muted: rgba(228, 248, 255, 0.64);
+  --primary: #22c4e8;
+  --primary-strong: #12b0d4;
+  --accent: #5ce1fa;
+  --accent-2: #34d399;
+  --stroke: rgba(255, 255, 255, 0.055);
+  --glow: 0 10px 40px rgba(34, 196, 232, 0.15);
+  color-scheme: dark;
+  --option-bg: #060f18;
+  --option-text: #e4f8ff;
+  --select-surface: #060f18;
+  --modal-surface: rgba(6, 14, 22, 0.99);
+  --modal-border: rgba(255, 255, 255, 0.07);
+  --orb-1: rgba(34, 196, 232, 0.1);
+  --orb-2: rgba(92, 225, 250, 0.06);
+  --orb-3: rgba(52, 211, 153, 0.05);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 38%, transparent);
+  --accent-hover: #3dd4f0;
+  --accent-dim: color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+[data-palette="aurora"][data-theme="light"] {
+  --bg: radial-gradient(circle at 14% 20%, rgba(34, 196, 232, 0.1), transparent 36%),
+    linear-gradient(145deg, #effcff, #e0f6fd 52%, #eaf9ff);
+  --panel: rgba(255, 255, 255, 0.9);
+  --secondary: var(--panel);
+  --panel-strong: rgba(6, 40, 54, 0.05);
+  --text: #063544;
+  --muted: rgba(6, 52, 68, 0.62);
+  --primary: #0894b8;
+  --primary-strong: #067a9a;
+  --accent: #22c4e8;
+  --accent-2: #0d9488;
+  --stroke: rgba(6, 52, 68, 0.11);
+  --glow: 0 12px 42px rgba(8, 148, 184, 0.14);
+  color-scheme: light;
+  --option-bg: #ffffff;
+  --option-text: #063544;
+  --select-surface: #ffffff;
+  --modal-surface: rgba(255, 255, 255, 0.98);
+  --modal-border: rgba(6, 52, 68, 0.11);
+  --orb-1: rgba(34, 196, 232, 0.1);
+  --orb-2: rgba(8, 148, 184, 0.07);
+  --orb-3: rgba(13, 148, 136, 0.06);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 44%, transparent);
+  --accent-hover: #12b0d4;
+  --accent-dim: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+[data-palette="dune"][data-theme="dark"] {
+  --bg: radial-gradient(circle at 22% 24%, rgba(196, 149, 106, 0.08), transparent 34%),
+    linear-gradient(145deg, #0b0907, #100d0a 52%, #080605);
+  --panel: rgba(255, 255, 255, 0.028);
+  --secondary: var(--panel);
+  --panel-strong: rgba(255, 255, 255, 0.055);
+  --text: #faf3ea;
+  --muted: rgba(250, 243, 234, 0.62);
+  --primary: #c4956a;
+  --primary-strong: #a87b52;
+  --accent: #d4b08a;
+  --accent-2: #e8c9a8;
+  --stroke: rgba(255, 255, 255, 0.055);
+  --glow: 0 8px 34px rgba(196, 149, 106, 0.12);
+  color-scheme: dark;
+  --option-bg: #14100c;
+  --option-text: #faf3ea;
+  --select-surface: #14100c;
+  --modal-surface: rgba(16, 12, 10, 0.99);
+  --modal-border: rgba(255, 255, 255, 0.07);
+  --orb-1: rgba(196, 149, 106, 0.09);
+  --orb-2: rgba(212, 176, 138, 0.06);
+  --orb-3: rgba(232, 201, 168, 0.05);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 38%, transparent);
+  --accent-hover: #d0a87e;
+  --accent-dim: color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+[data-palette="dune"][data-theme="light"] {
+  --bg: radial-gradient(circle at 20% 22%, rgba(196, 149, 106, 0.1), transparent 36%),
+    linear-gradient(145deg, #fdf9f4, #f6ece0 52%, #faf4eb);
+  --panel: rgba(255, 255, 255, 0.9);
+  --secondary: var(--panel);
+  --panel-strong: rgba(62, 42, 28, 0.05);
+  --text: #3a2618;
+  --muted: rgba(58, 38, 24, 0.62);
+  --primary: #a67b52;
+  --primary-strong: #8a6443;
+  --accent: #c4956a;
+  --accent-2: #8b6f4d;
+  --stroke: rgba(58, 38, 24, 0.11);
+  --glow: 0 12px 40px rgba(166, 123, 82, 0.12);
+  color-scheme: light;
+  --option-bg: #ffffff;
+  --option-text: #3a2618;
+  --select-surface: #ffffff;
+  --modal-surface: rgba(255, 255, 255, 0.98);
+  --modal-border: rgba(58, 38, 24, 0.11);
+  --orb-1: rgba(196, 149, 106, 0.1);
+  --orb-2: rgba(166, 123, 82, 0.07);
+  --orb-3: rgba(139, 111, 77, 0.06);
+  --surface: var(--panel);
+  --surface-2: var(--panel-strong);
+  --border: var(--stroke);
+  --text-1: var(--text);
+  --text-2: var(--muted);
+  --text-3: color-mix(in srgb, var(--text) 44%, transparent);
+  --accent-hover: #b8895e;
+  --accent-dim: color-mix(in srgb, var(--primary) 26%, transparent);
+}

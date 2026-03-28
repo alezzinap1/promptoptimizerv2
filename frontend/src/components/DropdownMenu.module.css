@@ -47,8 +47,7 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-[data-theme='light'] .menuItem:hover,
-[data-mode='light'] .menuItem:hover {
+[data-theme='light'] .menuItem:hover {
   background: rgba(0, 0, 0, 0.06);
 }
 

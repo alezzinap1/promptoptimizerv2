@@ -10,6 +10,7 @@ import {
   type Workspace,
 } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
+import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
@@ -543,7 +544,7 @@ export default function Home() {
           <div
             role="separator"
             aria-orientation="vertical"
-            aria-label="Граница колонок Задача и IDE — перетащите для изменения ширины"
+            aria-label="Граница колонок «Задача» и «Разбор задачи» — перетащите для изменения ширины"
             className={styles.splitGutter}
             onMouseDown={startSplitDrag(1)}
           />
@@ -556,16 +557,16 @@ export default function Home() {
             <div className={styles.ideBox}>
               <div className={styles.ideHeader}>
                 <div>
-                  <h3 className="pageTitleGradient">IDE-анализ</h3>
+                  <h3 className="pageTitleGradient">Разбор задачи</h3>
                   <p className={styles.ideHint}>
                     {taskSummary || 'Анализ структуры задачи'}
                     {preview.techniques.length > 0 ? ` · ${preview.techniques.map((t) => t.name).join(', ')}` : ''}
                   </p>
                 </div>
                 <div className={styles.ideStats}>
-                  <span>{previewIntentCount} intent nodes</span>
-                  <span>{previewIssueCount} issues</span>
-                  <span>{previewEvidenceCount} evidence</span>
+                  <span>{previewIntentCount} пунктов цели</span>
+                  <span>{previewIssueCount} замечаний</span>
+                  <span>{previewEvidenceCount} фрагментов контекста</span>
                   {previewLoading && <span>Обновляю...</span>}
                 </div>
               </div>
@@ -580,10 +581,10 @@ export default function Home() {
               </div>
 
               <div className={styles.ideTabs}>
-                <button className={ideTab === 'spec' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('spec')}>Spec</button>
-                <button className={ideTab === 'intent' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('intent')}>Intent</button>
-                <button className={ideTab === 'issues' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('issues')}>Issues</button>
-                <button className={ideTab === 'evidence' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('evidence')}>Evidence</button>
+                <button className={ideTab === 'spec' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('spec')}>Спека</button>
+                <button className={ideTab === 'intent' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('intent')}>Намерение</button>
+                <button className={ideTab === 'issues' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('issues')}>Замечания</button>
+                <button className={ideTab === 'evidence' ? styles.ideTabActive : styles.ideTab} onClick={() => setIdeTab('evidence')}>Доказательства</button>
               </div>
 
               {ideTab === 'spec' && (
@@ -662,8 +663,8 @@ export default function Home() {
                         {meta.value_preview && <p>{meta.value_preview}</p>}
                         {meta.can_accept_reject && (
                           <div className={styles.evidenceActions}>
-                            <button onClick={() => setEvidenceDecisions((prev) => ({ ...prev, [field]: 'accept' }))}>Принять</button>
-                            <button onClick={() => setEvidenceDecisions((prev) => ({ ...prev, [field]: 'reject' }))}>Отклонить</button>
+                            <button type="button" className="btn-secondary" onClick={() => setEvidenceDecisions((prev) => ({ ...prev, [field]: 'accept' }))}>Принять</button>
+                            <button type="button" className="btn-ghost" onClick={() => setEvidenceDecisions((prev) => ({ ...prev, [field]: 'reject' }))}>Отклонить</button>
                           </div>
                         )}
                       </div>
@@ -674,8 +675,8 @@ export default function Home() {
             </div>
           ) : (
             <div className={styles.emptyStatePanel}>
-              <h3 className="pageTitleGradient">IDE-анализ</h3>
-              <p>Здесь появятся intent map, issues и evidence после того, как задача станет достаточно конкретной.</p>
+              <h3 className="pageTitleGradient">Разбор задачи</h3>
+              <p>Здесь появится анализ: цель, уточнения и контекст — после того как формулировка задачи станет достаточно конкретной.</p>
             </div>
           )}
         </section>
@@ -683,7 +684,7 @@ export default function Home() {
           <div
             role="separator"
             aria-orientation="vertical"
-            aria-label="Граница колонок IDE и Результат — перетащите для изменения ширины"
+            aria-label="Граница колонок «Разбор задачи» и «Результат» — перетащите для изменения ширины"
             className={styles.splitGutter}
             onMouseDown={startSplitDrag(2)}
           />
@@ -705,7 +706,7 @@ export default function Home() {
               </button>
               <p>{GENERATION_ISSUE_TEXT[result.generation_issue]}</p>
               <div className={styles.issueBannerActions}>
-                <button type="button" className={styles.primaryAction} onClick={handleRetryGeneration}>
+                <button type="button" className={`${styles.primaryAction} btn-primary`} onClick={handleRetryGeneration}>
                   Попробовать снова
                 </button>
               </div>
@@ -713,43 +714,55 @@ export default function Home() {
           )}
           {error && <p className={styles.error}>{error}</p>}
           {!result && !error && (
-            <p className={styles.empty}>Опиши задачу в левой колонке и нажми <strong>Создать промпт</strong></p>
+            <div className={`${styles.resultPlaceholder} ${loading ? styles.resultPlaceholderLoading : ''}`}>
+              <div className={styles.resultPlaceholderIcon} aria-hidden>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="8" y1="13" x2="16" y2="13" />
+                  <line x1="8" y1="17" x2="14" y2="17" />
+                </svg>
+              </div>
+              <p className={styles.resultPlaceholderTitle}>Промпт появится здесь</p>
+              <p className={styles.resultPlaceholderHint}>
+                Опишите задачу в левой колонке и нажмите кнопку отправки, чтобы создать промпт.
+              </p>
+            </div>
           )}
           {result?.has_prompt && (
             <>
               <div className={styles.promptToolbar}>
                 <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
               </div>
-              <textarea
-                className={styles.resultPrompt}
-                value={result.prompt_block}
-                readOnly
-                rows={12}
-              />
+              <div className={styles.resultMarkdownWrap}>
+                <MarkdownOutput>{result.prompt_block}</MarkdownOutput>
+              </div>
               {result.reasoning && (
                 <details>
                   <summary>Почему именно эти техники?</summary>
                   <div className={styles.preToolbar}>
-                    <CopyIconButton text={result.reasoning} title="Копировать reasoning" />
+                    <CopyIconButton text={result.reasoning} title="Копировать пояснение" />
                   </div>
-                  <pre className={styles.reasoning}>{result.reasoning}</pre>
+                  <div className={styles.reasoningMd}>
+                    <MarkdownOutput>{result.reasoning}</MarkdownOutput>
+                  </div>
                 </details>
               )}
               {result.prompt_spec && (
                 <>
-                  <button className={styles.ideModalBtn} onClick={() => setShowIdeModal(true)}>
-                    Prompt IDE: spec / debugger / evidence
+                  <button type="button" className={styles.ideModalBtn} onClick={() => setShowIdeModal(true)}>
+                    Подробнее: спецификация и проверки
                   </button>
                   {showIdeModal && (
                     <div className={styles.modalOverlay} onClick={() => setShowIdeModal(false)}>
                       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
-                          <h3>Prompt IDE</h3>
+                          <h3>Спецификация промпта</h3>
                           <button className={styles.modalClose} onClick={() => setShowIdeModal(false)}>×</button>
                         </div>
                         <div className={styles.ideGrid}>
                     <div className={styles.ideSection}>
-                      <h3>Spec</h3>
+                      <h3>Спецификация</h3>
                       <p><strong>Цель:</strong> {result.prompt_spec.goal || '—'}</p>
                       <p><strong>Типы задач:</strong> {(result.prompt_spec.task_types || []).join(', ') || '—'}</p>
                       <p><strong>Сложность:</strong> {result.prompt_spec.complexity || '—'}</p>
@@ -760,9 +773,9 @@ export default function Home() {
                       <p><strong>Ограничения:</strong> {(result.prompt_spec.constraints || []).join('; ') || '—'}</p>
                     </div>
                     <div className={styles.ideSection}>
-                      <h3>Debugger</h3>
+                      <h3>Проверка промпта</h3>
                       {(result.debug_issues || []).length === 0 ? (
-                        <p className={styles.success}>Debugger не нашёл критичных проблем.</p>
+                        <p className={styles.success}>Критичных замечаний к структуре промпта не найдено.</p>
                       ) : (
                         (result.debug_issues || []).map((issue, idx) => (
                           <div key={idx} className={styles.issueCard}>
@@ -773,7 +786,7 @@ export default function Home() {
                       )}
                     </div>
                     <div className={styles.ideSection}>
-                      <h3>Evidence</h3>
+                      <h3>Контекст и источники</h3>
                       {Object.entries(result.evidence || {}).map(([field, meta]) => (
                         <div key={field} className={styles.evidenceCard}>
                           <strong>{field}</strong>
@@ -796,7 +809,7 @@ export default function Home() {
                     {promptCostStr && <div><strong>Оценка стоимости:</strong> {promptCostStr}</div>}
                     <div><strong>Инструкции:</strong> {String(result.metrics.instruction_count ?? 0)}</div>
                     <div><strong>Ограничения:</strong> {String(result.metrics.constraint_count ?? 0)}</div>
-                    <div><strong>Completeness:</strong> {String(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)}%</div>
+                    <div><strong>Полнота:</strong> {String(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)}%</div>
                   </div>
                   {Array.isArray(result.metrics.improvement_tips) && result.metrics.improvement_tips.length > 0 && (
                     <details>
@@ -812,6 +825,8 @@ export default function Home() {
               )}
               <div className={styles.actions}>
                 <button
+                  type="button"
+                  className="btn-secondary"
                   onClick={() => {
                     const blob = new Blob([result.prompt_block], { type: 'text/plain;charset=utf-8' })
                     const url = URL.createObjectURL(blob)
@@ -824,9 +839,9 @@ export default function Home() {
                 >
                   Скачать .txt
                 </button>
-                <button className={styles.iterateBtn} onClick={() => setIterationMode(true)}>Итерировать</button>
-                <button onClick={() => navigate('/compare', { state: { taskInput: result.task_input || taskInput } })}>Сравнить</button>
-                <button className={styles.libraryBtn} onClick={() => {
+                <button type="button" className={`${styles.iterateBtn} btn-primary`} onClick={() => setIterationMode(true)}>Итерировать</button>
+                <button type="button" className="btn-secondary" onClick={() => navigate('/compare', { state: { taskInput: result.task_input || taskInput } })}>Сравнить</button>
+                <button type="button" className={`${styles.libraryBtn} btn-secondary`} onClick={() => {
                   setSaveTitle(taskInput.slice(0, 60))
                   setShowSaveDialog((v) => !v)
                 }}>В библиотеку</button>
@@ -838,8 +853,8 @@ export default function Home() {
                   <input value={saveTags} onChange={(e) => setSaveTags(e.target.value)} placeholder="Теги через запятую" />
                   <textarea value={saveNotes} onChange={(e) => setSaveNotes(e.target.value)} rows={3} placeholder="Заметки" />
                   <div className={styles.actions}>
-                    <button className={styles.primaryAction} onClick={handleSaveToLibrary}>Сохранить</button>
-                    <button onClick={() => setShowSaveDialog(false)}>Отмена</button>
+                    <button type="button" className={`${styles.primaryAction} btn-primary`} onClick={handleSaveToLibrary}>Сохранить</button>
+                    <button type="button" className="btn-ghost" onClick={() => setShowSaveDialog(false)}>Отмена</button>
                   </div>
                 </div>
               )}
@@ -927,9 +942,10 @@ export default function Home() {
                 )
               })}
               <div className={styles.actions}>
-                <button onClick={() => handleGenerate([])}>Пропустить все</button>
+                <button type="button" className="btn-ghost" onClick={() => handleGenerate([])}>Пропустить все</button>
                 <button
-                  className={styles.primaryAction}
+                  type="button"
+                  className={`${styles.primaryAction} btn-primary`}
                   onClick={() => handleGenerate((result.questions || []).map((q, idx) => ({
                     question: q.question,
                     answers: [

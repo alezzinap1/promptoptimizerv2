@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeSanitize from 'rehype-sanitize'
 import readmeRaw from '../docs/user/README.md?raw'
 import onboardingRaw from '../docs/user/ONBOARDING.md?raw'
 import homeWorkflowRaw from '../docs/user/HOME_WORKFLOW.md?raw'
@@ -40,7 +41,9 @@ export default function Help() {
         </nav>
       </aside>
       <article className={styles.body}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{current.content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+          {current.content}
+        </ReactMarkdown>
       </article>
     </div>
   )

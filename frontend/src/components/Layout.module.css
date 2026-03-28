@@ -133,56 +133,6 @@
   white-space: nowrap;
 }
 
-.navLinkCta,
-.navLinkCtaActive {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 7px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  text-decoration: none;
-  color: var(--text);
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(110, 231, 183, 0.08));
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.navLinkCta::before,
-.navLinkCtaActive::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(110, 231, 183, 0.1));
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.navLinkCta:hover::before {
-  opacity: 1;
-}
-
-.navLinkCta:hover {
-  color: var(--text);
-  border-color: rgba(110, 231, 183, 0.5);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.2);
-}
-
-.navLinkCtaActive {
-  color: #0f172a;
-  background: linear-gradient(135deg, #38bdf8, #6ee7b7);
-  border-color: transparent;
-  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.3);
-}
-
-.navLinkCtaActive .navIcon {
-  color: #0f172a;
-}
-
 .controls {
   display: flex;
   gap: 16px;
@@ -308,9 +258,7 @@
   }
   
   .navLink,
-  .navLinkActive,
-  .navLinkCta,
-  .navLinkCtaActive {
+  .navLinkActive {
     padding: 10px;
   }
   

@@ -20,7 +20,149 @@
 }
 
 .taskComposerBlock {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+}
+
+.generateRow {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0 8px;
+}
+
+.generateBothBtn {
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.modeExplainer {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--muted);
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  min-height: 28px;
+  align-items: center;
+}
+
+.chipAuto {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: var(--text);
+}
+
+.chipTech {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  max-width: 100%;
+}
+
+.chipWarn {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--text);
+}
+
+.previewZone {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='light'] .previewZone {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.previewTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.previewSteps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.previewSteps li {
+  margin-bottom: 6px;
+}
+
+.previewSteps strong {
+  color: var(--text);
+}
+
+.columnVariantA {
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0.02));
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08) inset;
+}
+
+.columnVariantB {
+  border: 1px solid rgba(167, 139, 250, 0.5);
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.12), rgba(245, 158, 11, 0.04));
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.08) inset;
+}
+
+.columnTitleA {
+  margin: 0 0 12px !important;
+  background: linear-gradient(135deg, #38bdf8, #7dd3fc) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.columnTitleB {
+  margin: 0 0 12px !important;
+  background: linear-gradient(135deg, #c4b5fd, #fbbf24) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.radioRowA input[type='radio'] {
+  accent-color: #38bdf8;
+}
+
+.radioRowB input[type='radio'] {
+  accent-color: #a78bfa;
 }
 
 .taskComposerBlock .fieldLabelRow {
@@ -235,6 +377,15 @@
   overflow-x: auto;
 }
 
+.promptMarkdownWrap {
+  margin: 12px 0;
+  padding: 12px 14px;
+  min-height: 200px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+}
+
 .textarea {
   min-height: 320px;
   resize: vertical;
@@ -351,11 +502,10 @@
   font-size: 0.85rem;
 }
 
-.judgeReason {
+.judgeReasonMd {
   margin: 12px 0 0;
-  white-space: pre-wrap;
   line-height: 1.6;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 @media (max-width: 800px) {

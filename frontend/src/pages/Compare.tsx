@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
+import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
@@ -60,6 +61,26 @@ export default function Compare() {
       }),
     [generationOptions, modelsMap],
   )
+
+  const techById = useMemo(() => Object.fromEntries(techniques.map((t) => [t.id, t.name])), [techniques])
+
+  const renderTechBadges = (mode: 'auto' | 'manual', manualIds: string[]) => {
+    if (mode === 'auto') {
+      return (
+        <span className={styles.chipAuto} title="Техники подбираются автоматически по типу задачи">
+          Авто-подбор
+        </span>
+      )
+    }
+    if (manualIds.length === 0) {
+      return <span className={styles.chipWarn}>Выберите техники вручную</span>
+    }
+    return manualIds.map((id) => (
+      <span key={id} className={styles.chipTech} title={techById[id] || id}>
+        {techById[id] || id}
+      </span>
+    ))
+  }
 
   const handleCompare = async () => {
     if (!taskInput.trim()) return
@@ -133,7 +154,7 @@ export default function Compare() {
           />
           <div className={cb.composerFooter}>
             <div className={cb.composerFooterRow}>
-              <div className={cb.composerFooterMid}>
+              <div className={cb.composerFooterMid} style={{ flex: 1 }}>
                 <SelectDropdown
                   value={genModel}
                   options={genModelSelectOptions}
@@ -144,20 +165,10 @@ export default function Compare() {
                 />
                 <button
                   type="button"
-                  className={cb.composerGhostBtn}
+                  className={`${cb.composerGhostBtn} btn-ghost`}
                   onClick={() => setShowCompareAdv((v) => !v)}
                 >
                   {showCompareAdv ? 'Меньше' : 'Т° / Top-P'}
-                </button>
-              </div>
-              <div className={cb.composerFooterEnd}>
-                <button
-                  type="button"
-                  className={cb.composerPrimary}
-                  onClick={handleCompare}
-                  disabled={!taskInput.trim() || loading}
-                >
-                  {loading ? 'Генерирую…' : 'Сгенерировать оба'}
                 </button>
               </div>
             </div>
@@ -179,12 +190,49 @@ export default function Compare() {
         </div>
       </div>
 
+      <div className={styles.generateRow}>
+        <button
+          type="button"
+          className={`${styles.generateBothBtn} btn-primary`}
+          onClick={handleCompare}
+          disabled={!taskInput.trim() || loading}
+        >
+          {loading ? 'Генерирую…' : 'Сгенерировать оба'}
+        </button>
+      </div>
+
+      <p className={styles.modeExplainer}>
+        <strong>Авто</strong> — техники подбираются по типу задачи. <strong>Вручную</strong> — только отмеченные ниже техники
+        попадут в промпт. После генерации в каждом столбце появится текст промпта и метрики — так видна разница A и B.
+      </p>
+
       <div className={styles.results}>
-        <div className={styles.column}>
-          <h3>Вариант A</h3>
-          <div className={styles.radioRow}>
-            <label><input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто</label>
-            <label><input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную</label>
+        <div className={`${styles.column} ${styles.columnVariantA}`}>
+          <h3 className={styles.columnTitleA}>Вариант A</h3>
+          <div className={styles.badgeRow} aria-label="Техники варианта A">
+            {renderTechBadges(techsAMode, techsAManual)}
+          </div>
+          <div className={styles.previewZone}>
+            <div className={styles.previewTitle}>Что будет в этом столбце</div>
+            <ol className={styles.previewSteps}>
+              <li>
+                <strong>Техники</strong> — как на бейджах выше.
+              </li>
+              <li>
+                <strong>Промпт</strong> — текст инструкции для модели (появится после генерации ниже на странице).
+              </li>
+              <li>
+                <strong>Сравнение</strong> — метрики и при необходимости LLM-судья подскажут, какой вариант сильнее.
+              </li>
+            </ol>
+          </div>
+          <div className={`${styles.radioRow} ${styles.radioRowA}`}>
+            <label title="Техники выберет модель по классификации задачи">
+              <input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто
+            </label>
+            <label title="Использовать только отмеченные ниже техники">
+              <input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную
+            </label>
           </div>
           {techsAMode === 'manual' && (
             <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта A">
@@ -205,11 +253,32 @@ export default function Compare() {
             </div>
           )}
         </div>
-        <div className={styles.column}>
-          <h3>Вариант B</h3>
-          <div className={styles.radioRow}>
-            <label><input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто</label>
-            <label><input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную</label>
+        <div className={`${styles.column} ${styles.columnVariantB}`}>
+          <h3 className={styles.columnTitleB}>Вариант B</h3>
+          <div className={styles.badgeRow} aria-label="Техники варианта B">
+            {renderTechBadges(techsBMode, techsBManual)}
+          </div>
+          <div className={styles.previewZone}>
+            <div className={styles.previewTitle}>Что будет в этом столбце</div>
+            <ol className={styles.previewSteps}>
+              <li>
+                <strong>Техники</strong> — как на бейджах выше.
+              </li>
+              <li>
+                <strong>Промпт</strong> — отдельная сборка инструкции (сравните текст с колонкой A).
+              </li>
+              <li>
+                <strong>Сравнение</strong> — те же метрики, другой набор техник → другая полнота и длина.
+              </li>
+            </ol>
+          </div>
+          <div className={`${styles.radioRow} ${styles.radioRowB}`}>
+            <label title="Техники выберет модель по классификации задачи">
+              <input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто
+            </label>
+            <label title="Использовать только отмеченные ниже техники">
+              <input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную
+            </label>
           </div>
           {techsBMode === 'manual' && (
             <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта B">
@@ -259,7 +328,7 @@ export default function Compare() {
                 ))}
               </datalist>
             </label>
-            <button type="button" className={styles.secondaryBtn} onClick={handleJudge} disabled={judgeLoading}>
+            <button type="button" className={`${styles.secondaryBtn} btn-secondary`} onClick={handleJudge} disabled={judgeLoading}>
               {judgeLoading ? 'Судья…' : 'LLM-судья'}
             </button>
           </div>
@@ -269,35 +338,41 @@ export default function Compare() {
               <strong>Вердикт судьи:</strong>{' '}
               {judgeResult.winner === 'tie' ? 'ничья' : judgeResult.winner.toUpperCase()}
               {judgeResult.scores && (
-                <span className={styles.judgeScores}> · scores: {JSON.stringify(judgeResult.scores)}</span>
+                <span className={styles.judgeScores}> · оценки: {JSON.stringify(judgeResult.scores)}</span>
               )}
-              <p className={styles.judgeReason}>{judgeResult.reasoning}</p>
+              <div className={styles.judgeReasonMd}>
+                <MarkdownOutput>{judgeResult.reasoning}</MarkdownOutput>
+              </div>
             </div>
           )}
           <div className={styles.metricCompare}>
-            <div>Completeness A: {String(result.a.metrics.completeness_score ?? result.a.metrics.quality_score ?? 0)}%</div>
-            <div>Completeness B: {String(result.b.metrics.completeness_score ?? result.b.metrics.quality_score ?? 0)}%</div>
+            <div>Полнота A: {String(result.a.metrics.completeness_score ?? result.a.metrics.quality_score ?? 0)}%</div>
+            <div>Полнота B: {String(result.b.metrics.completeness_score ?? result.b.metrics.quality_score ?? 0)}%</div>
             <div>Токены A: {String(result.a.metrics.token_estimate ?? 0)}</div>
             <div>Токены B: {String(result.b.metrics.token_estimate ?? 0)}</div>
           </div>
           <div className={styles.results}>
-          <div className={styles.column}>
-            <h3>Вариант A</h3>
+          <div className={`${styles.column} ${styles.columnVariantA}`}>
+            <h3 className={styles.columnTitleA}>Вариант A — результат</h3>
             <p className={styles.meta}>{result.a.techniques.map((t) => t.name).join(' + ')}</p>
             {result.a.reasoning && (
               <details>
-                <summary>Reasoning A</summary>
+                <summary>Пояснение A</summary>
                 <div className={styles.copyRow}>
-                  <CopyIconButton text={result.a.reasoning} title="Копировать reasoning A" />
+                  <CopyIconButton text={result.a.reasoning} title="Копировать пояснение A" />
                 </div>
-                <pre className={styles.prompt}>{result.a.reasoning}</pre>
+                <div className={styles.promptMarkdownWrap}>
+                  <MarkdownOutput>{result.a.reasoning}</MarkdownOutput>
+                </div>
               </details>
             )}
             <div className={styles.copyRow}>
               <CopyIconButton text={result.a.prompt} title="Копировать промпт A" />
             </div>
-            <textarea className={styles.textarea} value={result.a.prompt} readOnly rows={14} />
-            <button onClick={() => {
+            <div className={styles.promptMarkdownWrap}>
+              <MarkdownOutput>{result.a.prompt}</MarkdownOutput>
+            </div>
+            <button type="button" className="btn-secondary" onClick={() => {
               const blob = new Blob([result.a.prompt], { type: 'text/plain;charset=utf-8' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
@@ -305,25 +380,29 @@ export default function Compare() {
               a.download = 'prompt_a.txt'
               a.click()
               URL.revokeObjectURL(url)
-            }}>Скачать A</button>
+            }}>Скачать A (.txt)</button>
           </div>
-          <div className={styles.column}>
-            <h3>Вариант B</h3>
+          <div className={`${styles.column} ${styles.columnVariantB}`}>
+            <h3 className={styles.columnTitleB}>Вариант B — результат</h3>
             <p className={styles.meta}>{result.b.techniques.map((t) => t.name).join(' + ')}</p>
             {result.b.reasoning && (
               <details>
-                <summary>Reasoning B</summary>
+                <summary>Пояснение B</summary>
                 <div className={styles.copyRow}>
-                  <CopyIconButton text={result.b.reasoning} title="Копировать reasoning B" />
+                  <CopyIconButton text={result.b.reasoning} title="Копировать пояснение B" />
                 </div>
-                <pre className={styles.prompt}>{result.b.reasoning}</pre>
+                <div className={styles.promptMarkdownWrap}>
+                  <MarkdownOutput>{result.b.reasoning}</MarkdownOutput>
+                </div>
               </details>
             )}
             <div className={styles.copyRow}>
               <CopyIconButton text={result.b.prompt} title="Копировать промпт B" />
             </div>
-            <textarea className={styles.textarea} value={result.b.prompt} readOnly rows={14} />
-            <button onClick={() => {
+            <div className={styles.promptMarkdownWrap}>
+              <MarkdownOutput>{result.b.prompt}</MarkdownOutput>
+            </div>
+            <button type="button" className="btn-secondary" onClick={() => {
               const blob = new Blob([result.b.prompt], { type: 'text/plain;charset=utf-8' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
@@ -331,7 +410,7 @@ export default function Compare() {
               a.download = 'prompt_b.txt'
               a.click()
               URL.revokeObjectURL(url)
-            }}>Скачать B</button>
+            }}>Скачать B (.txt)</button>
           </div>
           </div>
         </>

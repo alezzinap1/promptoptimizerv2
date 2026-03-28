@@ -5,12 +5,12 @@ import styles from './Workspaces.module.css'
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
 
 const WORKSPACE_FIELDS = [
-  { key: 'name', label: 'Название', placeholder: 'Например: Fintech analytics', help: 'Короткое имя workspace для выбора в Home.' },
-  { key: 'description', label: 'Описание', placeholder: 'Что хранит этот workspace', help: 'Человеческое описание сценария и контекста.' },
-  { key: 'glossary', label: 'Глоссарий', placeholder: 'Один термин на строку', help: 'Термины и определения проекта, которые нужно учитывать в prompt.' },
-  { key: 'style_rules', label: 'Style rules', placeholder: 'Одно правило на строку', help: 'Тон, стиль, форматирование и editorial-правила.' },
-  { key: 'default_constraints', label: 'Default constraints', placeholder: 'Одно ограничение на строку', help: 'Ограничения, которые должны автоматически попадать в prompt.' },
-  { key: 'reference_snippets', label: 'Reference snippets', placeholder: 'Один snippet на строку', help: 'Фрагменты, примеры или опорные куски контекста.' },
+  { key: 'name', label: 'Название', placeholder: 'Например: Аналитика fintech', help: 'Короткое имя для выбора на главной.' },
+  { key: 'description', label: 'Описание', placeholder: 'Что хранит это пространство', help: 'Человеческое описание сценария и контекста.' },
+  { key: 'glossary', label: 'Глоссарий', placeholder: 'Один термин на строку', help: 'Термины и определения проекта для учёта в промпте.' },
+  { key: 'style_rules', label: 'Правила стиля', placeholder: 'Одно правило на строку', help: 'Тон, форматирование и редакционные правила.' },
+  { key: 'default_constraints', label: 'Ограничения по умолчанию', placeholder: 'Одно ограничение на строку', help: 'Ограничения, которые автоматически попадают в промпт.' },
+  { key: 'reference_snippets', label: 'Опорные фрагменты', placeholder: 'Один фрагмент на строку', help: 'Примеры и опорные куски контекста.' },
 ] as const
 
 function splitLines(value: string) {
@@ -97,28 +97,30 @@ export default function Workspaces() {
 
   return (
     <div className={styles.page}>
-      <h1 className="pageTitleGradient">Workspaces</h1>
+      <h1 className="pageTitleGradient">Пространства</h1>
       <p className={styles.caption}>
-        Workspace — это контекст проекта: правила, глоссарий, ограничения и примеры. Выберите workspace при генерации промптов.
+        Пространство (workspace) — контекст проекта: правила, глоссарий, ограничения и примеры. Выберите его при генерации промптов.
       </p>
       {error && <p className={styles.error}>{error}</p>}
 
+      {items.length > 0 ? (
       <div className={styles.toolbar}>
-        <button className={styles.createBtn} onClick={() => setShowCreateModal(true)}>
-          Создать workspace
+        <button type="button" className={`${styles.toolbarPrimary} btn-primary`} onClick={() => setShowCreateModal(true)}>
+          Создать пространство
         </button>
       </div>
+      ) : null}
 
       {showCreateModal && (
         <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3>Новый workspace</h3>
+              <h3>Новое пространство</h3>
               <button className={styles.modalClose} onClick={() => setShowCreateModal(false)}>×</button>
             </div>
             <div className={styles.form}>
               {renderField(createForm, (key, value) => setCreateForm((prev) => ({ ...prev, [key]: value })))}
-              <button className={styles.primaryBtn} onClick={async () => {
+              <button type="button" className={`${styles.toolbarPrimary} btn-primary`} onClick={async () => {
                 await createWorkspace()
                 setShowCreateModal(false)
               }}>Создать</button>
@@ -127,6 +129,28 @@ export default function Workspaces() {
         </div>
       )}
 
+      {items.length === 0 ? (
+        <div className={styles.emptyState}>
+          <h2 className={styles.emptyTitle}>Пока нет пространств</h2>
+          <p className={styles.emptyText}>
+            Пространство сохраняет контекст проекта — термины, стиль, ограничения и короткие примеры. На главной вы
+            подключаете его один раз, и каждый новый промпт учитывает эти правила без копипаста.
+          </p>
+          <div className={styles.exampleBlock}>
+            <div className={styles.exampleLabel}>Пример заполнения</div>
+            <p className={styles.exampleLead}>
+              <strong>Название:</strong> Мобильное приложение доставки.<br />
+              <strong>Глоссарий:</strong> «Заказ», «Курьер», «SLA» — как в продукте.<br />
+              <strong>Правила стиля:</strong> короткие императивы, без воды, RU.<br />
+              <strong>Ограничения:</strong> не раскрывать внутренние id; не обещать сроки без данных.<br />
+              <strong>Фрагменты:</strong> 1–2 эталонных куска текста из вашей документации.
+            </p>
+          </div>
+          <button type="button" className={`${styles.toolbarPrimary} btn-primary`} onClick={() => setShowCreateModal(true)}>
+            Создать первое пространство
+          </button>
+        </div>
+      ) : (
       <div className={styles.grid}>
         {items.map((workspace) => {
           const cfg = workspace.config || {}
@@ -138,6 +162,11 @@ export default function Workspaces() {
             default_constraints: (cfg.default_constraints || []).join('\n'),
             reference_snippets: (cfg.reference_snippets || []).join('\n'),
           }
+          const gCount = (cfg.glossary || []).length
+          const cCount = (cfg.default_constraints || []).length
+          const rCount = (cfg.reference_snippets || []).length
+          const showMetrics = gCount > 0 || cCount > 0 || rCount > 0
+          const isActive = activeId === workspace.id
           return (
             <div key={workspace.id || workspace.name} className={styles.card}>
               <div className={styles.cardHeader}>
@@ -145,29 +174,46 @@ export default function Workspaces() {
                   <h3>{workspace.name}</h3>
                   <p>{workspace.description}</p>
                 </div>
-                <button onClick={() => {
-                  localStorage.setItem(ACTIVE_WORKSPACE_KEY, String(workspace.id || 0))
-                  setActiveId(Number(workspace.id || 0))
-                }}>
-                  {activeId === workspace.id ? 'Активен' : 'Активировать'}
-                </button>
-              </div>
-
-              <div className={styles.metrics}>
-                <span>Glossary: {(cfg.glossary || []).length}</span>
-                <span>Constraints: {(cfg.default_constraints || []).length}</span>
-                <span>Refs: {(cfg.reference_snippets || []).length}</span>
-              </div>
-
-              <details>
-                <summary>Редактировать workspace</summary>
-                <div className={styles.form}>
-                  {renderField(
-                    form,
-                    (key, value) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, [key]: value } })),
+                <div className={styles.cardHeaderActions}>
+                  {isActive ? (
+                    <div className={styles.activePill} title="Это пространство подставляется в блок генерации на главной">
+                      <span className={styles.activeDot} aria-hidden />
+                      Активно сейчас
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        localStorage.setItem(ACTIVE_WORKSPACE_KEY, String(workspace.id || 0))
+                        setActiveId(Number(workspace.id || 0))
+                      }}
+                    >
+                      Сделать активным
+                    </button>
                   )}
-                  <div className={styles.actions}>
-                    <button onClick={async () => {
+                </div>
+              </div>
+
+              {showMetrics ? (
+                <div className={styles.metrics}>
+                  {gCount > 0 ? <span>Глоссарий: {gCount}</span> : null}
+                  {cCount > 0 ? <span>Ограничения: {cCount}</span> : null}
+                  {rCount > 0 ? <span>Фрагменты: {rCount}</span> : null}
+                </div>
+              ) : null}
+
+              <p className={styles.editHint}>Заполните поля и нажмите «Сохранить», чтобы контекст учитывался в промптах.</p>
+              <div className={styles.form}>
+                {renderField(
+                  form,
+                  (key, value) => setEditing((prev) => ({ ...prev, [workspace.id || 0]: { ...form, [key]: value } })),
+                )}
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={async () => {
                       await api.updateWorkspace(workspace.id || 0, {
                         name: form.name,
                         description: form.description,
@@ -177,22 +223,31 @@ export default function Workspaces() {
                         reference_snippets: splitLines(form.reference_snippets),
                       })
                       load()
-                    }}>Сохранить</button>
-                    <button onClick={async () => {
+                    }}
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    onClick={async () => {
                       await api.deleteWorkspace(workspace.id || 0)
                       if (activeId === workspace.id) {
                         localStorage.setItem(ACTIVE_WORKSPACE_KEY, '0')
                         setActiveId(0)
                       }
                       load()
-                    }}>Удалить</button>
-                  </div>
+                    }}
+                  >
+                    Удалить
+                  </button>
                 </div>
-              </details>
+              </div>
             </div>
           )
         })}
       </div>
+      )}
     </div>
   )
 }

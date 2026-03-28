@@ -571,32 +571,94 @@
   border-radius: 7px;
 }
 
-.empty {
-  padding: 30px 18px;
+.resultPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  border: 2px dashed var(--accent-2);
-  border-radius: 8px;
-  opacity: 0.86;
-  background: rgba(255, 255, 255, 0.02);
+  min-height: 280px;
+  padding: 36px 22px;
+  margin-top: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--stroke);
+  color: var(--muted);
+  position: relative;
+  overflow: hidden;
 }
 
-.resultPrompt {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  min-height: 320px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 9px;
-  padding: 14px;
+.resultPlaceholderLoading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.07) 45%,
+    transparent 90%
+  );
+  background-size: 180% 100%;
+  animation: resultPlaceholderShimmer 1.15s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes resultPlaceholderShimmer {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -180% 0;
+  }
+}
+
+.resultPlaceholderIcon {
+  color: var(--muted);
+  opacity: 0.5;
+  margin-bottom: 14px;
+}
+
+.resultPlaceholderTitle {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
   color: var(--text);
 }
 
-.reasoning {
-  white-space: pre-wrap;
-  font-size: 14px;
-  padding: 12px;
+.resultPlaceholderHint {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-width: 340px;
+}
+
+[data-theme='light'] .resultPlaceholder {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+[data-theme='light'] .resultPlaceholderLoading::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.06) 45%,
+    transparent 90%
+  );
+  background-size: 180% 100%;
+}
+
+.resultMarkdownWrap {
+  min-height: 200px;
+  padding: 14px 16px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.reasoningMd {
+  padding: 10px 12px;
   border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .issueBanner {
@@ -661,7 +723,7 @@
 .llmRaw {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.45;
   max-height: min(70vh, 520px);
@@ -1084,14 +1146,6 @@
   border: 1px solid rgba(110, 231, 183, 0.35);
   color: var(--text);
   font-size: 0.9rem;
-}
-
-.resultShell {
-  border: 1px dashed rgba(245, 158, 11, 0.35);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  padding: 14px;
-  margin-top: 12px;
 }
 
 .hints {

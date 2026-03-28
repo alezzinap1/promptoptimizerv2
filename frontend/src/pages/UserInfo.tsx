@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, type LibraryItem } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import ProductMetrics from '../components/ProductMetrics'
 import styles from './UserInfo.module.css'
@@ -54,7 +54,7 @@ function EmailSection() {
             className={styles.emailInput}
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
-            placeholder="your@email.com"
+            placeholder="email@example.com"
             autoFocus
           />
           <button className={styles.saveBtn} onClick={handleSave} disabled={saving || !emailInput.trim()}>
@@ -73,12 +73,22 @@ function EmailSection() {
 
 export default function UserInfo() {
   const [info, setInfo] = useState<Awaited<ReturnType<typeof api.getUserInfo>> | null>(null)
+  const [recentPrompts, setRecentPrompts] = useState<LibraryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getUserInfo()
-      .then(setInfo)
+    Promise.all([
+      api.getUserInfo(),
+      api.getLibrary().catch(() => ({ items: [] as LibraryItem[] })),
+    ])
+      .then(([userInfo, lib]) => {
+        setInfo(userInfo)
+        const items = [...(lib.items || [])].sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        )
+        setRecentPrompts(items.slice(0, 5))
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
   }, [])
@@ -97,12 +107,12 @@ export default function UserInfo() {
   if (error) return <p className={styles.error}>{error}</p>
   if (!info) return null
 
-  const { tokens_used, dollars_used, has_own_api_key, trial_tokens_remaining, trial_tokens_limit, service_info } = info
+  const { tokens_used, dollars_used, has_own_api_key, trial_tokens_remaining, trial_tokens_limit } = info
 
   return (
     <>
       <div className={styles.page}>
-        <h1>User Info</h1>
+        <h1>Профиль</h1>
 
         <section className={styles.section}>
           <h2>Использование</h2>
@@ -135,13 +145,25 @@ export default function UserInfo() {
         <EmailSection />
 
         <section className={styles.section}>
-          <h2>О сервисе</h2>
-          <p className={styles.description}>{service_info.description}</p>
-          <ul className={styles.features}>
-            {service_info.features.map((f, i) => (
-              <li key={i}>{f}</li>
-            ))}
-          </ul>
+          <h2>Недавно в библиотеке</h2>
+          {recentPrompts.length === 0 ? (
+            <p className={styles.recentEmpty}>
+              Сохранённых промптов пока нет. После сохранения с главной они появятся здесь — или откройте{' '}
+              <Link to="/library">библиотеку</Link>.
+            </p>
+          ) : (
+            <ul className={styles.recentList}>
+              {recentPrompts.map((item) => (
+                <li key={item.id} className={styles.recentItem}>
+                  <Link to="/library">{item.title || 'Без названия'}</Link>
+                  <span className={styles.recentMeta}>
+                    Обновлён {new Date(item.updated_at).toLocaleDateString('ru-RU')}
+                    {item.target_model && item.target_model !== 'unknown' ? ` · ${item.target_model}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
 

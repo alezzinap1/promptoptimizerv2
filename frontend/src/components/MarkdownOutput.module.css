@@ -1,0 +1,111 @@
+.prose {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.prose :global(h1),
+.prose :global(h2),
+.prose :global(h3),
+.prose :global(h4) {
+  margin: 1.1em 0 0.45em;
+  font-family: var(--font);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.prose :global(h1) {
+  font-size: 1.25rem;
+}
+.prose :global(h2) {
+  font-size: 1.1rem;
+}
+.prose :global(h3) {
+  font-size: 1rem;
+}
+
+.prose :global(p) {
+  margin: 0 0 0.75em;
+}
+
+.prose :global(ul),
+.prose :global(ol) {
+  margin: 0 0 0.75em;
+  padding-left: 1.35em;
+}
+
+.prose :global(li) {
+  margin-bottom: 0.35em;
+}
+
+.prose :global(blockquote) {
+  margin: 0.75em 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--primary);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0 6px 6px 0;
+}
+
+.prose :global(a) {
+  color: var(--primary);
+}
+
+.prose :global(code) {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.prose :global(pre) {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0.75em 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.prose :global(pre code) {
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+.prose :global(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  font-size: 13px;
+}
+
+.prose :global(th),
+.prose :global(td) {
+  border: 1px solid var(--stroke);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.prose :global(hr) {
+  border: none;
+  border-top: 1px solid var(--stroke);
+  margin: 1em 0;
+}
+
+[data-theme='light'] .prose :global(code) {
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+[data-theme='light'] .prose :global(pre) {
+  background: rgba(15, 23, 42, 0.05);
+}

@@ -170,6 +170,7 @@ class DBManager:
             self._migrate_phase5_simple_improve(conn)
             self._migrate_phase6_task_classifier_prefs(conn)
             self._migrate_phase7_user_auth_extended(conn)
+            self._migrate_phase8_ui_color_mode(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -240,6 +241,12 @@ class DBManager:
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL")
         except sqlite3.OperationalError:
             pass
+
+    def _migrate_phase8_ui_color_mode(self, conn: sqlite3.Connection) -> None:
+        """Dark/light UI mode stored separately from palette (theme column)."""
+        self._safe_add_column(
+            conn, "user_preferences", "color_mode", "TEXT DEFAULT 'dark'"
+        )
 
     def _safe_add_column(
         self,
@@ -360,8 +367,9 @@ class DBManager:
         if not row:
             return {
                 "user_id": user_id,
-                "theme": "slate",
-                "font": "jetbrains",
+                "theme": "amber",
+                "font": "plusjakarta",
+                "color_mode": "dark",
                 "preferred_generation_models": [],
                 "preferred_target_models": [],
                 "simple_improve_preset": "balanced",
@@ -383,6 +391,7 @@ class DBManager:
         data.setdefault("simple_improve_meta", "")
         data.setdefault("task_classification_mode", "heuristic")
         data.setdefault("task_classifier_model", "")
+        data.setdefault("color_mode", "dark")
         return data
 
     def upsert_user_preferences(
@@ -396,10 +405,11 @@ class DBManager:
         simple_improve_meta: str | None = None,
         task_classification_mode: str | None = None,
         task_classifier_model: str | None = None,
+        color_mode: str | None = None,
     ) -> dict:
         current = self.get_user_preferences(user_id)
-        next_theme = theme if theme is not None else str(current.get("theme") or "slate")
-        next_font = font if font is not None else str(current.get("font") or "jetbrains")
+        next_theme = theme if theme is not None else str(current.get("theme") or "amber")
+        next_font = font if font is not None else str(current.get("font") or "plusjakarta")
         next_gen = (
             preferred_generation_models
             if preferred_generation_models is not None
@@ -432,17 +442,25 @@ class DBManager:
             if task_classifier_model is not None
             else str(current.get("task_classifier_model") or "")
         )
+        next_color_mode = (
+            color_mode
+            if color_mode is not None
+            else str(current.get("color_mode") or "dark")
+        )
+        if next_color_mode not in ("dark", "light"):
+            next_color_mode = "dark"
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO user_preferences
-                    (user_id, theme, font, gen_models_json, target_models_json,
+                    (user_id, theme, font, color_mode, gen_models_json, target_models_json,
                      simple_improve_preset, simple_improve_meta,
                      task_classification_mode, task_classifier_model, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id) DO UPDATE SET
                     theme = excluded.theme,
                     font = excluded.font,
+                    color_mode = excluded.color_mode,
                     gen_models_json = excluded.gen_models_json,
                     target_models_json = excluded.target_models_json,
                     simple_improve_preset = excluded.simple_improve_preset,
@@ -455,6 +473,7 @@ class DBManager:
                     user_id,
                     next_theme,
                     next_font,
+                    next_color_mode,
                     json.dumps(next_gen, ensure_ascii=False),
                     json.dumps(next_target, ensure_ascii=False),
                     next_simple_preset,
@@ -490,8 +509,8 @@ class DBManager:
             if cur.rowcount == 0:
                 conn.execute(
                     """
-                    INSERT INTO user_preferences (user_id, theme, font, gen_models_json, target_models_json, openrouter_api_key, updated_at)
-                    VALUES (?, 'slate', 'jetbrains', '[]', '["unknown"]', ?, CURRENT_TIMESTAMP)
+                    INSERT INTO user_preferences (user_id, theme, font, color_mode, gen_models_json, target_models_json, openrouter_api_key, updated_at)
+                    VALUES (?, 'amber', 'plusjakarta', 'dark', '[]', '["unknown"]', ?, CURRENT_TIMESTAMP)
                     """,
                     (user_id, stored),
                 )
