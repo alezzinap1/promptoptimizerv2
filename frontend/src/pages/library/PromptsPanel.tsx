@@ -87,6 +87,7 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
       task_type: taskType !== 'all' ? taskType : undefined,
     })
     setItems(refreshed.items)
+    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
   }
 
   return (
@@ -190,6 +191,7 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
                     setItems((prev) => prev.filter((x) => x.id !== item.id))
                     api.getLibraryStats().then(setStats)
                     onPromptCountChanged?.()
+                    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
                   }}
                 />
               </div>

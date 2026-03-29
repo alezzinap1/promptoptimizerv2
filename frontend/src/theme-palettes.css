@@ -1,7 +1,8 @@
 /* 4 palettes × 2 modes. html[data-palette][data-theme] — палитра и освещение отдельно. */
 
 [data-palette="amber"][data-theme="dark"] {
-  --bg: #100c08;
+  --bg: #141312;
+  --header-bg: rgba(22, 18, 16, 0.72);
   --panel: rgba(255, 255, 255, 0.032);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.065);
@@ -33,7 +34,8 @@
 }
 
 [data-palette="amber"][data-theme="light"] {
-  --bg: #fceee4;
+  --bg: #f0eeeb;
+  --header-bg: rgba(248, 247, 245, 0.9);
   --panel: rgba(255, 255, 255, 0.9);
   --secondary: var(--panel);
   --panel-strong: rgba(61, 37, 22, 0.06);
@@ -65,7 +67,8 @@
 }
 
 [data-palette="obsidian"][data-theme="dark"] {
-  --bg: #090a10;
+  --bg: #12131a;
+  --header-bg: rgba(18, 19, 26, 0.72);
   --panel: rgba(255, 255, 255, 0.026);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.055);
@@ -97,7 +100,8 @@
 }
 
 [data-palette="obsidian"][data-theme="light"] {
-  --bg: #eee9fc;
+  --bg: #f0f0f4;
+  --header-bg: rgba(245, 245, 248, 0.9);
   --panel: rgba(255, 255, 255, 0.92);
   --secondary: var(--panel);
   --panel-strong: rgba(30, 24, 56, 0.05);
@@ -129,7 +133,8 @@
 }
 
 [data-palette="aurora"][data-theme="dark"] {
-  --bg: #061218;
+  --bg: #111418;
+  --header-bg: rgba(17, 19, 22, 0.72);
   --panel: rgba(255, 255, 255, 0.028);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.058);
@@ -161,7 +166,8 @@
 }
 
 [data-palette="aurora"][data-theme="light"] {
-  --bg: #e0f6fd;
+  --bg: #eceef0;
+  --header-bg: rgba(244, 246, 247, 0.9);
   --panel: rgba(255, 255, 255, 0.9);
   --secondary: var(--panel);
   --panel-strong: rgba(6, 40, 54, 0.05);
@@ -193,7 +199,8 @@
 }
 
 [data-palette="dune"][data-theme="dark"] {
-  --bg: #100d0a;
+  --bg: #131211;
+  --header-bg: rgba(22, 18, 16, 0.72);
   --panel: rgba(255, 255, 255, 0.028);
   --secondary: var(--panel);
   --panel-strong: rgba(255, 255, 255, 0.055);
@@ -225,7 +232,8 @@
 }
 
 [data-palette="dune"][data-theme="light"] {
-  --bg: #f6ece0;
+  --bg: #efede9;
+  --header-bg: rgba(247, 246, 243, 0.9);
   --panel: rgba(255, 255, 255, 0.9);
   --secondary: var(--panel);
   --panel-strong: rgba(62, 42, 28, 0.05);

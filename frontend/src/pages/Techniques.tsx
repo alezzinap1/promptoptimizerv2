@@ -124,6 +124,7 @@ export default function Techniques({
       setShowTechniqueModal(false)
       await load()
       onCatalogChanged?.()
+      window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить технику')
     } finally {
@@ -387,6 +388,7 @@ export default function Techniques({
                         setDetailTechnique((cur) => (cur?.id === t.id ? null : cur))
                         await load()
                         onCatalogChanged?.()
+                        window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
                       }}
                     >
                       Удалить

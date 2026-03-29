@@ -14,6 +14,7 @@ import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
@@ -136,7 +137,16 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    const state = location.state as { prefillTask?: string; clearResult?: boolean } | null
+    const state = location.state as {
+      prefillTask?: string
+      clearResult?: boolean
+      restoreSessionId?: string
+    } | null
+    if (state?.restoreSessionId) {
+      setSessionId(state.restoreSessionId)
+      navigate(location.pathname, { replace: true, state: null })
+      return
+    }
     if (state?.prefillTask) {
       setTaskInput(state.prefillTask)
       if (state.clearResult) setResult(null)
@@ -146,6 +156,10 @@ export default function Home() {
 
   useEffect(() => {
     localStorage.setItem(ACTIVE_WORKSPACE_KEY, String(workspaceId))
+  }, [workspaceId])
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('metaprompt-workspace', { detail: { id: workspaceId } }))
   }, [workspaceId])
 
   useEffect(() => {
@@ -247,6 +261,7 @@ export default function Home() {
       const res = await api.generate(req)
       setResult(res)
       setSessionId(res.session_id)
+      pushRecentSession(res.session_id, taskInput.trim())
       setIterationMode(false)
       setQuestionState({})
     } catch (e) {
@@ -315,6 +330,7 @@ export default function Home() {
       techniques: result.technique_ids,
       notes: saveNotes,
     })
+    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
     setShowSaveDialog(false)
     setSaveNotes('')
     setSaveTags('')

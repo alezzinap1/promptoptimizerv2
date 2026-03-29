@@ -70,11 +70,6 @@ export default function Landing() {
 
   return (
     <div className={styles.landing}>
-      <div className={styles.bgEffects}>
-        <div className={styles.orb1} />
-        <div className={styles.orb2} />
-      </div>
-
       <div className={styles.content}>
         <div className={styles.hero}>
           <div className={styles.logoWrap}>

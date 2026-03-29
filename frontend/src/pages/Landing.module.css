@@ -4,55 +4,10 @@
   align-items: center;
   justify-content: center;
   padding: 48px 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.bgEffects {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.orb1 {
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
-  opacity: 0.35;
-  top: -150px;
-  left: -100px;
-  filter: blur(80px);
-  animation: floatA 20s ease-in-out infinite;
-}
-
-.orb2 {
-  position: absolute;
-  width: 400px;
-  height: 400px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  opacity: 0.35;
-  bottom: -100px;
-  right: -80px;
-  filter: blur(100px);
-  animation: floatB 25s ease-in-out infinite;
-}
-
-@keyframes floatA {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(40px, 30px); }
-}
-
-@keyframes floatB {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-30px, -20px); }
 }
 
 .content {
   position: relative;
-  z-index: 1;
   max-width: 760px;
   width: 100%;
   display: flex;

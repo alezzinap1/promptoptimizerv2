@@ -121,14 +121,6 @@ export default function AuthPage() {
 
   return (
     <div className={styles.authPage}>
-      {/* Background Effects */}
-      <div className={styles.bgEffects}>
-        <div className={styles.bgOrb1} />
-        <div className={styles.bgOrb2} />
-        <div className={styles.bgOrb3} />
-        <div className={styles.gridPattern} />
-      </div>
-
       <div className={styles.container}>
         {/* Left Side - Branding */}
         <div className={styles.brandingSide}>

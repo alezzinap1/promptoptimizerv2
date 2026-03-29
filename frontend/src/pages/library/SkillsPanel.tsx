@@ -57,6 +57,7 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
   const persist = (next: SkillItem[]) => {
     setItems(next)
     saveSkills(next)
+    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
   }
 
   const openCreate = () => {
