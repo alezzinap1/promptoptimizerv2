@@ -338,6 +338,12 @@ def generate_prompt(
 
     target_model_type = classify_model(req.target_model)
 
+    # После ответов на уточнения модель иногда оставляет хвост [QUESTIONS] вместе с [PROMPT] —
+    # иначе клиент остаётся в режиме вопросов без показа результата.
+    if parsed.get("has_prompt"):
+        questions = []
+        parsed = {**parsed, "has_questions": False, "questions_raw": ""}
+
     return {
         **parsed,
         "llm_raw": full_text,

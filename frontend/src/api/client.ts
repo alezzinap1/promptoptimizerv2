@@ -303,6 +303,15 @@ export const api = {
   generate: (req: GenerateRequest) =>
     fetchApi<GenerateResult>('/generate', { method: 'POST', body: JSON.stringify(req) }),
 
+  semanticAgentRoute: (req: { text: string; has_prompt?: boolean }) =>
+    fetchApi<{
+      intent: string | null
+      confidence: number
+      margin: number
+      backend: string
+      rejected_reason?: string
+    }>('/agent/semantic-route', { method: 'POST', body: JSON.stringify(req) }),
+
   getDomains: () => fetchApi<{ domains: { id: string; name: string }[] }>('/domains'),
 
   compare: (req: {

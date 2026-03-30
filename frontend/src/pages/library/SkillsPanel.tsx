@@ -63,6 +63,8 @@ const emptyDraft = {
 }
 
 type SkillsPanelProps = {
+  /** При уходе со вкладки «Скиллы» в хабе — закрыть модалку создания */
+  libraryActiveTab?: 'prompts' | 'techniques' | 'skills'
   onCountChange?: (n: number) => void
   gridCols?: 3 | 4
 }
@@ -74,7 +76,7 @@ function matchesSearch(item: SkillItem, q: string): boolean {
   return blob.includes(n)
 }
 
-export default function SkillsPanel({ onCountChange, gridCols = 3 }: SkillsPanelProps) {
+export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols = 3 }: SkillsPanelProps) {
   const [items, setItems] = useState<SkillItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
@@ -96,6 +98,14 @@ export default function SkillsPanel({ onCountChange, gridCols = 3 }: SkillsPanel
   useEffect(() => {
     onCountChange?.(items.length)
   }, [items.length, onCountChange])
+
+  useEffect(() => {
+    if (libraryActiveTab === undefined) return
+    if (libraryActiveTab !== 'skills') {
+      setShowModal(false)
+      setEditingId(null)
+    }
+  }, [libraryActiveTab])
 
   const filtered = useMemo(() => items.filter((it) => matchesSearch(it, search)), [items, search])
 

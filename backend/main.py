@@ -23,6 +23,7 @@ load_dotenv(ROOT / ".env")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
 
 from backend.api import (
+    agent_route,
     auth,
     compare,
     config,
@@ -63,6 +64,7 @@ app.include_router(workspaces.router, prefix="/api", tags=["workspaces"])
 app.include_router(metrics.router, prefix="/api", tags=["metrics"])
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(prompt_ide.router, prefix="/api", tags=["prompt-ide"])
+app.include_router(agent_route.router, prefix="/api", tags=["agent"])
 app.include_router(generate.router, prefix="/api", tags=["generate"])
 app.include_router(simple_improve.router, prefix="/api", tags=["simple-improve"])
 app.include_router(compare.router, prefix="/api", tags=["compare"])

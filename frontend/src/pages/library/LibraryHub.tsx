@@ -120,10 +120,15 @@ export default function LibraryHub() {
             <PromptsPanel onPromptCountChanged={refreshPromptCount} gridCols={gridCols} />
           </div>
           <div className={hubStyles.panel}>
-            <Techniques variant="embedded" onCatalogChanged={refreshTechniqueCount} gridCols={gridCols} />
+            <Techniques
+              variant="embedded"
+              libraryActiveTab={tab}
+              onCatalogChanged={refreshTechniqueCount}
+              gridCols={gridCols}
+            />
           </div>
           <div className={hubStyles.panel}>
-            <SkillsPanel onCountChange={handleSkillsCount} gridCols={gridCols} />
+            <SkillsPanel libraryActiveTab={tab} onCountChange={handleSkillsCount} gridCols={gridCols} />
           </div>
         </div>
       </div>

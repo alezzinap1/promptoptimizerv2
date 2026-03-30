@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type LibraryItem } from '../../api/client'
 import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
 import LibraryTagChips from '../../components/LibraryTagChips'
@@ -28,6 +28,7 @@ type Props = {
 
 export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Props) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [items, setItems] = useState<LibraryItem[]>([])
   const [stats, setStats] = useState<{ total: number; models?: string[]; task_types?: string[] }>({ total: 0 })
   const [search, setSearch] = useState('')
@@ -51,6 +52,11 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
   useEffect(() => {
     api.getLibraryStats().then(setStats)
   }, [])
+
+  useEffect(() => {
+    const q = searchParams.get('search')
+    if (q) setSearch(q)
+  }, [searchParams])
 
   useEffect(() => {
     setLoading(true)

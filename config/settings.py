@@ -47,3 +47,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "https://metaprompt.online")
 # ── Observability ────────────────────────────────────────────
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if APP_ENV == "prod" else "DEBUG")
+
+# ── Семантический роутер агента (fastembed) ─────────────────
+# Косинус к центроидам; margin отсекает «почти равные» классы.
+SEMANTIC_ROUTE_MIN_CONFIDENCE = float(os.getenv("SEMANTIC_ROUTE_MIN_CONFIDENCE", "0.34"))
+SEMANTIC_ROUTE_MIN_MARGIN = float(os.getenv("SEMANTIC_ROUTE_MIN_MARGIN", "0.025"))

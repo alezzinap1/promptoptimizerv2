@@ -50,10 +50,13 @@ const EMPTY_FORM = {
 
 export default function Techniques({
   variant = 'page',
+  libraryActiveTab,
   onCatalogChanged,
   gridCols = 3,
 }: {
   variant?: 'page' | 'embedded'
+  /** В хабе библиотеки: при смене вкладки закрываем модалки создания/карточки */
+  libraryActiveTab?: 'prompts' | 'techniques' | 'skills'
   onCatalogChanged?: () => void
   gridCols?: 3 | 4
 }) {
@@ -86,6 +89,14 @@ export default function Techniques({
   useEffect(() => {
     load()
   }, [search, taskType, complexity])
+
+  useEffect(() => {
+    if (variant !== 'embedded' || libraryActiveTab === undefined) return
+    if (libraryActiveTab !== 'techniques') {
+      setShowTechniqueModal(false)
+      setDetailTechnique(null)
+    }
+  }, [variant, libraryActiveTab])
 
   const customCount = useMemo(
     () => techniques.filter((item) => item.origin === 'custom').length,

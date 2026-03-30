@@ -17,7 +17,12 @@ import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIc
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { clearAgentDraft, loadAgentDraft, saveAgentDraft } from '../lib/agentDraft'
-import { isConversationalOnlyMessage } from '../lib/conversationalGate'
+import {
+  isConversationalOnlyMessage,
+  pickAfterPromptChatReply,
+  pickConversationalReply,
+} from '../lib/conversationalGate'
+import { resolveAgentFollowUpPlan } from '../lib/agentPlanResolver'
 import {
   COMPLETENESS_SCORE_TITLE,
   PROMPT_COST_TITLE,
@@ -43,6 +48,12 @@ const AGENT_WELCOME =
 const MIN_COL_FRAC = 0.14
 const DEFAULT_SPLIT_A = 0.33
 const DEFAULT_SPLIT_B = 0.66
+
+/** Если в ответе одновременно [PROMPT] и хвост [QUESTIONS], UI зависает в режиме вопросов. */
+function normalizeClientGenerateResult(res: GenerateResult): GenerateResult {
+  if (!res.has_prompt) return res
+  return { ...res, has_questions: false, questions: [] }
+}
 
 function clampSplit(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n))
@@ -447,12 +458,13 @@ export default function Home() {
         evidence_decisions: evidenceDecisions,
         question_answers: questionAnswers || [],
       }
-      const res = await api.generate(req)
+      const res = normalizeClientGenerateResult(await api.generate(req))
       setResult(res)
       setSessionId(res.session_id)
       pushRecentSession(res.session_id, effectiveTask)
       setIterationMode(false)
       setQuestionState({})
+      setQuestionCarouselIdx(0)
       setQuickSaved(false)
       if (creationMode === 'agent' && !opts?.skipAgentChatReplies) {
         setChatMessages((prev) => {
@@ -501,7 +513,7 @@ export default function Home() {
               id: cid,
               role: 'assistant',
               content:
-                'Нужны уточнения: ответьте во всплывающем окне, листайте до последнего вопроса — там кнопка «Создать промпт с этими ответами».',
+                'Нужны уточнения: панель под чатом, листайте вопросы — в конце кнопка «Создать».',
             })
           }
           queueMicrotask(() => {
@@ -555,34 +567,124 @@ export default function Home() {
     const text = chatInput.trim()
     if (!text || loading) return
     if (result?.has_questions && !result?.has_prompt) {
-      setError('Сначала завершите уточнения во всплывающем окне (до последнего вопроса).')
+      setError('Завершите уточнения в панели под чатом или нажмите «Создать».')
       return
     }
     setChatInput('')
     setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: text }])
     setError(null)
 
-    const baseBefore = (baseTaskRef || taskInput).trim()
-    if (!result?.has_prompt && !baseBefore && isConversationalOnlyMessage(text)) {
+    if (isConversationalOnlyMessage(text)) {
+      if (result?.has_prompt) {
+        setChatMessages((m) => [
+          ...m,
+          { id: crypto.randomUUID(), role: 'assistant', content: pickAfterPromptChatReply() },
+        ])
+        return
+      }
       setChatMessages((m) => [
         ...m,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content:
-            'Привет! Я помогу составить или улучшить промпт под вашу модель. Опишите задачу одним сообщением (например: «промпт для разбора писем в CRM») — результат появится справа.',
-        },
+        { id: crypto.randomUUID(), role: 'assistant', content: pickConversationalReply() },
       ])
       return
     }
 
     if (result?.has_prompt && result.prompt_block) {
-      void handleGenerate(undefined, {
-        taskInputOverride: (baseTaskRef || taskInput).trim(),
-        feedbackOverride: text,
-        forceIteration: true,
-        previousPromptOverride: result.prompt_block,
-      })
+      const taskRef = (baseTaskRef || taskInput).trim()
+      const snapshot = result
+      const tm = targetModel
+      const sidRef = sessionId
+
+      void (async () => {
+        const plan = await resolveAgentFollowUpPlan(text)
+        const dbg =
+          import.meta.env.DEV && plan.debug
+            ? `\n\n\`\`\`text\n[Router] ${plan.type} · ${plan.debug}\n\`\`\``
+            : ''
+
+        const pushAssistant = (body: string) => {
+          const content = body + dbg
+          setChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content }])
+        }
+
+        if (plan.type === 'iterate') {
+          void handleGenerate(undefined, {
+            taskInputOverride: taskRef,
+            feedbackOverride: text,
+            forceIteration: true,
+            previousPromptOverride: snapshot.prompt_block,
+          })
+          return
+        }
+
+        if (plan.type === 'chat') {
+          pushAssistant(plan.text)
+          return
+        }
+
+        try {
+          if (plan.type === 'save_library') {
+            const title = plan.titleHint?.trim() || suggestLibraryTitle(taskRef)
+            await api.saveToLibrary({
+              title,
+              prompt: snapshot.prompt_block,
+              tags: plan.tags,
+              target_model: tm,
+              task_type: snapshot.task_types?.[0] || 'general',
+              techniques: snapshot.technique_ids,
+            })
+            window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+            setQuickSaved(true)
+            const tagStr = plan.tags.length ? ` Теги: ${plan.tags.join(', ')}.` : ''
+            pushAssistant(`Сохранено в библиотеку как «${title}».${tagStr}`)
+            return
+          }
+          if (plan.type === 'eval_prompt') {
+            const { metrics } = await api.evaluatePrompt(snapshot.prompt_block, tm)
+            const pretty = JSON.stringify(metrics, null, 2)
+            pushAssistant(`Оценка текущего промпта (эвристика на сервере):\n\n\`\`\`json\n${pretty}\n\`\`\``)
+            return
+          }
+          if (plan.type === 'show_versions') {
+            const sid = snapshot.session_id || sidRef
+            if (!sid) {
+              pushAssistant('Нет активной сессии генерации — версии появятся после первого сохранённого промпта.')
+              return
+            }
+            const { items } = await api.getSessionVersions(sid)
+            if (!items.length) {
+              pushAssistant('В этой сессии пока нет сохранённых версий.')
+              return
+            }
+            const lines = items
+              .map((row) => {
+                const v = row as Record<string, unknown>
+                return `• v${v.version} — ${String(v.created_at || '').slice(0, 19)}`
+              })
+              .join('\n')
+            pushAssistant(`Версии в этой сессии:\n${lines}\n\nПереключать текущий текст можно таблетками **v1, v2…** под промптом справа.`)
+            return
+          }
+          if (plan.type === 'nav_compare') {
+            navigate('/compare', { state: { taskInput: taskRef } })
+            pushAssistant('Открыта страница **Сравнение** с подставленной задачей.')
+            return
+          }
+          if (plan.type === 'nav_library') {
+            const q = plan.search?.trim()
+            navigate(q ? `/library?search=${encodeURIComponent(q)}` : '/library')
+            pushAssistant(q ? `Открыта библиотека с поиском «${q}».` : 'Открыта библиотека промптов.')
+            return
+          }
+          if (plan.type === 'nav_skills') {
+            navigate('/library?tab=skills')
+            pushAssistant('Открыта вкладка **Скиллы** в библиотеке.')
+            return
+          }
+        } catch (e) {
+          pushAssistant(e instanceof Error ? e.message : 'Команда не выполнена.')
+        }
+      })()
       return
     }
 
@@ -1057,41 +1159,107 @@ export default function Home() {
         </div>
         </div>
         <div className={`${styles.wizardFooter} ${compact ? styles.wizardFooterCompact : ''}`}>
-        <div className={styles.questionCarouselNav}>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={idx <= 0}
-            onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
-          >
-            ← Назад
-          </button>
-          {idx < total - 1 ? (
-            <button
-              type="button"
-              className={`${styles.primaryAction} btn-primary ${styles.wizardNextPrimary}`}
-              onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
-            >
-              Далее: вопрос {idx + 2} из {total} →
-            </button>
+          {compact ? (
+            <div className={styles.wizardToolbar}>
+              <button
+                type="button"
+                className={styles.wizIconBtn}
+                disabled={idx <= 0}
+                aria-label="Назад"
+                title="Назад"
+                onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M15 18l-6-6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              {idx < total - 1 ? (
+                <button
+                  type="button"
+                  className={`${styles.wizIconBtn} ${styles.wizIconBtnPrimary}`}
+                  aria-label={`Далее, вопрос ${idx + 2} из ${total}`}
+                  title={`Вопрос ${idx + 2} из ${total}`}
+                  onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M9 18l6-6-6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : null}
+              <span className={styles.wizToolbarGrow} aria-hidden />
+              <button
+                type="button"
+                className={styles.wizIconBtn}
+                disabled={loading}
+                aria-label="Пропустить ответы"
+                title="Пропустить ответы"
+                onClick={() => handleGenerate([], questionGenOpts)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M6 18V6h2v12H6zm11-6l-6 4V8l6 4z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={styles.wizCreateBtn}
+                disabled={loading}
+                title="Собираются ответы со всех шагов; на непросмотренных вопросах ответы пустые"
+                onClick={() => submitWizardAnswers()}
+              >
+                Создать
+              </button>
+            </div>
           ) : (
-            <span className={styles.wizardLastHint}>Последний вопрос</span>
+            <>
+              <div className={styles.questionCarouselNav}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={idx <= 0}
+                  onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
+                >
+                  ← Назад
+                </button>
+                {idx < total - 1 ? (
+                  <button
+                    type="button"
+                    className={`${styles.primaryAction} btn-primary ${styles.wizardNextPrimary}`}
+                    onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
+                  >
+                    Далее: вопрос {idx + 2} из {total} →
+                  </button>
+                ) : (
+                  <span className={styles.wizardNavTailSpacer} aria-hidden />
+                )}
+              </div>
+              <div className={styles.actions}>
+                <button type="button" className="btn-ghost" disabled={loading} onClick={() => handleGenerate([], questionGenOpts)}>
+                  Пропустить ответы
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.primaryAction} btn-primary`}
+                  disabled={loading}
+                  title="Собираются ответы со всех шагов; на непросмотренных вопросах ответы пустые"
+                  onClick={() => submitWizardAnswers()}
+                >
+                  Создать промпт
+                </button>
+              </div>
+            </>
           )}
-        </div>
-        <div className={styles.actions}>
-          <button type="button" className="btn-ghost" disabled={loading} onClick={() => handleGenerate([], questionGenOpts)}>
-            Пропустить ответы
-          </button>
-          <button
-            type="button"
-            className={`${styles.primaryAction} btn-primary`}
-            disabled={loading}
-            title="Собираются ответы со всех шагов; на непросмотренных вопросах ответы пустые"
-            onClick={() => submitWizardAnswers()}
-          >
-            Создать промпт
-          </button>
-        </div>
         </div>
       </div>
     )
@@ -1665,7 +1833,10 @@ export default function Home() {
                   {error && <p className={styles.error}>{error}</p>}
                 </div>
                 {result?.has_questions && !result?.has_prompt && (
-                  <div className={styles.wizardOverlay}>
+                  <div className={styles.agentWizardDock} aria-label="Уточняющие вопросы">
+                    <p className={styles.agentWizardDockHint}>
+                      Ответьте по шагам — чат выше можно листать. Ниже — строка ввода для следующего сообщения.
+                    </p>
                     {renderQuestionsPanel('agent')}
                   </div>
                 )}

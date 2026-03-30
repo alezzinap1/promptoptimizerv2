@@ -87,6 +87,7 @@
 | Backend | FastAPI, Uvicorn |
 | БД | SQLite (`db/manager.py`), опционально Postgres (скрипты миграции) |
 | LLM | OpenRouter (OpenAI-совместимый API) |
+| Семантика агента (студия) | `fastembed` + ONNX-модель `paraphrase-multilingual-MiniLM-L12-v2` (`POST /api/agent/semantic-route`). Отключение: `SEMANTIC_AGENT_ROUTER=0`. Пороги: `SEMANTIC_ROUTE_MIN_CONFIDENCE`, `SEMANTIC_ROUTE_MIN_MARGIN` в `config/settings.py`. На Windows без symlink для кэша HF см. [документацию huggingface_hub](https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations) или режим разработчика. |
 
 ```text
 user → React (Vite) → FastAPI /api → core/ + services/ + db/
