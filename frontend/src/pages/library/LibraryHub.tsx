@@ -79,7 +79,7 @@ export default function LibraryHub() {
             onClick={() => setGrid(3)}
             title="Три колонки"
           >
-            3
+            <svg width="14" height="14" viewBox="0 0 12 12"><rect x="0" y="0" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="4.5" y="0" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="9" y="0" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="0" y="7" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="4.5" y="7" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="9" y="7" width="3" height="5" rx="0.5" fill="currentColor"/></svg>
           </button>
           <button
             type="button"
@@ -88,7 +88,7 @@ export default function LibraryHub() {
             onClick={() => setGrid(4)}
             title="Четыре колонки"
           >
-            4
+            <svg width="14" height="14" viewBox="0 0 12 12"><rect x="0" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="3.25" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="6.5" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="9.75" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="0" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="3.25" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="6.5" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="9.75" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/></svg>
           </button>
         </div>
       </div>

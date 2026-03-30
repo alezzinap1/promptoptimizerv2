@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type LibraryItem } from '../../api/client'
+import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
 import LibraryTagChips from '../../components/LibraryTagChips'
 import SelectDropdown from '../../components/SelectDropdown'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
@@ -265,7 +266,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                     <span className={styles.evalInlineLoading}>Оцениваю…</span>
                   ) : evalData ? (
                     <>
-                      <div className={styles.evalInlineRow}>
+                      <div className={styles.evalInlineRow} title={COMPLETENESS_SCORE_TITLE}>
                         <span className={styles.evalInlineLabel}>Полнота</span>
                         <div className={styles.evalMiniBar}>
                           <div className={styles.evalMiniBarFill} style={{ width: `${Math.min(100, Number(evalData.completeness_score ?? 0))}%` }} />

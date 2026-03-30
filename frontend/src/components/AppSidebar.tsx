@@ -155,7 +155,9 @@ export default function AppSidebar({ collapsed, onToggleCollapse, counts, recent
 
           {recentSessions.length > 0 ? (
             <div className={styles.section}>
-              <div className={styles.recentLabel}>Недавние</div>
+              <div className={styles.recentLabel} title="Сессии на сервере (история версий). Черновик чата в студии дополнительно сохраняется в браузере до «Новый диалог».">
+                Сессии
+              </div>
               <div className={styles.recentList}>
                 {recentSessions.map((s) => (
                   <button

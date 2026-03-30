@@ -10,7 +10,9 @@ export type RecentSession = {
 function normalizeLabel(task: string): string {
   const one = task.replace(/\s+/g, ' ').trim()
   if (!one) return 'Сессия'
-  return one.length > 72 ? `${one.slice(0, 69)}…` : one
+  const words = one.split(' ')
+  if (words.length <= 5) return one
+  return words.slice(0, 5).join(' ') + '…'
 }
 
 export function pushRecentSession(sessionId: string, taskPreview: string): void {

@@ -141,13 +141,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     to="/home"
                     className={({ isActive }) => `${styles.modeBtn} ${isActive ? styles.modeBtnActive : ''}`}
                   >
-                    Режим создания
+                    Студия
                   </NavLink>
                   <NavLink
                     to="/simple"
                     className={({ isActive }) => `${styles.modeBtn} ${isActive ? styles.modeBtnActive : ''}`}
                   >
-                    Простой режим
+                    Улучшить
                   </NavLink>
                 </div>
               ) : null}

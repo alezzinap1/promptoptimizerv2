@@ -16,6 +16,14 @@ import WorkspacePicker from '../components/WorkspacePicker'
 import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
+import { clearAgentDraft, loadAgentDraft, saveAgentDraft } from '../lib/agentDraft'
+import { isConversationalOnlyMessage } from '../lib/conversationalGate'
+import {
+  COMPLETENESS_SCORE_TITLE,
+  PROMPT_COST_TITLE,
+  TECHNIQUES_COUNT_TITLE,
+  TOKEN_ESTIMATE_TITLE,
+} from '../lib/scoreTooltips'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
@@ -83,7 +91,12 @@ function loadAgentSplit(): number {
   return DEFAULT_AGENT_SPLIT
 }
 
-type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
+type ChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  clarificationQA?: { question: string; answers: string[] }[]
+}
 
 type Technique = { id: string; name: string }
 
@@ -151,6 +164,8 @@ export default function Home() {
   const agentChatScrollRef = useRef<HTMLDivElement>(null)
   const [issueBannerDismissed, setIssueBannerDismissed] = useState(false)
   const lastQuestionAnswersRef = useRef<{ question: string; answers: string[] }[] | undefined>(undefined)
+  const lastClarificationsMsgIdRef = useRef<string | null>(null)
+  const agentStudioBootstrappedRef = useRef(false)
   const [inputTokens, setInputTokens] = useState<{ tokens: number; method: string } | null>(null)
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
 
@@ -202,7 +217,37 @@ export default function Home() {
   }, [creationMode])
 
   useEffect(() => {
-    if (creationMode !== 'agent') return
+    if (creationMode !== 'agent') {
+      agentStudioBootstrappedRef.current = false
+      return
+    }
+    if (agentStudioBootstrappedRef.current) return
+    agentStudioBootstrappedRef.current = true
+    const draft = loadAgentDraft()
+    if (draft && draft.chatMessages.length > 0) {
+      const msgs = draft.chatMessages as ChatMessage[]
+      setChatMessages(msgs)
+      setBaseTaskRef(draft.baseTaskRef)
+      setTaskInput(draft.taskInput)
+      setFeedback(draft.feedback)
+      setResult(draft.result)
+      setSessionId(draft.sessionId)
+      setIterationMode(draft.iterationMode)
+      setQuestionState(draft.questionState)
+      setQuestionCarouselIdx(draft.questionCarouselIdx)
+      setQuickSaved(draft.quickSaved)
+      if (draft.sessionId) localStorage.setItem(ACTIVE_SESSION_KEY, draft.sessionId)
+      const pendingClar = [...msgs]
+        .reverse()
+        .find(
+          (m) =>
+            m.role === 'assistant' &&
+            m.content.includes('Нужны уточнения') &&
+            m.clarificationQA === undefined,
+        )
+      lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
+      return
+    }
     setChatMessages((msgs) => {
       if (msgs.length > 0) return msgs
       return [{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }]
@@ -410,56 +455,71 @@ export default function Home() {
       setQuestionState({})
       setQuickSaved(false)
       if (creationMode === 'agent' && !opts?.skipAgentChatReplies) {
-        if (res.has_prompt) {
-          const thinkingParts: string[] = []
-          if (res.techniques?.length) {
-            thinkingParts.push(`**Техники:** ${res.techniques.map((t) => t.name).join(', ')}`)
+        setChatMessages((prev) => {
+          let next: ChatMessage[] = [...prev]
+          if (questionAnswers !== undefined && lastClarificationsMsgIdRef.current) {
+            const cid = lastClarificationsMsgIdRef.current
+            next = next.map((m) => (m.id === cid ? { ...m, clarificationQA: questionAnswers } : m))
+            lastClarificationsMsgIdRef.current = null
           }
-          if (res.reasoning) {
-            const short = res.reasoning.length > 400 ? res.reasoning.slice(0, 400) + '…' : res.reasoning
-            thinkingParts.push(short)
-          }
-          if (res.metrics) {
-            const score = Number(res.metrics.completeness_score ?? res.metrics.quality_score ?? 0)
-            const tokens = Number(res.metrics.token_estimate ?? 0)
-            const parts: string[] = []
-            if (score > 0) parts.push(`полнота ${score}%`)
-            if (tokens > 0) parts.push(`≈${tokens.toLocaleString()} токенов`)
-            if (parts.length) thinkingParts.push(`**Оценка:** ${parts.join(' · ')}`)
-          }
-          if (res.metrics && Array.isArray(res.metrics.improvement_tips) && (res.metrics.improvement_tips as string[]).length > 0) {
-            thinkingParts.push(`**Можно улучшить:** ${(res.metrics.improvement_tips as string[]).join('; ')}`)
-          }
-          if (thinkingParts.length > 0) {
-            setChatMessages((m) => [
-              ...m,
-              {
+          if (res.has_prompt) {
+            const thinkingParts: string[] = []
+            if (res.techniques?.length) {
+              thinkingParts.push(`**Техники:** ${res.techniques.map((t) => t.name).join(', ')}`)
+            }
+            if (res.reasoning) {
+              const short = res.reasoning.length > 400 ? res.reasoning.slice(0, 400) + '…' : res.reasoning
+              thinkingParts.push(short)
+            }
+            if (res.metrics) {
+              const score = Number(res.metrics.completeness_score ?? res.metrics.quality_score ?? 0)
+              const tokens = Number(res.metrics.token_estimate ?? 0)
+              const parts: string[] = []
+              if (score > 0) parts.push(`полнота ${score}%`)
+              if (tokens > 0) parts.push(`≈${tokens.toLocaleString()} токенов`)
+              if (parts.length) thinkingParts.push(`**Оценка:** ${parts.join(' · ')}`)
+            }
+            if (res.metrics && Array.isArray(res.metrics.improvement_tips) && (res.metrics.improvement_tips as string[]).length > 0) {
+              thinkingParts.push(`**Можно улучшить:** ${(res.metrics.improvement_tips as string[]).join('; ')}`)
+            }
+            if (thinkingParts.length > 0) {
+              next.push({
                 id: crypto.randomUUID(),
-                role: 'assistant' as const,
+                role: 'assistant',
                 content: `__thinking__\n${thinkingParts.join('\n\n')}`,
-              },
-            ])
+              })
+            }
+            next.push({
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content: 'Готово — промпт справа. Напишите в чат, что изменить.',
+            })
+          } else if (res.has_questions && (res.questions?.length || 0) > 0) {
+            const cid = crypto.randomUUID()
+            lastClarificationsMsgIdRef.current = cid
+            next.push({
+              id: cid,
+              role: 'assistant',
+              content:
+                'Нужны уточнения: ответьте во всплывающем окне, листайте до последнего вопроса — там кнопка «Создать промпт с этими ответами».',
+            })
           }
-          setChatMessages((m) => [
-            ...m,
-            {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content:
-                'Готово — промпт справа. Напишите в чат, что изменить.',
-            },
-          ])
-        } else if (res.has_questions && (res.questions?.length || 0) > 0) {
-          setChatMessages((m) => [
-            ...m,
-            {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content:
-                'Нужны уточнения: отметьте варианты в блоке ниже и нажмите «Создать промпт с этими ответами».',
-            },
-          ])
-        }
+          queueMicrotask(() => {
+            saveAgentDraft({
+              chatMessages: next,
+              baseTaskRef,
+              taskInput,
+              feedback,
+              result: res,
+              sessionId: res.session_id,
+              iterationMode: false,
+              questionState: {},
+              questionCarouselIdx: 0,
+              quickSaved: false,
+            })
+          })
+          return next
+        })
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка генерации')
@@ -476,6 +536,8 @@ export default function Home() {
   }
 
   const resetAgentDialog = () => {
+    clearAgentDraft()
+    lastClarificationsMsgIdRef.current = null
     setChatMessages([{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }])
     setChatInput('')
     setBaseTaskRef('')
@@ -493,12 +555,26 @@ export default function Home() {
     const text = chatInput.trim()
     if (!text || loading) return
     if (result?.has_questions && !result?.has_prompt) {
-      setError('Сначала ответьте на вопросы в блоке ниже.')
+      setError('Сначала завершите уточнения во всплывающем окне (до последнего вопроса).')
       return
     }
     setChatInput('')
     setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: text }])
     setError(null)
+
+    const baseBefore = (baseTaskRef || taskInput).trim()
+    if (!result?.has_prompt && !baseBefore && isConversationalOnlyMessage(text)) {
+      setChatMessages((m) => [
+        ...m,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content:
+            'Привет! Я помогу составить или улучшить промпт под вашу модель. Опишите задачу одним сообщением (например: «промпт для разбора писем в CRM») — результат появится справа.',
+        },
+      ])
+      return
+    }
 
     if (result?.has_prompt && result.prompt_block) {
       void handleGenerate(undefined, {
@@ -600,6 +676,37 @@ export default function Home() {
   )
 
   const [quickSaved, setQuickSaved] = useState(false)
+
+  useEffect(() => {
+    if (creationMode !== 'agent') return
+    const t = window.setTimeout(() => {
+      saveAgentDraft({
+        chatMessages,
+        baseTaskRef,
+        taskInput,
+        feedback,
+        result,
+        sessionId,
+        iterationMode,
+        questionState,
+        questionCarouselIdx,
+        quickSaved,
+      })
+    }, 450)
+    return () => window.clearTimeout(t)
+  }, [
+    creationMode,
+    chatMessages,
+    baseTaskRef,
+    taskInput,
+    feedback,
+    result,
+    sessionId,
+    iterationMode,
+    questionState,
+    questionCarouselIdx,
+    quickSaved,
+  ])
 
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
@@ -889,11 +996,16 @@ export default function Home() {
 
     return (
       <div className={`${styles.questionBox} ${compact ? styles.questionBoxCompact : ''} ${styles.questionCarousel}`}>
-        <p className={styles.questionCarouselMeta}>
-          Вопрос {idx + 1} из {total}
-        </p>
-        <p className={styles.info}>
-          Отметьте варианты или допишите свой ответ. Листайте стрелками между вопросами.
+        <div className={styles.wizardProgressWrap}>
+          <div className={styles.wizardProgressBar}>
+            <div className={styles.wizardProgressFill} style={{ width: `${((idx + 1) / total) * 100}%` }} />
+          </div>
+          <span className={styles.questionCarouselMeta}>
+            {idx + 1} / {total}
+          </span>
+        </div>
+        <p className={`${styles.info} ${compact ? styles.wizardInfoCompact : ''}`}>
+          Ответ на каждый вопрос необязателен. Дойдите до последнего — там кнопка создания промпта.
         </p>
         <div className={`${styles.questionItem} ${compact ? styles.questionItemCompact : ''}`}>
           <strong>
@@ -938,37 +1050,43 @@ export default function Home() {
           >
             ← Назад
           </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={idx >= total - 1}
-            onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
-          >
-            Вперёд →
-          </button>
+          {idx < total - 1 ? (
+            <button
+              type="button"
+              className={`${styles.primaryAction} btn-primary ${styles.wizardNextPrimary}`}
+              onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
+            >
+              Далее: вопрос {idx + 2} из {total} →
+            </button>
+          ) : (
+            <span className={styles.wizardLastHint}>Последний вопрос</span>
+          )}
         </div>
         <div className={styles.actions}>
-          <button type="button" className="btn-ghost" onClick={() => handleGenerate([], questionGenOpts)}>
-            Пропустить все
+          <button type="button" className="btn-ghost" disabled={loading} onClick={() => handleGenerate([], questionGenOpts)}>
+            Пропустить ответы
           </button>
-          <button
-            type="button"
-            className={`${styles.primaryAction} btn-primary`}
-            onClick={() =>
-              handleGenerate(
-                qs.map((qq, i) => ({
-                  question: qq.question,
-                  answers: [
-                    ...(questionState[i]?.options || []),
-                    ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
-                  ],
-                })),
-                questionGenOpts,
-              )
-            }
-          >
-            Создать промпт с этими ответами
-          </button>
+          {idx >= total - 1 ? (
+            <button
+              type="button"
+              className={`${styles.primaryAction} btn-primary`}
+              disabled={loading}
+              onClick={() =>
+                handleGenerate(
+                  qs.map((qq, i) => ({
+                    question: qq.question,
+                    answers: [
+                      ...(questionState[i]?.options || []),
+                      ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
+                    ],
+                  })),
+                  questionGenOpts,
+                )
+              }
+            >
+              Создать промпт с этими ответами
+            </button>
+          ) : null}
         </div>
       </div>
     )
@@ -1160,35 +1278,51 @@ export default function Home() {
                   {result.metrics && (() => {
                     const score = Number(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)
                     return score > 0 ? (
-                      <div className={styles.evalBar} title={`Полнота: ${score}%`}>
-                        <div className={styles.evalBarFill} style={{ width: `${Math.min(100, score)}%` }} />
-                        <span className={styles.evalBarLabel}>{score}%</span>
+                      <div className={styles.evalScorePrimary} title={COMPLETENESS_SCORE_TITLE}>
+                        <span className={styles.evalScoreLabel}>Полнота</span>
+                        <div className={styles.evalBar}>
+                          <div className={styles.evalBarFill} style={{ width: `${Math.min(100, score)}%` }} />
+                        </div>
+                        <span className={styles.evalScoreNum}>{score}%</span>
                       </div>
                     ) : null
                   })()}
+                  {result.techniques?.length > 0 && (
+                    <span
+                      className={styles.evalMeta}
+                      title={`${TECHNIQUES_COUNT_TITLE} Сейчас: ${result.techniques.map((t) => t.name).join(', ')}.`}
+                    >
+                      {result.techniques.length} техн.
+                    </span>
+                  )}
                   {tokenEstimate > 0 && (
-                    <span className={styles.evalMeta}>≈{tokenEstimate.toLocaleString()} tok</span>
+                    <span className={styles.evalMetaSecondary} title={TOKEN_ESTIMATE_TITLE}>
+                      ≈{tokenEstimate.toLocaleString()} tok
+                    </span>
                   )}
-                  {promptCostStr && <span className={styles.evalMeta}>{promptCostStr}</span>}
-                  {result.technique_ids?.length > 0 && (
-                    <span className={styles.evalMeta}>{result.technique_ids.length} техн.</span>
-                  )}
+                  {promptCostStr ? (
+                    <span className={styles.evalMetaSecondary} title={PROMPT_COST_TITLE}>
+                      {promptCostStr}
+                    </span>
+                  ) : null}
                 </div>
                 <div className={styles.promptToolbar}>
                   <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
-                  <TryInGeminiButton prompt={result.prompt_block} title="Попробовать в Gemini" />
+                  <TryInGeminiButton prompt={result.prompt_block} />
                   {creationMode === 'agent' && !quickSaved && (
                     <button
                       type="button"
                       className={styles.quickSaveBtn}
-                      title="Быстро сохранить в библиотеку"
+                      title="Сохранить в библиотеку"
                       onClick={handleQuickSave}
                     >
-                      ♡
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                     </button>
                   )}
                   {creationMode === 'agent' && quickSaved && (
-                    <span className={styles.quickSavedMark} title="Сохранено">♥</span>
+                    <span className={styles.quickSavedMark} title="Сохранено в библиотеку">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                    </span>
                   )}
                 </div>
               </div>
@@ -1269,32 +1403,35 @@ export default function Home() {
                   <strong>Что можно улучшить:</strong>
                   <ul>
                     {(result.metrics.improvement_tips as string[]).map((tip, idx) => (
-                      <li key={idx}>{tip}</li>
+                      <li key={idx} className={styles.tipItem}>
+                        <span className={styles.tipText}>{tip}</span>
+                        <button
+                          type="button"
+                          className={styles.tipApplyBtn}
+                          disabled={loading}
+                          title="Автоматически применить этот совет"
+                          onClick={() => {
+                            if (creationMode === 'agent') {
+                              setChatInput(`Примени совет: ${tip}`)
+                            } else {
+                              setFeedback(tip)
+                              setIterationMode(true)
+                            }
+                          }}
+                        >
+                          + Применить
+                        </button>
+                      </li>
                     ))}
                   </ul>
                 </div>
               )}
               {result?.has_prompt && (
-                <p className={styles.strategicHint}>
-                  Оценка полноты смотрит на структуру промпта, а не на ответ в чате. Перед важным использованием проверьте текст в своей модели.
+                <p className={styles.strategicHint} title={COMPLETENESS_SCORE_TITLE}>
+                  Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.
                 </p>
               )}
               <div className={styles.actions}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    const blob = new Blob([result.prompt_block], { type: 'text/plain;charset=utf-8' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = 'prompt.txt'
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }}
-                >
-                  Скачать .txt
-                </button>
                 {creationMode !== 'agent' ? (
                   <button type="button" className={`${styles.iterateBtn} btn-primary`} onClick={() => setIterationMode(true)}>Итерировать</button>
                 ) : null}
@@ -1338,6 +1475,23 @@ export default function Home() {
                   <div className={styles.versionTimelineHeader}>
                     <span className={styles.versionTimelineLabel}>Версии</span>
                     <span className={styles.versionTimelineCount}>{versions.length}</span>
+                    {(() => {
+                      const scores = versions.map((v) => {
+                        const m = ((v as Record<string, unknown>).metrics || {}) as Record<string, unknown>
+                        return Number(m.completeness_score ?? m.quality_score ?? 0)
+                      }).filter((s) => s > 0)
+                      if (scores.length < 2) return null
+                      const max = Math.max(...scores, 100)
+                      const w = 72
+                      const h = 20
+                      const step = w / (scores.length - 1)
+                      const pts = scores.map((s, i) => `${i * step},${h - (s / max) * h}`).join(' ')
+                      return (
+                        <svg className={styles.sparkline} width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+                          <polyline points={pts} fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )
+                    })()}
                   </div>
                   <div className={styles.versionPills}>
                     {([...versions].reverse()).map((item) => {
@@ -1446,24 +1600,55 @@ export default function Home() {
                   Новый диалог
                 </button>
               </div>
+              <p className={styles.agentDraftHint} title="Черновик студии хранится в браузере и подхватывается при возврате на эту страницу. Список «Сессии» в сайдбаре — отдельно, это сохранённые на сервере сессии с версиями.">
+                Черновик сохраняется в браузере при переходах по сайту. «Новый диалог» очищает его.
+              </p>
               <div className={styles.agentChatBody}>
                 <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
                   {chatMessages.map((m) => {
                     const isThinking = m.role === 'assistant' && m.content.startsWith('__thinking__\n')
                     const displayContent = isThinking ? m.content.slice('__thinking__\n'.length) : m.content
+                    if (isThinking) {
+                      const firstLine = displayContent.split('\n')[0] || 'Анализ задачи'
+                      return (
+                        <details key={m.id} className={styles.chatBubbleThinking}>
+                          <summary className={styles.thinkingSummary}>
+                            <span className={styles.thinkingLabel}>Размышления</span>
+                            <span className={styles.thinkingSummaryText}>{firstLine.replace(/\*\*/g, '')}</span>
+                          </summary>
+                          <div className={styles.thinkingBody}>
+                            <MarkdownOutput>{displayContent}</MarkdownOutput>
+                          </div>
+                        </details>
+                      )
+                    }
                     return (
                       <div
                         key={m.id}
-                        className={
-                          m.role === 'user'
-                            ? styles.chatBubbleUser
-                            : isThinking
-                              ? styles.chatBubbleThinking
-                              : styles.chatBubbleAssistant
-                        }
+                        className={m.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAssistant}
                       >
-                        {isThinking && <span className={styles.thinkingLabel}>Размышления</span>}
                         <MarkdownOutput>{displayContent}</MarkdownOutput>
+                        {m.role === 'assistant' && m.clarificationQA !== undefined ? (
+                          <details className={styles.clarificationRecap}>
+                            <summary>Показать вопросы и ответы</summary>
+                            <div className={styles.clarificationRecapBody}>
+                              {m.clarificationQA.length === 0 ? (
+                                <p className={styles.clarificationRecapEmpty}>Ответы не выбраны — учтена только ваша формулировка задачи.</p>
+                              ) : (
+                                <ol className={styles.clarificationRecapList}>
+                                  {m.clarificationQA.map((row, i) => (
+                                    <li key={i}>
+                                      <div className={styles.clarificationQ}>{row.question}</div>
+                                      <div className={styles.clarificationA}>
+                                        {row.answers.length ? row.answers.join('; ') : '—'}
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ol>
+                              )}
+                            </div>
+                          </details>
+                        ) : null}
                       </div>
                     )
                   })}
@@ -1472,9 +1657,13 @@ export default function Home() {
                       <span className={styles.agentThinkingInner}>Думаю над промптом и уточнениями…</span>
                     </div>
                   )}
-                  {result?.has_questions && !result?.has_prompt && renderQuestionsPanel('agent')}
                   {error && <p className={styles.error}>{error}</p>}
                 </div>
+                {result?.has_questions && !result?.has_prompt && (
+                  <div className={styles.wizardOverlay}>
+                    {renderQuestionsPanel('agent')}
+                  </div>
+                )}
               </div>
               <div className={styles.agentChatComposerHost}>
               <div className={cb.composer}>
