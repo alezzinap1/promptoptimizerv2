@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type LibraryItem } from '../../api/client'
+import LibraryTagChips from '../../components/LibraryTagChips'
 import SelectDropdown from '../../components/SelectDropdown'
-import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
+import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
 import styles from '../Library.module.css'
 
@@ -12,20 +13,39 @@ function ratingLabel(rating: number | undefined | null) {
   return `★ ${r}/5`
 }
 
-type Props = {
-  onPromptCountChanged?: () => void
+const IMAGE_SIGNALS = ['image', 'картинк', 'изображен', 'midjourney', 'dall-e', 'dalle', 'stable diffusion', 'генерац', 'иллюстрац', 'фото', 'photo', 'visual', 'art', 'рисунок', 'рисов']
+
+function isImagePrompt(item: LibraryItem): boolean {
+  const text = `${item.title} ${item.tags.join(' ')} ${item.task_type} ${item.prompt.slice(0, 300)}`.toLowerCase()
+  return IMAGE_SIGNALS.some((s) => text.includes(s))
 }
 
-export default function PromptsPanel({ onPromptCountChanged }: Props) {
+type Props = {
+  onPromptCountChanged?: () => void
+  gridCols?: 3 | 4
+}
+
+export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Props) {
   const navigate = useNavigate()
   const [items, setItems] = useState<LibraryItem[]>([])
   const [stats, setStats] = useState<{ total: number; models?: string[]; task_types?: string[] }>({ total: 0 })
   const [search, setSearch] = useState('')
   const [taskType, setTaskType] = useState('all')
+  const [sortBy, setSortBy] = useState<'rating' | 'date' | 'tokens' | 'name'>('rating')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<Record<number, { title: string; tags: string; notes: string; rating: number }>>({})
+  const [evalId, setEvalId] = useState<number | null>(null)
+  const [evalData, setEvalData] = useState<Record<string, unknown> | null>(null)
+  const [evalLoading, setEvalLoading] = useState(false)
+  const [tagPaintTick, setTagPaintTick] = useState(0)
+
+  useEffect(() => {
+    const onPaint = () => setTagPaintTick((t) => t + 1)
+    window.addEventListener('metaprompt-tag-accent-changed', onPaint)
+    return () => window.removeEventListener('metaprompt-tag-accent-changed', onPaint)
+  }, [])
 
   useEffect(() => {
     api.getLibraryStats().then(setStats)
@@ -34,22 +54,15 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    api.getLibrary({
-      search: search || undefined,
-      task_type: taskType !== 'all' ? taskType : undefined,
-    })
+    api
+      .getLibrary({
+        search: search || undefined,
+        task_type: taskType !== 'all' ? taskType : undefined,
+      })
       .then((r) => setItems(r.items))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
   }, [search, taskType])
-
-  const exportText = useMemo(
-    () =>
-      items
-        .map((item) => `# ${item.title}\n# tags: ${item.tags.join(', ')}\n\n${item.prompt}`)
-        .join('\n\n' + '='.repeat(60) + '\n\n'),
-    [items],
-  )
 
   const taskTypeOptions = useMemo(
     () => [
@@ -58,6 +71,24 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
     ],
     [stats.task_types],
   )
+
+  const sortOptions = useMemo(() => [
+    { value: 'rating', label: 'По оценке' },
+    { value: 'date', label: 'По дате' },
+    { value: 'tokens', label: 'По токенам' },
+    { value: 'name', label: 'По имени' },
+  ], [])
+
+  const sorted = useMemo(() => {
+    const arr = [...items]
+    switch (sortBy) {
+      case 'rating': return arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.id - a.id)
+      case 'date': return arr.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+      case 'tokens': return arr.sort((a, b) => b.prompt.length - a.prompt.length)
+      case 'name': return arr.sort((a, b) => a.title.localeCompare(b.title))
+      default: return arr
+    }
+  }, [items, sortBy])
 
   const startEdit = (item: LibraryItem) => {
     setEditingId(item.id)
@@ -90,19 +121,35 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
     window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
   }
 
+  const handleEval = async (item: LibraryItem) => {
+    if (evalId === item.id) {
+      setEvalId(null)
+      setEvalData(null)
+      return
+    }
+    setEvalId(item.id)
+    setEvalLoading(true)
+    try {
+      const res = await api.evaluatePrompt(item.prompt, item.target_model)
+      setEvalData(res.metrics)
+    } catch {
+      setEvalData(null)
+    } finally {
+      setEvalLoading(false)
+    }
+  }
+
+  const gridClass = gridCols === 4 ? styles.grid4 : styles.grid3
+
   return (
     <div className={styles.library}>
-      <div className={styles.header}>
-        <h2 className="pageTitleGradient">Промпты</h2>
-      </div>
-
-      <div className={styles.toolbar}>
+      <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
         <input
           type="search"
-          placeholder="Поиск..."
+          placeholder="Поиск по тексту и тегам…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className={styles.search}
+          className={`${styles.search} ${styles.searchCompact}`}
         />
         <SelectDropdown
           value={taskType}
@@ -110,24 +157,16 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
           onChange={setTaskType}
           aria-label="Тип задачи"
           variant="toolbar"
-          className={styles.toolbarSelect}
+          className={`${styles.toolbarSelect} ${styles.toolbarSelectCompact}`}
         />
-        <button
-          type="button"
-          className={`${styles.exportBtn} btn-ghost`}
-          title="Скачать один .txt со всеми промптами из текущего списка (с учётом поиска и фильтра)"
-          onClick={() => {
-            const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = 'prompt_library.txt'
-            a.click()
-            URL.revokeObjectURL(url)
-          }}
-        >
-          Экспорт всех
-        </button>
+        <SelectDropdown
+          value={sortBy}
+          options={sortOptions}
+          onChange={(v) => setSortBy(v as 'rating' | 'date' | 'tokens' | 'name')}
+          aria-label="Сортировка"
+          variant="toolbar"
+          className={`${styles.toolbarSelect} ${styles.toolbarSelectCompact}`}
+        />
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
@@ -137,8 +176,8 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
       ) : items.length === 0 ? (
         <p className={styles.empty}>Нет сохранённых промптов</p>
       ) : (
-        <div className={styles.grid}>
-          {items.map((item) => (
+        <div key={tagPaintTick} className={`${styles.grid} ${gridClass}`}>
+          {sorted.map((item) => (
             <div key={item.id} className={styles.card}>
               <h3 className={styles.cardTitle}>{item.title}</h3>
               {item.created_at ? (
@@ -148,11 +187,24 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
                 <span className={styles.taskTypeLabel} title="Тип задачи при сохранении">
                   {item.task_type}
                 </span>
+                {isImagePrompt(item) && (
+                  <span className={styles.imageBadge} title="Промпт для генерации изображений">
+                    🎨
+                  </span>
+                )}
+                {item.target_model && item.target_model !== 'unknown' && (
+                  <span className={styles.modelBadge} title="Целевая модель">
+                    {item.target_model}
+                  </span>
+                )}
                 <span className={styles.ratingBadge} title="Оценка по шкале от 0 до 5 звёзд">
                   {ratingLabel(item.rating)}
                 </span>
+                <span className={styles.tokenBadgeMini} title="Приблизительное количество токенов">
+                  ≈{Math.max(1, Math.round(item.prompt.length / 3.5)).toLocaleString()} tok
+                </span>
               </p>
-              {item.tags.length > 0 && <p className={styles.tags}>{item.tags.join(', ')}</p>}
+              {item.tags.length > 0 ? <LibraryTagChips tags={item.tags} className={styles.tagChipsMargin} /> : null}
               <div className={styles.promptBlock}>
                 <pre className={styles.preview}>
                   {item.prompt.slice(0, 200)}
@@ -170,6 +222,10 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
                 >
                   Открыть
                 </button>
+                <TryInGeminiButton
+                  prompt={item.prompt}
+                  title={isImagePrompt(item) ? 'Сгенерировать картинку в Gemini' : 'Попробовать в Gemini'}
+                />
                 <CopyIconButton text={item.prompt} title="Копировать текст промпта в буфер обмена" />
                 <DownloadIconButton
                   title="Скачать этот промпт одним .txt файлом на диск"
@@ -184,6 +240,14 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
                   }}
                 />
                 <PencilIconButton title="Редактировать название, теги, заметки и оценку" onClick={() => startEdit(item)} />
+                <button
+                  type="button"
+                  className={`${styles.evalBtn} ${evalId === item.id ? styles.evalBtnActive : ''}`}
+                  title="Оценить качество промпта"
+                  onClick={() => handleEval(item)}
+                >
+                  %
+                </button>
                 <TrashIconButton
                   title="Удалить запись из библиотеки без восстановления"
                   onClick={async () => {
@@ -195,6 +259,38 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
                   }}
                 />
               </div>
+              {evalId === item.id && (
+                <div className={styles.evalInline}>
+                  {evalLoading ? (
+                    <span className={styles.evalInlineLoading}>Оцениваю…</span>
+                  ) : evalData ? (
+                    <>
+                      <div className={styles.evalInlineRow}>
+                        <span className={styles.evalInlineLabel}>Полнота</span>
+                        <div className={styles.evalMiniBar}>
+                          <div className={styles.evalMiniBarFill} style={{ width: `${Math.min(100, Number(evalData.completeness_score ?? 0))}%` }} />
+                        </div>
+                        <span className={styles.evalInlineVal}>{String(evalData.completeness_score ?? 0)}%</span>
+                      </div>
+                      <div className={styles.evalInlineChips}>
+                        {evalData.has_role ? <span className={styles.evalChipGood}>роль</span> : <span className={styles.evalChipMiss}>роль</span>}
+                        {evalData.has_output_format ? <span className={styles.evalChipGood}>формат</span> : <span className={styles.evalChipMiss}>формат</span>}
+                        {evalData.has_examples ? <span className={styles.evalChipGood}>примеры</span> : <span className={styles.evalChipMiss}>примеры</span>}
+                        {evalData.has_context ? <span className={styles.evalChipGood}>контекст</span> : <span className={styles.evalChipMiss}>контекст</span>}
+                      </div>
+                      {Array.isArray(evalData.improvement_tips) && (evalData.improvement_tips as string[]).length > 0 && (
+                        <ul className={styles.evalTips}>
+                          {(evalData.improvement_tips as string[]).slice(0, 3).map((tip, i) => (
+                            <li key={i}>{tip}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <span className={styles.evalInlineLoading}>Ошибка оценки</span>
+                  )}
+                </div>
+              )}
               {editingId === item.id && drafts[item.id] && (
                 <div className={styles.editBox}>
                   <input
@@ -208,7 +304,7 @@ export default function PromptsPanel({ onPromptCountChanged }: Props) {
                     onChange={(e) =>
                       setDrafts((prev) => ({ ...prev, [item.id]: { ...prev[item.id], tags: e.target.value } }))
                     }
-                    placeholder="Теги"
+                    placeholder="Теги через запятую"
                   />
                   <textarea
                     rows={3}

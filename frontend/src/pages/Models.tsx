@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type OpenRouterModel, type Settings } from '../api/client'
+import { CURATED_MODEL_PICKS } from '../constants/curatedModels'
 import styles from './Models.module.css'
 
 function formatPrice(price: number | undefined): string {
@@ -77,6 +78,7 @@ function buildGroups(models: OpenRouterModel[]): { singles: OpenRouterModel[]; g
 }
 
 export default function Models() {
+  const fullCatalogRef = useRef<HTMLElement>(null)
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -88,6 +90,12 @@ export default function Models() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set())
   const [trialMode, setTrialMode] = useState(false)
+
+  const modelById = useMemo(() => {
+    const m = new Map<string, OpenRouterModel>()
+    for (const x of models) m.set(x.id, x)
+    return m
+  }, [models])
 
   const load = async (forceRefresh = false) => {
     if (forceRefresh) setRefreshing(true)
@@ -114,16 +122,12 @@ export default function Models() {
 
   const isSearching = search.trim().length > 0
 
-  // Flat filtered list for search mode
   const flatFiltered = useMemo(() => {
     if (!isSearching) return models
     const q = search.toLowerCase()
-    return models.filter(
-      (m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
-    )
+    return models.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
   }, [models, search, isSearching])
 
-  // Sorted flat list (for search mode)
   const flatSorted = useMemo(() => {
     return [...flatFiltered].sort((a, b) => {
       const cmp = (a.name || a.id).localeCompare(b.name || b.id)
@@ -131,7 +135,6 @@ export default function Models() {
     })
   }, [flatFiltered, sortDir])
 
-  // Grouped view (for non-search mode)
   const { singles, groups } = useMemo(() => {
     const allSorted = [...models].sort((a, b) => {
       const pa = providerOf(a.id)
@@ -142,7 +145,6 @@ export default function Models() {
     return buildGroups(allSorted)
   }, [models, sortDir])
 
-  // Singles sorted by provider name then model name
   const singlesSorted = useMemo(() => {
     return [...singles].sort((a, b) => {
       const cmp = providerOf(a.id).localeCompare(providerOf(b.id))
@@ -151,7 +153,6 @@ export default function Models() {
     })
   }, [singles, sortDir])
 
-  // Groups sorted by provider name
   const groupsSorted = useMemo(() => {
     return [...groups].sort((a, b) => {
       const cmp = a.provider.localeCompare(b.provider)
@@ -161,9 +162,7 @@ export default function Models() {
 
   const selectedGen = new Set(settings?.preferred_generation_models || [])
 
-  const updatedStr = meta?.updated_at
-    ? new Date(meta.updated_at * 1000).toLocaleString('ru-RU')
-    : ''
+  const updatedStr = meta?.updated_at ? new Date(meta.updated_at * 1000).toLocaleString('ru-RU') : ''
 
   const toggleGenModel = async (modelId: string) => {
     if (!settings) return
@@ -191,6 +190,10 @@ export default function Models() {
     })
   }
 
+  const scrollToFullCatalog = () => {
+    fullCatalogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const renderActionCell = (m: OpenRouterModel) => (
     <div className={styles.actionCell}>
       <button
@@ -198,7 +201,7 @@ export default function Models() {
         onClick={() => toggleGenModel(m.id)}
         disabled={saving}
       >
-        {selectedGen.has(m.id) ? '− Генерация' : '+ Генерация'}
+        {selectedGen.has(m.id) ? 'В наборе' : 'В набор'}
       </button>
     </div>
   )
@@ -206,161 +209,196 @@ export default function Models() {
   return (
     <div className={styles.models}>
       <div className={styles.header}>
-        <h1 className="pageTitleGradient">Модели OpenRouter</h1>
+        <h1 className="pageTitleGradient">Модели</h1>
       </div>
 
       <p className={styles.subtitle}>
-        Список моделей. Цены в колонках «Вход» и «Выход» — в USD за 1M токенов. Данные обновляются раз в сутки.
+        Сначала — короткая подборка для генерации промптов. Ниже — полный каталог OpenRouter с ценами. Модели из набора
+        появляются в выборе на главной.
       </p>
 
       {trialMode && (
         <div className={styles.trialBanner}>
-          <strong>Пробный режим:</strong> доступны только модели с выходом ≤$1/1M токенов. Лимит 50 000 пробных токенов на пользователя.
-          Введите свой API ключ OpenRouter в <Link to="/settings">Настройках</Link> для доступа ко всем моделям.
+          <strong>Пробный режим:</strong> доступны только модели с выходом ≤$1/1M токенов. Лимит пробных токенов на пользователя.
+          Свой ключ OpenRouter — в <Link to="/settings">Настройках</Link>.
         </div>
       )}
 
-      <div className={styles.toolbar}>
-        <input
-          type="search"
-          placeholder="Поиск по названию или ID..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={styles.search}
-        />
-        <div className={styles.toolbarEnd}>
-          <div className={styles.headerMeta}>
-            <span className={styles.metric}>
-              {models.length} моделей
-              {meta?.from_cache && <span className={styles.cacheBadge}> · кеш</span>}
-            </span>
-            {updatedStr && <span className={styles.updated}>Обновлено: {updatedStr}</span>}
-            <button
-              type="button"
-              className={styles.refreshBtn}
-              onClick={() => load(true)}
-              disabled={refreshing || loading}
-            >
-              {refreshing ? 'Обновление…' : 'Обновить'}
-            </button>
-          </div>
-          {settings && (
-            <div className={styles.selectionBar}>
-              <span>В генерации: {settings.preferred_generation_models.length}</span>
-            </div>
-          )}
+      <section className={styles.curatedSection} aria-labelledby="curated-heading">
+        <h2 id="curated-heading" className={styles.curatedHeading}>
+          С чего начать
+        </h2>
+        <p className={styles.curatedLead}>Шесть моделей, с которыми проще всего начать. Нажмите «В набор», чтобы добавить в список на главной.</p>
+        <div className={styles.curatedGrid}>
+          {CURATED_MODEL_PICKS.map((pick) => {
+            const live = modelById.get(pick.id)
+            const inSet = selectedGen.has(pick.id)
+            return (
+              <article key={pick.id} className={styles.curatedCard}>
+                <div className={styles.curatedCardTop}>
+                  <h3 className={styles.curatedTitle}>{pick.title}</h3>
+                  <code className={styles.curatedId}>{pick.id}</code>
+                </div>
+                <p className={styles.curatedLine}>
+                  <span className={styles.curatedLabel}>Хорошо для</span> {pick.goodFor}
+                </p>
+                <p className={styles.curatedLine}>
+                  <span className={styles.curatedLabel}>Отличие</span> {pick.vsOthers}
+                </p>
+                {live && (
+                  <p className={styles.curatedMeta}>
+                    Контекст {formatContext(live.context_length)} · выход {formatPrice(live.pricing?.completion)}/1M
+                  </p>
+                )}
+                {!live && !loading && (
+                  <p className={styles.curatedMissing}>Нет в текущем каталоге — ID мог обновиться на OpenRouter.</p>
+                )}
+                <button
+                  type="button"
+                  className={inSet ? styles.curatedBtnOut : styles.curatedBtnIn}
+                  onClick={() => live && toggleGenModel(pick.id)}
+                  disabled={saving || !live}
+                >
+                  {!live ? 'Недоступна' : inSet ? 'Убрать из набора' : 'В набор'}
+                </button>
+              </article>
+            )
+          })}
         </div>
-      </div>
+        <button type="button" className={styles.showMoreCatalog} onClick={scrollToFullCatalog}>
+          Показать полный каталог
+        </button>
+      </section>
 
       {error && <p className={styles.error}>{error}</p>}
 
-      {loading ? (
-        <p className={styles.loading}>Загрузка моделей...</p>
-      ) : (isSearching ? flatSorted : [...groupsSorted, ...singlesSorted]).length === 0 ? (
-        <p className={styles.empty}>Модели не найдены</p>
-      ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th
-                  className={styles.sortable}
-                  onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                >
-                  {isSearching ? 'Модель' : 'Провайдер / Модель'} {sortDir === 'asc' ? '↑' : '↓'}
-                </th>
-                <th>Контекст</th>
-                <th>Вход</th>
-                <th>Выход</th>
-                <th>Набор пользователя</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isSearching ? (
-                // Flat search view — show full info with ID
-                flatSorted.map((m) => (
-                  <tr key={m.id}>
-                    <td>
-                      <div className={styles.modelCell}>
-                        <strong>{m.name}</strong>
-                        <code className={styles.modelId}>{m.id}</code>
-                      </div>
-                    </td>
-                    <td>{formatContext(m.context_length)}</td>
-                    <td>{formatPrice(m.pricing?.prompt)}</td>
-                    <td>{formatPrice(m.pricing?.completion)}</td>
-                    <td>{renderActionCell(m)}</td>
-                  </tr>
-                ))
-              ) : (
-                <>
-                  {/* Provider groups (2+ models) */}
-                  {groupsSorted.map((g) => {
-                    const isExpanded = expandedProviders.has(g.provider)
-                    return [
-                      <tr
-                        key={`group-${g.provider}`}
-                        className={styles.providerRow}
-                        onClick={() => toggleProvider(g.provider)}
-                      >
+      <section ref={fullCatalogRef} id="models-full-catalog" className={styles.fullCatalogSection} aria-labelledby="full-catalog-heading">
+        <h2 id="full-catalog-heading" className={styles.fullCatalogHeading}>
+          Полный каталог OpenRouter
+        </h2>
+        <div className={styles.toolbar}>
+          <input
+            type="search"
+            placeholder="Поиск по названию или ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={styles.search}
+          />
+          <div className={styles.toolbarEnd}>
+            <div className={styles.headerMeta}>
+              <span className={styles.metric}>
+                {models.length} моделей
+                {meta?.from_cache && <span className={styles.cacheBadge}> · кеш</span>}
+              </span>
+              {updatedStr && <span className={styles.updated}>Обновлено: {updatedStr}</span>}
+              <button type="button" className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing || loading}>
+                {refreshing ? 'Обновление…' : 'Обновить'}
+              </button>
+            </div>
+            {settings && (
+              <div className={styles.selectionBar}>
+                <span>В наборе: {settings.preferred_generation_models.length}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {loading ? (
+          <p className={styles.loading}>Загрузка моделей...</p>
+        ) : (isSearching ? flatSorted : [...groupsSorted, ...singlesSorted]).length === 0 ? (
+          <p className={styles.empty}>Модели не найдены</p>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.sortable} onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}>
+                    {isSearching ? 'Модель' : 'Провайдер / Модель'} {sortDir === 'asc' ? '↑' : '↓'}
+                  </th>
+                  <th>Контекст</th>
+                  <th>Вход</th>
+                  <th>Выход</th>
+                  <th>Набор</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isSearching
+                  ? flatSorted.map((m) => (
+                      <tr key={m.id}>
                         <td>
-                          <div className={styles.providerCell}>
-                            <span className={`${styles.expandIcon} ${isExpanded ? styles.expandIconOpen : ''}`}>▶</span>
-                            <strong>{g.provider}</strong>
-                            <span className={styles.modelCount}>{g.models.length} моделей</span>
+                          <div className={styles.modelCell}>
+                            <strong>{m.name}</strong>
+                            <code className={styles.modelId}>{m.id}</code>
                           </div>
                         </td>
-                        <td className={styles.rangeCell}>
-                          {g.contextMin || g.contextMax
-                            ? formatContextRange(g.contextMin, g.contextMax)
-                            : '—'}
-                        </td>
-                        <td className={styles.rangeCell}>
-                          {formatPriceRange(g.promptMin, g.promptMax)}
-                        </td>
-                        <td className={styles.rangeCell}>
-                          {formatPriceRange(g.completionMin, g.completionMax)}
-                        </td>
-                        <td />
-                      </tr>,
-                      ...(isExpanded
-                        ? g.models.map((m) => (
-                            <tr key={m.id} className={styles.nestedRow}>
+                        <td>{formatContext(m.context_length)}</td>
+                        <td>{formatPrice(m.pricing?.prompt)}</td>
+                        <td>{formatPrice(m.pricing?.completion)}</td>
+                        <td>{renderActionCell(m)}</td>
+                      </tr>
+                    ))
+                  : (
+                      <>
+                        {groupsSorted.map((g) => {
+                          const isExpanded = expandedProviders.has(g.provider)
+                          return [
+                            <tr
+                              key={`group-${g.provider}`}
+                              className={styles.providerRow}
+                              onClick={() => toggleProvider(g.provider)}
+                            >
                               <td>
-                                <div className={styles.nestedModelCell}>
-                                  <span className={styles.nestedIndent} />
-                                  <span>{m.name}</span>
+                                <div className={styles.providerCell}>
+                                  <span className={`${styles.expandIcon} ${isExpanded ? styles.expandIconOpen : ''}`}>▶</span>
+                                  <strong>{g.provider}</strong>
+                                  <span className={styles.modelCount}>{g.models.length} моделей</span>
                                 </div>
                               </td>
-                              <td>{formatContext(m.context_length)}</td>
-                              <td>{formatPrice(m.pricing?.prompt)}</td>
-                              <td>{formatPrice(m.pricing?.completion)}</td>
-                              <td>{renderActionCell(m)}</td>
-                            </tr>
-                          ))
-                        : []),
-                    ]
-                  })}
-                  {/* Singles (1 model per provider) */}
-                  {singlesSorted.map((m) => (
-                    <tr key={m.id}>
-                      <td>
-                        <div className={styles.modelCell}>
-                          <strong>{m.name}</strong>
-                        </div>
-                      </td>
-                      <td>{formatContext(m.context_length)}</td>
-                      <td>{formatPrice(m.pricing?.prompt)}</td>
-                      <td>{formatPrice(m.pricing?.completion)}</td>
-                      <td>{renderActionCell(m)}</td>
-                    </tr>
-                  ))}
-                </>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                              <td className={styles.rangeCell}>
+                                {g.contextMin || g.contextMax ? formatContextRange(g.contextMin, g.contextMax) : '—'}
+                              </td>
+                              <td className={styles.rangeCell}>{formatPriceRange(g.promptMin, g.promptMax)}</td>
+                              <td className={styles.rangeCell}>{formatPriceRange(g.completionMin, g.completionMax)}</td>
+                              <td />
+                            </tr>,
+                            ...(isExpanded
+                              ? g.models.map((m) => (
+                                  <tr key={m.id} className={styles.nestedRow}>
+                                    <td>
+                                      <div className={styles.nestedModelCell}>
+                                        <span className={styles.nestedIndent} />
+                                        <span>{m.name}</span>
+                                      </div>
+                                    </td>
+                                    <td>{formatContext(m.context_length)}</td>
+                                    <td>{formatPrice(m.pricing?.prompt)}</td>
+                                    <td>{formatPrice(m.pricing?.completion)}</td>
+                                    <td>{renderActionCell(m)}</td>
+                                  </tr>
+                                ))
+                              : []),
+                          ]
+                        })}
+                        {singlesSorted.map((m) => (
+                          <tr key={m.id}>
+                            <td>
+                              <div className={styles.modelCell}>
+                                <strong>{m.name}</strong>
+                              </div>
+                            </td>
+                            <td>{formatContext(m.context_length)}</td>
+                            <td>{formatPrice(m.pricing?.prompt)}</td>
+                            <td>{formatPrice(m.pricing?.completion)}</td>
+                            <td>{renderActionCell(m)}</td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

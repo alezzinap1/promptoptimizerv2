@@ -120,6 +120,8 @@ export interface GenerateResult {
   task_input?: string
   gen_model: string
   target_model: string
+  /** "reasoning" | "standard" | "small" */
+  target_model_type?: string
   metrics: Record<string, unknown>
   session_id: string
   prompt_spec?: PromptSpec
@@ -324,7 +326,7 @@ export const api = {
   getLibraryStats: () => fetchApi<{ total: number; models: string[]; task_types: string[] }>('/library/stats'),
   saveToLibrary: (req: { title: string; prompt: string; tags?: string[]; target_model?: string; task_type?: string; techniques?: string[]; notes?: string }) =>
     fetchApi<{ id: number }>('/library', { method: 'POST', body: JSON.stringify(req) }),
-  updateLibrary: (id: number, req: { title?: string; tags?: string[]; notes?: string; rating?: number }) =>
+  updateLibrary: (id: number, req: { title?: string; prompt?: string; tags?: string[]; notes?: string; rating?: number }) =>
     fetchApi<{ ok: boolean }>(`/library/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
   deleteLibrary: (id: number) =>
     fetchApi<{ ok: boolean }>(`/library/${id}`, { method: 'DELETE' }),
@@ -379,4 +381,16 @@ export const api = {
   getMetricsSummary: () => fetchApi<Record<string, unknown>>('/metrics/summary'),
   getMetricsEvents: (limit?: number) =>
     fetchApi<{ items: Record<string, unknown>[] }>(`/metrics/events${limit ? `?limit=${limit}` : ''}`),
+
+  countTokens: (text: string, modelId?: string) =>
+    fetchApi<{ tokens: number; method: string; model: string }>('/tokenizer/count', {
+      method: 'POST',
+      body: JSON.stringify({ text, model_id: modelId || '' }),
+    }),
+
+  evaluatePrompt: (prompt: string, targetModel?: string) =>
+    fetchApi<{ metrics: Record<string, unknown> }>('/library/evaluate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, target_model: targetModel || '' }),
+    }),
 }

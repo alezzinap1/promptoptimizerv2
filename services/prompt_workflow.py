@@ -7,6 +7,7 @@ import inspect
 
 from core.evidence import build_evidence_map
 from core.intent_graph import build_intent_graph
+from core.model_taxonomy import ModelType, classify_model, SUPPRESS_FOR_REASONING
 from core.prompt_debugger import analyze_prompt_spec
 from core.prompt_spec import build_prompt_spec
 from core.task_classifier import classify_task
@@ -86,10 +87,17 @@ def resolve_techniques(
     task_types = classification["task_types"]
     complexity = classification["complexity"]
     if technique_mode == "manual" and manual_techs:
-        return [t for t in (registry.get(tid) for tid in manual_techs) if t]
-    return registry.select_techniques(
-        task_types, complexity, max_techniques=max_techniques, target_model=target_model
-    )
+        selected = [t for t in (registry.get(tid) for tid in manual_techs) if t]
+    else:
+        selected = registry.select_techniques(
+            task_types, complexity, max_techniques=max_techniques, target_model=target_model
+        )
+
+    model_type = classify_model(target_model)
+    if model_type == ModelType.REASONING and technique_mode != "manual":
+        selected = [t for t in selected if t["id"] not in SUPPRESS_FOR_REASONING]
+
+    return selected
 
 
 def build_preview_payload(

@@ -1039,9 +1039,9 @@ class DBManager:
             query += " AND task_type = ?"
             params.append(task_type)
         if search and search.strip():
-            query += " AND (title LIKE ? OR prompt LIKE ? OR notes LIKE ?)"
+            query += " AND (title LIKE ? OR prompt LIKE ? OR notes LIKE ? OR tags LIKE ?)"
             like = f"%{search.strip()}%"
-            params.extend([like, like, like])
+            params.extend([like, like, like, like])
 
         query += " ORDER BY rating DESC, created_at DESC"
 
@@ -1064,6 +1064,7 @@ class DBManager:
         self,
         item_id: int,
         title: str | None = None,
+        prompt: str | None = None,
         tags: list[str] | None = None,
         notes: str | None = None,
         rating: int | None = None,
@@ -1074,6 +1075,9 @@ class DBManager:
         if title is not None:
             updates.append("title = ?")
             params.append(title)
+        if prompt is not None:
+            updates.append("prompt = ?")
+            params.append(prompt)
         if tags is not None:
             updates.append("tags = ?")
             params.append(json.dumps(tags, ensure_ascii=False))

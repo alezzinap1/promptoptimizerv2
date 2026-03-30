@@ -25,6 +25,8 @@ export default function Compare() {
   const [modelsMap, setModelsMap] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [techniques, setTechniques] = useState<{ id: string; name: string }[]>([])
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
+  const [preferredTargetModels, setPreferredTargetModels] = useState<string[]>(['unknown'])
+  const [targetModel, setTargetModel] = useState('unknown')
   const [techsAMode, setTechsAMode] = useState<'auto' | 'manual'>('auto')
   const [techsBMode, setTechsBMode] = useState<'auto' | 'manual'>('auto')
   const [techsAManual, setTechsAManual] = useState<string[]>([])
@@ -43,6 +45,9 @@ export default function Compare() {
       }, { unknown: 'Неизвестно / Любая модель' })
       setModelsMap(labels)
       setGenerationOptions(settings.preferred_generation_models)
+      const targets = settings.preferred_target_models?.length ? settings.preferred_target_models : ['unknown']
+      setPreferredTargetModels(targets)
+      setTargetModel((prev) => (prev !== 'unknown' && targets.includes(prev) ? prev : targets[0] || 'unknown'))
       const gen0 = settings.preferred_generation_models[0] || ''
       setGenModel(gen0)
       setJudgeModel(gen0 || 'gemini_flash')
@@ -60,6 +65,16 @@ export default function Compare() {
         return { value: id, label: shortGenerationModelLabel(full), title: full }
       }),
     [generationOptions, modelsMap],
+  )
+
+  const targetModelSelectOptions = useMemo(
+    () =>
+      preferredTargetModels.map((id) => ({
+        value: id,
+        label: id === 'unknown' ? 'Любая модель' : shortGenerationModelLabel(modelsMap[id] || id),
+        title: id === 'unknown' ? 'Промпт без привязки к модели' : modelsMap[id] || id,
+      })),
+    [preferredTargetModels, modelsMap],
   )
 
   const techById = useMemo(() => Object.fromEntries(techniques.map((t) => [t.id, t.name])), [techniques])
@@ -92,7 +107,7 @@ export default function Compare() {
       const res = await api.compare({
         task_input: taskInput.trim(),
         gen_model: genModel,
-        target_model: 'unknown',
+        target_model: targetModel,
         temperature,
         top_p: topP,
         techs_a_mode: techsAMode,
@@ -162,6 +177,14 @@ export default function Compare() {
                   aria-label="Модель генерации"
                   variant="composer"
                   footerLink={{ to: '/models', label: 'Добавить модель' }}
+                />
+                <SelectDropdown
+                  value={targetModel}
+                  options={targetModelSelectOptions}
+                  onChange={setTargetModel}
+                  aria-label="Модель, для которой пишется промпт"
+                  variant="composer"
+                  footerLink={{ to: '/models', label: 'Каталог моделей' }}
                 />
                 <button
                   type="button"

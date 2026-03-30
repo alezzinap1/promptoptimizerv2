@@ -35,6 +35,7 @@ from backend.api import (
     settings,
     simple_improve,
     techniques,
+    tokenizer,
     user_info,
     workspaces,
 )
@@ -67,6 +68,7 @@ app.include_router(simple_improve.router, prefix="/api", tags=["simple-improve"]
 app.include_router(compare.router, prefix="/api", tags=["compare"])
 app.include_router(library.router, prefix="/api", tags=["library"])
 app.include_router(techniques.router, prefix="/api", tags=["techniques"])
+app.include_router(tokenizer.router, prefix="/api", tags=["tokenizer"])
 
 
 @app.get("/api/health")

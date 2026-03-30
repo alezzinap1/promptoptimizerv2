@@ -65,10 +65,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <AppShell />
-      </ThemeProvider>
-    </AuthProvider>
+    <div className="appRoot">
+      <AuthProvider>
+        <ThemeProvider>
+          <AppShell />
+        </ThemeProvider>
+      </AuthProvider>
+    </div>
   )
 }

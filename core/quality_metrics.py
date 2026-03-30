@@ -7,10 +7,17 @@ from __future__ import annotations
 
 import re
 
+from core.tokenizer import count_tokens, estimate_tokens_quick
 
-def estimate_tokens(text: str) -> int:
-    """Rough token count estimate (~4 chars/token for mixed Russian/English)."""
-    return max(1, len(text) // 4)
+
+def estimate_tokens(text: str, model_id: str = "") -> int:
+    """
+    Token count — exact for OpenAI models via tiktoken, approximate for others.
+    Falls back to char-based estimation when model is unknown.
+    """
+    if model_id:
+        return count_tokens(text, model_id)["tokens"]
+    return estimate_tokens_quick(text)
 
 
 def count_instructions(text: str) -> int:
@@ -175,13 +182,15 @@ def get_improvement_tips(metrics: dict) -> list[str]:
     return tips
 
 
-def analyze_prompt(text: str) -> dict:
+def analyze_prompt(text: str, model_id: str = "") -> dict:
     """
     Full prompt analysis. Returns metrics dict with quality score and tips.
+    *model_id* (OpenRouter id or short key) enables exact token counting.
     """
     if not text or not text.strip():
         return {
             "token_estimate": 0,
+            "token_method": "none",
             "instruction_count": 0,
             "constraint_count": 0,
             "has_role": False,
@@ -194,8 +203,11 @@ def analyze_prompt(text: str) -> dict:
             "improvement_tips": [],
         }
 
+    tok = count_tokens(text, model_id) if model_id else {"tokens": estimate_tokens_quick(text), "method": "estimate"}
+
     metrics = {
-        "token_estimate": estimate_tokens(text),
+        "token_estimate": tok["tokens"],
+        "token_method": tok["method"],
         "instruction_count": count_instructions(text),
         "constraint_count": count_constraints(text),
         "has_role": has_role(text),

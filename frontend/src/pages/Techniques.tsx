@@ -51,9 +51,11 @@ const EMPTY_FORM = {
 export default function Techniques({
   variant = 'page',
   onCatalogChanged,
+  gridCols = 3,
 }: {
   variant?: 'page' | 'embedded'
   onCatalogChanged?: () => void
+  gridCols?: 3 | 4
 }) {
   const [techniques, setTechniques] = useState<TechniqueRecord[]>([])
   const [search, setSearch] = useState('')
@@ -173,6 +175,9 @@ export default function Techniques({
     URL.revokeObjectURL(url)
   }
 
+  const embed = variant === 'embedded'
+  const gridClass = embed ? (gridCols === 4 ? styles.grid4 : styles.grid3) : styles.gridPage
+
   return (
     <div className={styles.techniques}>
       {variant === 'page' ? (
@@ -182,11 +187,9 @@ export default function Techniques({
             Дефолтные техники доступны каждому пользователю. Свои техники можно добавлять поверх базы.
           </p>
         </>
-      ) : (
-        <h2 className="pageTitleGradient">Техники</h2>
-      )}
-      <p className={styles.meta}>
-        <span>{defaultCount} встроенных техник</span>
+      ) : null}
+      <p className={`${styles.meta} ${embed ? styles.metaEmbed : ''}`.trim()}>
+        <span>{defaultCount} встроенных</span>
         {customCount > 0 ? <span> · своих: {customCount}</span> : null}
         {' · '}
         <button type="button" className={styles.inlineLinkBtn} onClick={openNewTechnique}>
@@ -194,16 +197,16 @@ export default function Techniques({
         </button>
       </p>
 
-      <div className={styles.toolbar}>
-        <button type="button" className={styles.createBtn} onClick={openNewTechnique}>
-          Новая техника
+      <div className={`${styles.toolbar} ${embed ? styles.toolbarEmbedCompact : ''}`.trim()}>
+        <button type="button" className={embed ? styles.createBtnSmall : styles.createBtn} onClick={openNewTechnique}>
+          {embed ? '+ Техника' : 'Новая техника'}
         </button>
         <input
           type="search"
-          placeholder="Поиск: chain of thought, роль..."
+          placeholder={embed ? 'Поиск…' : 'Поиск: chain of thought, роль...'}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className={styles.search}
+          className={`${styles.search} ${embed ? styles.searchEmbedCompact : ''}`.trim()}
         />
         <SelectDropdown
           value={taskType}
@@ -211,7 +214,7 @@ export default function Techniques({
           onChange={setTaskType}
           aria-label="Фильтр по типу задачи"
           variant="toolbar"
-          className={styles.toolbarFilter}
+          className={`${styles.toolbarFilter} ${embed ? styles.toolbarFilterCompact : ''}`.trim()}
         />
         <SelectDropdown
           value={complexity}
@@ -219,7 +222,7 @@ export default function Techniques({
           onChange={setComplexity}
           aria-label="Фильтр по сложности"
           variant="toolbar"
-          className={styles.toolbarFilter}
+          className={`${styles.toolbarFilter} ${embed ? styles.toolbarFilterCompact : ''}`.trim()}
         />
       </div>
 
@@ -348,7 +351,7 @@ export default function Techniques({
       ) : techniques.length === 0 ? (
         <p className={styles.empty}>Техники не найдены</p>
       ) : (
-        <div className={styles.grid}>
+        <div className={`${styles.grid} ${gridClass}`}>
           {techniques.map((t) => (
             <div
               key={t.id}

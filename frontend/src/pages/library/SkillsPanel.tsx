@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import LibraryTagChips from '../../components/LibraryTagChips'
 import MarkdownOutput from '../../components/MarkdownOutput'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
+import SelectDropdown from '../../components/SelectDropdown'
 import styles from './SkillsPanel.module.css'
 
 const STORAGE_KEY = 'prompt-engineer-skills-v1'
@@ -10,8 +12,27 @@ export type SkillItem = {
   title: string
   description: string
   frameworks: string[]
+  /** Произвольные теги для поиска и группировки */
+  tags: string[]
   body: string
   createdAt: string
+}
+
+function normalizeSkill(raw: unknown): SkillItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.id !== 'string' || typeof o.title !== 'string' || typeof o.body !== 'string') return null
+  const frameworks = Array.isArray(o.frameworks) ? o.frameworks.filter((x): x is string => typeof x === 'string') : []
+  const tags = Array.isArray(o.tags) ? o.tags.filter((x): x is string => typeof x === 'string') : []
+  return {
+    id: o.id,
+    title: o.title,
+    description: typeof o.description === 'string' ? o.description : '',
+    frameworks,
+    tags,
+    body: o.body,
+    createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date().toISOString(),
+  }
 }
 
 function loadSkills(): SkillItem[] {
@@ -19,7 +40,11 @@ function loadSkills(): SkillItem[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const p = JSON.parse(raw)
-    return Array.isArray(p) ? p : []
+    if (!Array.isArray(p)) return []
+    return p
+      .map(normalizeSkill)
+      .filter((x): x is SkillItem => x !== null)
+      .map((it) => ({ ...it, tags: it.tags?.length ? it.tags : [] }))
   } catch {
     return []
   }
@@ -33,18 +58,36 @@ const emptyDraft = {
   title: '',
   description: '',
   frameworks: '',
+  tags: '',
   body: '',
 }
 
 type SkillsPanelProps = {
   onCountChange?: (n: number) => void
+  gridCols?: 3 | 4
 }
 
-export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
+function matchesSearch(item: SkillItem, q: string): boolean {
+  if (!q.trim()) return true
+  const n = q.trim().toLowerCase()
+  const blob = [item.title, item.description, item.body, ...item.frameworks, ...item.tags].join(' ').toLowerCase()
+  return blob.includes(n)
+}
+
+export default function SkillsPanel({ onCountChange, gridCols = 3 }: SkillsPanelProps) {
   const [items, setItems] = useState<SkillItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
   const [showModal, setShowModal] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'date' | 'name'>('date')
+  const [tagPaintTick, setTagPaintTick] = useState(0)
+
+  useEffect(() => {
+    const onPaint = () => setTagPaintTick((t) => t + 1)
+    window.addEventListener('metaprompt-tag-accent-changed', onPaint)
+    return () => window.removeEventListener('metaprompt-tag-accent-changed', onPaint)
+  }, [])
 
   useEffect(() => {
     setItems(loadSkills())
@@ -53,6 +96,19 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
   useEffect(() => {
     onCountChange?.(items.length)
   }, [items.length, onCountChange])
+
+  const filtered = useMemo(() => items.filter((it) => matchesSearch(it, search)), [items, search])
+
+  const sortOptions = useMemo(() => [
+    { value: 'date', label: 'По дате' },
+    { value: 'name', label: 'По имени' },
+  ], [])
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered]
+    if (sortBy === 'name') return arr.sort((a, b) => a.title.localeCompare(b.title))
+    return arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  }, [filtered, sortBy])
 
   const persist = (next: SkillItem[]) => {
     setItems(next)
@@ -72,6 +128,7 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
       title: item.title,
       description: item.description,
       frameworks: item.frameworks.join(', '),
+      tags: item.tags.join(', '),
       body: item.body,
     })
     setShowModal(true)
@@ -85,6 +142,10 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
+    const tags = draft.tags
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
     if (editingId) {
       persist(
         items.map((it) =>
@@ -94,6 +155,7 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
                 title,
                 description: draft.description.trim(),
                 frameworks,
+                tags,
                 body,
               }
             : it,
@@ -108,6 +170,7 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
           title,
           description: draft.description.trim(),
           frameworks,
+          tags,
           body,
           createdAt: new Date().toISOString(),
         },
@@ -122,66 +185,47 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
     persist(items.filter((it) => it.id !== id))
   }
 
-  const exportAll = useMemo(() => {
-    return items
-      .map(
-        (it) =>
-          `# ${it.title}\nFrameworks: ${it.frameworks.join(', ')}\n\n${it.description}\n\n---\n\n${it.body}`,
-      )
-      .join('\n\n' + '='.repeat(48) + '\n\n')
-  }, [items])
+  const gridClass = gridCols === 4 ? styles.grid4 : styles.grid3
+  const chipTags = (it: SkillItem) => [...it.tags, ...it.frameworks]
 
   return (
     <div className={styles.root}>
-      <div className={styles.header}>
-        <h2 className="pageTitleGradient">Скиллы</h2>
-        <p className={styles.lead}>
-          Наборы инструкций и сценариев для агентных пайплайнов (LangGraph, CrewAI, AutoGen и т.д.). Хранятся локально в
-          браузере.
-        </p>
-      </div>
+      <p className={styles.leadCompact}>
+        Скиллы хранятся локально в браузере. Теги участвуют в поиске; цвет тега — по нажатию на чип.
+      </p>
 
-      <div className={styles.toolbar}>
-        <button type="button" className={`${styles.primary} btn-primary`} onClick={openCreate}>
-          Новый скилл
+      <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
+        <button type="button" className={`${styles.primary} ${styles.primarySmall} btn-primary`} onClick={openCreate}>
+          + Скилл
         </button>
-        {items.length > 0 ? (
-          <button
-            type="button"
-            className={`${styles.export} btn-ghost`}
-            title="Скачать один .txt со всеми скиллами"
-            onClick={() => {
-              const blob = new Blob([exportAll], { type: 'text/plain;charset=utf-8' })
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url
-              a.download = 'skills_export.txt'
-              a.click()
-              URL.revokeObjectURL(url)
-            }}
-          >
-            Экспорт всех
-          </button>
-        ) : null}
+        <input
+          type="search"
+          className={styles.search}
+          placeholder="Поиск по тексту, тегам, фреймворкам…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <SelectDropdown
+          value={sortBy}
+          options={sortOptions}
+          onChange={(v) => setSortBy(v as 'date' | 'name')}
+          aria-label="Сортировка"
+          variant="toolbar"
+          className={styles.sortSelect}
+        />
       </div>
 
       {items.length === 0 ? (
-        <p className={styles.empty}>Пока нет скиллов — добавьте первый набор инструкций для вашего агента.</p>
+        <p className={styles.empty}>Пока нет скиллов — добавьте первый набор инструкций.</p>
+      ) : filtered.length === 0 ? (
+        <p className={styles.empty}>Ничего не найдено — измените запрос.</p>
       ) : (
-        <div className={styles.grid}>
-          {items.map((it) => (
+        <div key={tagPaintTick} className={`${styles.grid} ${gridClass}`}>
+          {sorted.map((it) => (
             <div key={it.id} className={styles.card}>
               <h3>{it.title}</h3>
               {it.description ? <p className={styles.desc}>{it.description}</p> : null}
-              {it.frameworks.length > 0 ? (
-                <div className={styles.tags}>
-                  {it.frameworks.map((f) => (
-                    <span key={f} className={styles.tag}>
-                      {f}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+              {chipTags(it).length > 0 ? <LibraryTagChips tags={chipTags(it)} /> : null}
               <div className={styles.previewBox}>
                 <MarkdownOutput className={styles.mdClamp}>
                   {it.body.length > 1200 ? `${it.body.slice(0, 1200)}\n\n…` : it.body}
@@ -192,7 +236,7 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
                 <DownloadIconButton
                   title="Скачать скилл как .txt"
                   onClick={() => {
-                    const text = `${it.title}\n\n${it.description}\n\nФреймворки: ${it.frameworks.join(', ')}\n\n${it.body}`
+                    const text = `${it.title}\n\n${it.description}\n\nТеги: ${it.tags.join(', ')}\nФреймворки: ${it.frameworks.join(', ')}\n\n${it.body}`
                     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
                     const url = URL.createObjectURL(blob)
                     const a = document.createElement('a')
@@ -228,15 +272,23 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
                 rows={2}
                 value={draft.description}
                 onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-                placeholder="Зачем этот скилл и когда его вызывать"
+                placeholder="Зачем этот скилл"
               />
             </label>
             <label className={styles.field}>
-              Совместимые фреймворки (через запятую)
+              Теги (через запятую)
+              <input
+                value={draft.tags}
+                onChange={(e) => setDraft((d) => ({ ...d, tags: e.target.value }))}
+                placeholder="research, rag, api…"
+              />
+            </label>
+            <label className={styles.field}>
+              Фреймворки (через запятую)
               <input
                 value={draft.frameworks}
                 onChange={(e) => setDraft((d) => ({ ...d, frameworks: e.target.value }))}
-                placeholder="LangGraph, CrewAI, OpenAI Agents…"
+                placeholder="LangGraph, CrewAI…"
               />
             </label>
             <label className={styles.field}>
@@ -246,7 +298,7 @@ export default function SkillsPanel({ onCountChange }: SkillsPanelProps) {
                 className={styles.bodyInput}
                 value={draft.body}
                 onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-                placeholder="Инструкции, шаги, формат вывода, ограничения…"
+                placeholder="Инструкции, шаги, формат вывода…"
               />
             </label>
             <div className={styles.modalActions}>

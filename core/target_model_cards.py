@@ -6,8 +6,11 @@ from __future__ import annotations
 
 import re
 
+from core.model_taxonomy import ModelType, classify_model
+
 # Ключ = семейство; значение = компактная инструкция (только для текста внутри [PROMPT])
 TARGET_MODEL_CARDS: dict[str, str] = {
+    "reasoning": """**Целевой вывод (Reasoning-модель: o1/o3/R1/QwQ):** эта модель думает самостоятельно — НЕ добавляй chain-of-thought, «думай пошагово» или пошаговые инструкции. Пиши прямые, компактные указания: роль, задача, формат вывода, ограничения. Без примеров рассуждений — модель справится сама. Чем короче и точнее — тем лучше.""",
     "claude_3_5": """**Целевой вывод (Claude 3.5 / Sonnet):** структурируй через XML-секции: <task>, <context>, <format>, <instructions>. Для пошагового разбора внутри промпта — опционально <thinking>. Для диалоговых примеров — префиксы Human:/Assistant:. Claude терпим к длинным чётким инструкциям.""",
     "claude_3": """**Целевой вывод (Claude 3):** XML-скелет <task>, <context>, <output_format>; роль и запреты — в начале текста промпта.""",
     "gpt4o": """**Целевой вывод (GPT-4o):** Markdown-заголовки и нумерованные списки для шагов; при сложной логике — явная фраза step-by-step внутри промпта. Если нужен JSON — задай схему полей в тексте промпта.""",
@@ -29,8 +32,11 @@ def resolve_target_model_family(model_id: str) -> str:
     if not raw or raw.lower() == "unknown":
         return "unknown"
 
+    if classify_model(raw) == ModelType.REASONING:
+        return "reasoning"
+
     key = raw.lower()
-    if key in TARGET_MODEL_CARDS and key != "general_large":
+    if key in TARGET_MODEL_CARDS and key not in ("general_large", "reasoning"):
         return key
 
     # OpenRouter-style ids

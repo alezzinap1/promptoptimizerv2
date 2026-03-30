@@ -10,6 +10,7 @@ from backend.deps import get_current_user, get_db, get_registry_for_user, get_se
 from core.compare_judge import run_compare_judge
 from core.context_builder import ContextBuilder
 from core.parsing import parse_reply
+from core.model_taxonomy import ModelType, classify_model, SUPPRESS_FOR_REASONING
 from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task
 from db.manager import DBManager
@@ -82,6 +83,8 @@ def compare_prompts(
         if mode == "manual" and manual:
             return [t for t in (registry.get(tid) for tid in manual) if t]
         candidates = registry.select_techniques(task_types, complexity, 6, req.target_model)
+        if classify_model(req.target_model) == ModelType.REASONING:
+            candidates = [t for t in candidates if t["id"] not in SUPPRESS_FOR_REASONING]
         if exclude_ids:
             distinct = [t for t in candidates if t["id"] not in exclude_ids]
             if distinct:
@@ -117,8 +120,8 @@ def compare_prompts(
     prompt_a = parsed_a.get("prompt_block") or result_a_text
     prompt_b = parsed_b.get("prompt_block") or result_b_text
 
-    metrics_a = analyze_prompt(prompt_a)
-    metrics_b = analyze_prompt(prompt_b)
+    metrics_a = analyze_prompt(prompt_a, model_id=req.target_model)
+    metrics_b = analyze_prompt(prompt_b, model_id=req.target_model)
     score_a = _score(metrics_a)
     score_b = _score(metrics_b)
     winner = "a" if score_a > score_b else "b" if score_b > score_a else "tie"

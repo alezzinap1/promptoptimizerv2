@@ -13,7 +13,7 @@ import AutoTextarea from '../components/AutoTextarea'
 import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
-import { CopyIconButton } from '../components/PromptToolbarIcons'
+import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
@@ -24,6 +24,13 @@ import styles from './Home.module.css'
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
 const ACTIVE_SESSION_KEY = 'prompt-engineer-active-prompt-session'
 const HOME_SPLIT_KEY = 'prompt-engineer-home-split'
+const HOME_MODE_KEY = 'prompt-engineer-home-creation-mode'
+const HOME_AGENT_SPLIT_KEY = 'prompt-engineer-home-agent-split'
+type CreationMode = 'classic' | 'agent'
+
+const AGENT_WELCOME =
+  'Опишите задачу в чате — при необходимости задам уточнения, затем соберу промпт справа. Модель генерации, целевая модель и рабочую область можно выбрать внизу.'
+
 /** Минимальная доля ширины на колонку (0–1) */
 const MIN_COL_FRAC = 0.14
 const DEFAULT_SPLIT_A = 0.33
@@ -52,7 +59,42 @@ function loadHomeSplits(): { splitA: number; splitB: number } {
   return { splitA: DEFAULT_SPLIT_A, splitB: DEFAULT_SPLIT_B }
 }
 
+function loadCreationMode(): CreationMode {
+  try {
+    const raw = localStorage.getItem(HOME_MODE_KEY)
+    if (raw === 'agent' || raw === 'classic') return raw
+  } catch {
+    /* ignore */
+  }
+  return 'classic'
+}
+
+const DEFAULT_AGENT_SPLIT = 0.38
+function loadAgentSplit(): number {
+  try {
+    const raw = localStorage.getItem(HOME_AGENT_SPLIT_KEY)
+    if (raw) {
+      const n = parseFloat(raw)
+      if (!Number.isNaN(n)) return clampSplit(n, 0.22, 0.62)
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_AGENT_SPLIT
+}
+
+type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
+
 type Technique = { id: string; name: string }
+
+function IconGlobe() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  )
+}
 
 export default function Home() {
   const location = useLocation()
@@ -96,10 +138,21 @@ export default function Home() {
   const [ideTab, setIdeTab] = useState<'spec' | 'intent' | 'issues' | 'evidence'>('spec')
   const [showIdeModal, setShowIdeModal] = useState(false)
   const [modelsData, setModelsData] = useState<OpenRouterModel[]>([])
+  const [preferredTargetModels, setPreferredTargetModels] = useState<string[]>(['unknown'])
+  const [targetModel, setTargetModel] = useState('unknown')
   const [splits, setSplits] = useState(() => loadHomeSplits())
+  const [creationMode, setCreationMode] = useState<CreationMode>(() => loadCreationMode())
+  const [agentSplit, setAgentSplit] = useState(() => loadAgentSplit())
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [baseTaskRef, setBaseTaskRef] = useState('')
   const splitRootRef = useRef<HTMLDivElement>(null)
+  const agentSplitRootRef = useRef<HTMLDivElement>(null)
+  const agentChatScrollRef = useRef<HTMLDivElement>(null)
   const [issueBannerDismissed, setIssueBannerDismissed] = useState(false)
   const lastQuestionAnswersRef = useRef<{ question: string; answers: string[] }[] | undefined>(undefined)
+  const [inputTokens, setInputTokens] = useState<{ tokens: number; method: string } | null>(null)
+  const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
 
   const GENERATION_ISSUE_TEXT: Record<GenerationIssue, string> = {
     format_failure:
@@ -122,6 +175,14 @@ export default function Home() {
         setModelLabels(labels)
         setGenerationOptions(settings.preferred_generation_models)
         setGenModel((current) => current || settings.preferred_generation_models[0] || '')
+        const targets = settings.preferred_target_models?.length
+          ? settings.preferred_target_models
+          : ['unknown']
+        setPreferredTargetModels(targets)
+        setTargetModel((prev) => {
+          if (prev !== 'unknown' && targets.includes(prev)) return prev
+          return targets[0] || 'unknown'
+        })
         const items = techniquesRes.techniques.map((item) => ({
           id: String(item.id),
           name: String(item.name || item.id),
@@ -137,6 +198,18 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    localStorage.setItem(HOME_MODE_KEY, creationMode)
+  }, [creationMode])
+
+  useEffect(() => {
+    if (creationMode !== 'agent') return
+    setChatMessages((msgs) => {
+      if (msgs.length > 0) return msgs
+      return [{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }]
+    })
+  }, [creationMode])
+
+  useEffect(() => {
     const state = location.state as {
       prefillTask?: string
       clearResult?: boolean
@@ -148,11 +221,19 @@ export default function Home() {
       return
     }
     if (state?.prefillTask) {
-      setTaskInput(state.prefillTask)
+      const t = state.prefillTask
+      setTaskInput(t)
+      setBaseTaskRef(t)
+      if (creationMode === 'agent') {
+        setChatMessages([
+          { id: 'welcome', role: 'assistant', content: AGENT_WELCOME },
+          { id: crypto.randomUUID(), role: 'user', content: t },
+        ])
+      }
       if (state.clearResult) setResult(null)
       navigate(location.pathname, { replace: true, state: null })
     }
-  }, [location.pathname, location.state, navigate])
+  }, [location.pathname, location.state, navigate, creationMode])
 
   useEffect(() => {
     localStorage.setItem(ACTIVE_WORKSPACE_KEY, String(workspaceId))
@@ -163,6 +244,14 @@ export default function Home() {
   }, [workspaceId])
 
   useEffect(() => {
+    const ws = workspaces.find((w) => w.id != null && w.id === workspaceId)
+    const pref = ws?.config?.preferred_target_model
+    if (pref && pref !== 'unknown') {
+      setTargetModel(pref)
+    }
+  }, [workspaceId, workspaces])
+
+  useEffect(() => {
     if (sessionId) {
       localStorage.setItem(ACTIVE_SESSION_KEY, sessionId)
       api.getSessionVersions(sessionId).then((r) => setVersions(r.items)).catch(() => setVersions([]))
@@ -171,6 +260,29 @@ export default function Home() {
       setVersions([])
     }
   }, [sessionId])
+
+  useEffect(() => {
+    setQuestionCarouselIdx(0)
+  }, [result?.has_questions, result?.questions])
+
+  useEffect(() => {
+    if (creationMode !== 'agent') return
+    const el = agentChatScrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [creationMode, chatMessages, result?.has_questions, result?.questions, loading, error])
+
+  useEffect(() => {
+    const text = iterationMode ? feedback : taskInput
+    if (!text.trim()) {
+      setInputTokens(null)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      api.countTokens(text, genModel).then(setInputTokens).catch(() => {})
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [taskInput, feedback, iterationMode, genModel])
 
   const ideOverrides = useMemo(
     () => ({
@@ -203,7 +315,7 @@ export default function Home() {
       try {
         const res = await api.previewPromptIde({
           task_input: taskInput,
-          target_model: 'unknown',
+          target_model: targetModel,
           workspace_id: workspaceId || null,
           previous_prompt: iterationMode ? result?.prompt_block : undefined,
           technique_mode: techniqueMode,
@@ -229,21 +341,53 @@ export default function Home() {
     }, 350)
 
     return () => window.clearTimeout(timer)
-  }, [taskInput, workspaceId, techniqueMode, manualTechs, iterationMode, result?.prompt_block, ideOverrides, evidenceDecisions, previewSeed])
+  }, [
+    taskInput,
+    workspaceId,
+    targetModel,
+    techniqueMode,
+    manualTechs,
+    iterationMode,
+    result?.prompt_block,
+    ideOverrides,
+    evidenceDecisions,
+    previewSeed,
+  ])
 
-  const handleGenerate = async (questionAnswers?: { question: string; answers: string[] }[]) => {
-    if (!taskInput.trim()) return
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  type GenerateOptions = {
+    taskInputOverride?: string
+    feedbackOverride?: string
+    forceIteration?: boolean
+    previousPromptOverride?: string
+    skipAgentChatReplies?: boolean
+  }
+
+  const handleGenerate = async (
+    questionAnswers?: { question: string; answers: string[] }[],
+    opts?: GenerateOptions,
+  ) => {
+    const effectiveTask = (opts?.taskInputOverride ?? taskInput).trim()
+    if (!effectiveTask) return
+    if (creationMode === 'classic') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
     lastQuestionAnswersRef.current = questionAnswers
     setIssueBannerDismissed(false)
     setLoading(true)
     setError(null)
+    const isIteration =
+      opts?.forceIteration !== undefined ? opts.forceIteration : iterationMode
+    const feedbackText = isIteration ? (opts?.feedbackOverride ?? feedback).trim() : ''
+    const previousPrompt =
+      isIteration
+        ? opts?.previousPromptOverride ?? result?.prompt_block
+        : undefined
     try {
       const req: GenerateRequest = {
-        task_input: taskInput.trim(),
-        feedback: iterationMode ? feedback : '',
+        task_input: effectiveTask,
+        feedback: isIteration ? feedbackText : '',
         gen_model: genModel,
-        target_model: 'unknown',
+        target_model: targetModel,
         domain: 'auto',
         technique_mode: techniqueMode,
         manual_techs: techniqueMode === 'manual' ? manualTechs : [],
@@ -252,7 +396,7 @@ export default function Home() {
         top_k: topK === '' ? undefined : topK,
         questions_mode: questionsMode && !questionAnswers?.length,
         session_id: sessionId || undefined,
-        previous_prompt: iterationMode && result ? result.prompt_block : undefined,
+        previous_prompt: previousPrompt && previousPrompt.trim() ? previousPrompt : undefined,
         workspace_id: workspaceId || null,
         prompt_spec_overrides: ideOverrides,
         evidence_decisions: evidenceDecisions,
@@ -261,9 +405,62 @@ export default function Home() {
       const res = await api.generate(req)
       setResult(res)
       setSessionId(res.session_id)
-      pushRecentSession(res.session_id, taskInput.trim())
+      pushRecentSession(res.session_id, effectiveTask)
       setIterationMode(false)
       setQuestionState({})
+      setQuickSaved(false)
+      if (creationMode === 'agent' && !opts?.skipAgentChatReplies) {
+        if (res.has_prompt) {
+          const thinkingParts: string[] = []
+          if (res.techniques?.length) {
+            thinkingParts.push(`**Техники:** ${res.techniques.map((t) => t.name).join(', ')}`)
+          }
+          if (res.reasoning) {
+            const short = res.reasoning.length > 400 ? res.reasoning.slice(0, 400) + '…' : res.reasoning
+            thinkingParts.push(short)
+          }
+          if (res.metrics) {
+            const score = Number(res.metrics.completeness_score ?? res.metrics.quality_score ?? 0)
+            const tokens = Number(res.metrics.token_estimate ?? 0)
+            const parts: string[] = []
+            if (score > 0) parts.push(`полнота ${score}%`)
+            if (tokens > 0) parts.push(`≈${tokens.toLocaleString()} токенов`)
+            if (parts.length) thinkingParts.push(`**Оценка:** ${parts.join(' · ')}`)
+          }
+          if (res.metrics && Array.isArray(res.metrics.improvement_tips) && (res.metrics.improvement_tips as string[]).length > 0) {
+            thinkingParts.push(`**Можно улучшить:** ${(res.metrics.improvement_tips as string[]).join('; ')}`)
+          }
+          if (thinkingParts.length > 0) {
+            setChatMessages((m) => [
+              ...m,
+              {
+                id: crypto.randomUUID(),
+                role: 'assistant' as const,
+                content: `__thinking__\n${thinkingParts.join('\n\n')}`,
+              },
+            ])
+          }
+          setChatMessages((m) => [
+            ...m,
+            {
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content:
+                'Готово — промпт справа. Напишите в чат, что изменить.',
+            },
+          ])
+        } else if (res.has_questions && (res.questions?.length || 0) > 0) {
+          setChatMessages((m) => [
+            ...m,
+            {
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content:
+                'Нужны уточнения: отметьте варианты в блоке ниже и нажмите «Создать промпт с этими ответами».',
+            },
+          ])
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка генерации')
     } finally {
@@ -273,8 +470,92 @@ export default function Home() {
 
   const handleRetryGeneration = () => {
     const qa = lastQuestionAnswersRef.current
-    void handleGenerate(qa !== undefined ? qa : undefined)
+    const taskOverride =
+      creationMode === 'agent' ? (baseTaskRef || taskInput).trim() || undefined : undefined
+    void handleGenerate(qa !== undefined ? qa : undefined, taskOverride ? { taskInputOverride: taskOverride } : undefined)
   }
+
+  const resetAgentDialog = () => {
+    setChatMessages([{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }])
+    setChatInput('')
+    setBaseTaskRef('')
+    setTaskInput('')
+    setFeedback('')
+    setResult(null)
+    setSessionId(null)
+    setIterationMode(false)
+    setQuestionState({})
+    setError(null)
+    localStorage.removeItem(ACTIVE_SESSION_KEY)
+  }
+
+  const handleAgentSend = () => {
+    const text = chatInput.trim()
+    if (!text || loading) return
+    if (result?.has_questions && !result?.has_prompt) {
+      setError('Сначала ответьте на вопросы в блоке ниже.')
+      return
+    }
+    setChatInput('')
+    setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: text }])
+    setError(null)
+
+    if (result?.has_prompt && result.prompt_block) {
+      void handleGenerate(undefined, {
+        taskInputOverride: (baseTaskRef || taskInput).trim(),
+        feedbackOverride: text,
+        forceIteration: true,
+        previousPromptOverride: result.prompt_block,
+      })
+      return
+    }
+
+    const base = (baseTaskRef || taskInput).trim()
+    if (!base) {
+      setBaseTaskRef(text)
+      setTaskInput(text)
+      void handleGenerate(undefined, { taskInputOverride: text })
+      return
+    }
+
+    const merged = `${base}\n\nДополнение: ${text}`
+    setBaseTaskRef(merged)
+    setTaskInput(merged)
+    void handleGenerate(undefined, { taskInputOverride: merged })
+  }
+
+  const startAgentSplitDrag = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const root = agentSplitRootRef.current
+      if (!root) return
+      const w = Math.max(root.getBoundingClientRect().width, 1)
+      const startX = e.clientX
+      const s0 = agentSplit
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX
+        const dFrac = dx / w
+        const next = clampSplit(s0 + dFrac, 0.22, 0.62)
+        setAgentSplit(next)
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        document.body.style.removeProperty('cursor')
+        document.body.style.removeProperty('user-select')
+        setAgentSplit((cur) => {
+          localStorage.setItem(HOME_AGENT_SPLIT_KEY, String(cur))
+          return cur
+        })
+      }
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [agentSplit],
+  )
 
   const startSplitDrag = useCallback(
     (which: 1 | 2) => (e: React.MouseEvent) => {
@@ -318,6 +599,8 @@ export default function Home() {
     [splits.splitA, splits.splitB],
   )
 
+  const [quickSaved, setQuickSaved] = useState(false)
+
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
     const title = saveTitle.trim() || suggestLibraryTitle(taskInput)
@@ -325,7 +608,7 @@ export default function Home() {
       title,
       prompt: result.prompt_block,
       tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
-      target_model: 'unknown',
+      target_model: targetModel,
       task_type: result.task_types?.[0] || 'general',
       techniques: result.technique_ids,
       notes: saveNotes,
@@ -334,6 +617,22 @@ export default function Home() {
     setShowSaveDialog(false)
     setSaveNotes('')
     setSaveTags('')
+    setQuickSaved(true)
+  }
+
+  const handleQuickSave = async () => {
+    if (!result?.prompt_block) return
+    const title = suggestLibraryTitle(taskInput)
+    await api.saveToLibrary({
+      title,
+      prompt: result.prompt_block,
+      tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
+      target_model: targetModel,
+      task_type: result.task_types?.[0] || 'general',
+      techniques: result.technique_ids,
+    })
+    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+    setQuickSaved(true)
   }
 
   const taskSummary = preview
@@ -348,9 +647,12 @@ export default function Home() {
     if (cost < 0.0001) return '<$0.0001'
     return `~$${cost.toFixed(4)}`
   }
-  const promptCostStr = result?.gen_model && result?.metrics?.token_estimate
-    ? estimatePromptCost(result.gen_model, Number(result.metrics.token_estimate))
-    : null
+  const costModelId =
+    result?.target_model && result.target_model !== 'unknown' ? result.target_model : result?.gen_model
+  const promptCostStr =
+    costModelId && result?.metrics?.token_estimate
+      ? estimatePromptCost(costModelId, Number(result.metrics.token_estimate))
+      : null
   const previewEvidenceCount = Object.keys(preview?.evidence || {}).length
   const previewIntentCount = preview?.intent_graph?.length || 0
   const tokenEstimate = Number(result?.metrics?.token_estimate ?? 0)
@@ -363,6 +665,19 @@ export default function Home() {
         return { value: id, label: shortGenerationModelLabel(full), title: full }
       }),
     [generationOptions, modelLabels],
+  )
+
+  const targetModelSelectOptions = useMemo(
+    () =>
+      preferredTargetModels.map((id) => ({
+        value: id,
+        label:
+          id === 'unknown'
+            ? 'Любая модель'
+            : shortGenerationModelLabel(modelLabels[id] || id),
+        title: id === 'unknown' ? 'Промпт без привязки к конкретной модели' : modelLabels[id] || id,
+      })),
+    [preferredTargetModels, modelLabels],
   )
   const ideOutputFormatOptions = useMemo(
     () => [
@@ -381,10 +696,25 @@ export default function Home() {
     <div className={styles.columnStack}>
       <section className={`${styles.panel} ${styles.taskPanel}`}>
         <div className={styles.panelHeader}>
-          <h2 className="pageTitleGradient">{iterationMode ? 'Итерация' : 'Задача'}</h2>
+          <div className={styles.taskTitleWithSwitch}>
+            <h2 className="pageTitleGradient">{iterationMode ? 'Итерация' : 'Задача'}</h2>
+            <button
+              type="button"
+              className={styles.creationModeFlip}
+              title="Режим агента: чат слева"
+              aria-label="Переключить на режим агента"
+              onClick={() => setCreationMode('agent')}
+            >
+              ◇
+            </button>
+          </div>
           <div className={styles.panelHeaderEnd}>
-            <span className={cb.metaMuted} title="Оценка по последней генерации">
-              Токенов: {tokenEstimate ? tokenEstimate.toLocaleString() : '—'}
+            <span className={cb.metaMuted} title={inputTokens ? `Метод: ${inputTokens.method === 'tiktoken' ? 'точный (tiktoken)' : 'приблизительный'}` : 'Оценка по последней генерации'}>
+              {inputTokens
+                ? `${inputTokens.tokens.toLocaleString()} ${inputTokens.method === 'tiktoken' ? 'токенов' : '≈ токенов'}`
+                : tokenEstimate
+                  ? `${tokenEstimate.toLocaleString()} токенов`
+                  : ''}
               {promptCostStr ? ` · ${promptCostStr}` : ''}
             </span>
             {(iterationMode ? feedback.trim() : taskInput.trim()) ? (
@@ -429,24 +759,26 @@ export default function Home() {
                   footerLink={{ to: '/models', label: 'Добавить модель' }}
                 />
                 <WorkspacePicker workspaces={workspaces} workspaceId={workspaceId} onSelect={setWorkspaceId} />
-                <div className={styles.techSegment} role="group" aria-label="Режим техник">
-                  <button
-                    type="button"
-                    className={`${styles.techSegmentBtn} ${techniqueMode === 'auto' ? styles.techSegmentBtnActive : ''}`}
-                    aria-pressed={techniqueMode === 'auto'}
-                    onClick={() => setTechniqueMode('auto')}
-                  >
-                    Авто
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.techSegmentBtn} ${techniqueMode === 'manual' ? styles.techSegmentBtnActive : ''}`}
-                    aria-pressed={techniqueMode === 'manual'}
-                    onClick={() => setTechniqueMode('manual')}
-                  >
-                    Вручную
-                  </button>
-                </div>
+                <SelectDropdown
+                  value={targetModel}
+                  options={targetModelSelectOptions}
+                  onChange={setTargetModel}
+                  aria-label="Модель, для которой пишется промпт"
+                  variant="composer"
+                  footerLink={{ to: '/models', label: 'Каталог моделей' }}
+                  triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
+                  triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
+                />
+                <button
+                  type="button"
+                  className={styles.techModeMicro}
+                  title={techniqueMode === 'auto' ? 'Техники: авто — нажмите для выбора вручную' : 'Техники: вручную — нажмите для авто'}
+                  aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
+                  aria-pressed={techniqueMode === 'manual'}
+                  onClick={() => setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))}
+                >
+                  {techniqueMode === 'auto' ? 'A' : '✎'}
+                </button>
                 <button
                   type="button"
                   className={cb.composerGhostBtn}
@@ -541,36 +873,113 @@ export default function Home() {
     </div>
   )
 
-  return (
-    <div className={styles.home}>
-      {loading && (
-        <div className={styles.loadingBar}>
-          <div className={styles.loadingBarGradient} />
-          <span className={styles.loadingBarText}>
-            {iterationMode ? 'Обновляю промпт...' : 'Генерирую промпт...'}
-          </span>
-        </div>
-      )}
+  const questionGenOpts: GenerateOptions | undefined =
+    creationMode === 'agent' && (baseTaskRef || taskInput).trim()
+      ? { taskInputOverride: (baseTaskRef || taskInput).trim() }
+      : undefined
 
-      <div ref={splitRootRef} className={styles.splitRoot}>
-          <div
-            className={styles.splitPane}
-            style={{ flex: `${splits.splitA} 1 0%`, minWidth: 0 }}
-          >
-            {renderTaskColumn()}
+  const renderQuestionsPanel = (placement: 'classic' | 'agent' = 'classic') => {
+    const compact = placement === 'agent'
+    const qs = result?.questions || []
+    const total = qs.length
+    if (total === 0) return null
+    const idx = Math.min(Math.max(0, questionCarouselIdx), total - 1)
+    const q = qs[idx]
+    const state = questionState[idx] || { options: [], custom: '' }
+
+    return (
+      <div className={`${styles.questionBox} ${compact ? styles.questionBoxCompact : ''} ${styles.questionCarousel}`}>
+        <p className={styles.questionCarouselMeta}>
+          Вопрос {idx + 1} из {total}
+        </p>
+        <p className={styles.info}>
+          Отметьте варианты или допишите свой ответ. Листайте стрелками между вопросами.
+        </p>
+        <div className={`${styles.questionItem} ${compact ? styles.questionItemCompact : ''}`}>
+          <strong>
+            {idx + 1}. {q.question}
+          </strong>
+          <div className={checkboxList.optionChecks} role="group" aria-label={`Варианты для вопроса ${idx + 1}`}>
+            {q.options.map((option, optIdx) => (
+              <label key={`${idx}-${optIdx}-${option}`} className={checkboxList.optionCheck}>
+                <input
+                  type="checkbox"
+                  checked={state.options.includes(option)}
+                  onChange={() => {
+                    setQuestionState((prev) => {
+                      const cur = prev[idx] ?? { options: [], custom: '' }
+                      const on = cur.options.includes(option)
+                      const nextOpts = on ? cur.options.filter((x) => x !== option) : [...cur.options, option]
+                      return { ...prev, [idx]: { ...cur, options: nextOpts } }
+                    })
+                  }}
+                />
+                <span>{option}</span>
+              </label>
+            ))}
           </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Граница колонок «Задача» и «Разбор задачи» — перетащите для изменения ширины"
-            className={styles.splitGutter}
-            onMouseDown={startSplitDrag(1)}
+          <input
+            value={state.custom}
+            placeholder="Свой ответ (добавится к выбранным)"
+            onChange={(e) =>
+              setQuestionState((prev) => {
+                const cur = prev[idx] ?? { options: [], custom: '' }
+                return { ...prev, [idx]: { ...cur, custom: e.target.value } }
+              })
+            }
           />
-          <div
-            className={styles.splitPane}
-            style={{ flex: `${splits.splitB - splits.splitA} 1 0%`, minWidth: 0 }}
+        </div>
+        <div className={styles.questionCarouselNav}>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={idx <= 0}
+            onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
           >
-        <section className={`${styles.panel} ${styles.ideColumn} ${styles.bareColumn}`}>
+            ← Назад
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={idx >= total - 1}
+            onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
+          >
+            Вперёд →
+          </button>
+        </div>
+        <div className={styles.actions}>
+          <button type="button" className="btn-ghost" onClick={() => handleGenerate([], questionGenOpts)}>
+            Пропустить все
+          </button>
+          <button
+            type="button"
+            className={`${styles.primaryAction} btn-primary`}
+            onClick={() =>
+              handleGenerate(
+                qs.map((qq, i) => ({
+                  question: qq.question,
+                  answers: [
+                    ...(questionState[i]?.options || []),
+                    ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
+                  ],
+                })),
+                questionGenOpts,
+              )
+            }
+          >
+            Создать промпт с этими ответами
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const ideSection = (
+        <section
+          className={`${styles.panel} ${styles.ideColumn} ${styles.bareColumn} ${
+            creationMode === 'agent' ? styles.agentStackSection : ''
+          }`}
+        >
           {preview ? (
             <div className={styles.ideBox}>
               <div className={styles.ideHeader}>
@@ -698,19 +1107,14 @@ export default function Home() {
             </div>
           )}
         </section>
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Граница колонок «Разбор задачи» и «Результат» — перетащите для изменения ширины"
-            className={styles.splitGutter}
-            onMouseDown={startSplitDrag(2)}
-          />
-          <div
-            className={styles.splitPane}
-            style={{ flex: `${1 - splits.splitB} 1 0%`, minWidth: 0 }}
-          >
-        <section className={`${styles.panel} ${styles.resultColumn} ${styles.bareColumn}`}>
+  )
+
+  const resultSection = (
+        <section
+          className={`${styles.panel} ${styles.resultColumn} ${styles.bareColumn} ${
+            creationMode === 'agent' ? styles.agentStackSection : ''
+          }`}
+        >
           <h2 className="pageTitleGradient">Результат</h2>
           {result?.generation_issue && !issueBannerDismissed && (
             <div className={styles.issueBanner} role="alert">
@@ -730,7 +1134,7 @@ export default function Home() {
               </div>
             </div>
           )}
-          {error && <p className={styles.error}>{error}</p>}
+          {creationMode === 'classic' && error && <p className={styles.error}>{error}</p>}
           {!result && !error && (
             <div className={`${styles.resultPlaceholder} ${loading ? styles.resultPlaceholderLoading : ''}`}>
               <div className={styles.resultPlaceholderIcon} aria-hidden>
@@ -743,19 +1147,55 @@ export default function Home() {
               </div>
               <p className={styles.resultPlaceholderTitle}>Промпт появится здесь</p>
               <p className={styles.resultPlaceholderHint}>
-                Опишите задачу в левой колонке и нажмите кнопку отправки, чтобы создать промпт.
+                {creationMode === 'agent'
+                  ? 'Промпт появится здесь после диалога слева.'
+                  : 'Опишите задачу в левой колонке и нажмите кнопку отправки, чтобы создать промпт.'}
               </p>
             </div>
           )}
           {result?.has_prompt && (
             <>
-              <div className={styles.promptToolbar}>
-                <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
+              <div className={styles.evalStrip}>
+                <div className={styles.evalStripLeft}>
+                  {result.metrics && (() => {
+                    const score = Number(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)
+                    return score > 0 ? (
+                      <div className={styles.evalBar} title={`Полнота: ${score}%`}>
+                        <div className={styles.evalBarFill} style={{ width: `${Math.min(100, score)}%` }} />
+                        <span className={styles.evalBarLabel}>{score}%</span>
+                      </div>
+                    ) : null
+                  })()}
+                  {tokenEstimate > 0 && (
+                    <span className={styles.evalMeta}>≈{tokenEstimate.toLocaleString()} tok</span>
+                  )}
+                  {promptCostStr && <span className={styles.evalMeta}>{promptCostStr}</span>}
+                  {result.technique_ids?.length > 0 && (
+                    <span className={styles.evalMeta}>{result.technique_ids.length} техн.</span>
+                  )}
+                </div>
+                <div className={styles.promptToolbar}>
+                  <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
+                  <TryInGeminiButton prompt={result.prompt_block} title="Попробовать в Gemini" />
+                  {creationMode === 'agent' && !quickSaved && (
+                    <button
+                      type="button"
+                      className={styles.quickSaveBtn}
+                      title="Быстро сохранить в библиотеку"
+                      onClick={handleQuickSave}
+                    >
+                      ♡
+                    </button>
+                  )}
+                  {creationMode === 'agent' && quickSaved && (
+                    <span className={styles.quickSavedMark} title="Сохранено">♥</span>
+                  )}
+                </div>
               </div>
               <div className={styles.resultMarkdownWrap}>
                 <MarkdownOutput>{result.prompt_block}</MarkdownOutput>
               </div>
-              {result.reasoning && (
+              {result.reasoning && creationMode === 'classic' && (
                 <details>
                   <summary>Почему именно эти техники?</summary>
                   <div className={styles.preToolbar}>
@@ -819,27 +1259,25 @@ export default function Home() {
                   )}
                 </>
               )}
-              {result.metrics && (
-                <div className={styles.metricsBox}>
-                  <h3>Метрики промпта</h3>
-                  <div className={styles.metricGrid}>
-                    <div><strong>Токены:</strong> {String(result.metrics.token_estimate ?? 0)}</div>
-                    {promptCostStr && <div><strong>Оценка стоимости:</strong> {promptCostStr}</div>}
-                    <div><strong>Инструкции:</strong> {String(result.metrics.instruction_count ?? 0)}</div>
-                    <div><strong>Ограничения:</strong> {String(result.metrics.constraint_count ?? 0)}</div>
-                    <div><strong>Полнота:</strong> {String(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)}%</div>
-                  </div>
-                  {Array.isArray(result.metrics.improvement_tips) && result.metrics.improvement_tips.length > 0 && (
-                    <details>
-                      <summary>Советы по улучшению</summary>
-                      <ul>
-                        {(result.metrics.improvement_tips as string[]).map((tip, idx) => (
-                          <li key={idx}>{tip}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
+              {result.target_model_type === 'reasoning' && (
+                <div className={styles.reasoningBadge}>
+                  Reasoning-модель — техники адаптированы: убраны CoT и step-by-step, промпт компактнее
                 </div>
+              )}
+              {result.metrics && Array.isArray(result.metrics.improvement_tips) && result.metrics.improvement_tips.length > 0 && (
+                <div className={styles.tipsBox}>
+                  <strong>Что можно улучшить:</strong>
+                  <ul>
+                    {(result.metrics.improvement_tips as string[]).map((tip, idx) => (
+                      <li key={idx}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {result?.has_prompt && (
+                <p className={styles.strategicHint}>
+                  Оценка полноты смотрит на структуру промпта, а не на ответ в чате. Перед важным использованием проверьте текст в своей модели.
+                </p>
               )}
               <div className={styles.actions}>
                 <button
@@ -857,7 +1295,9 @@ export default function Home() {
                 >
                   Скачать .txt
                 </button>
-                <button type="button" className={`${styles.iterateBtn} btn-primary`} onClick={() => setIterationMode(true)}>Итерировать</button>
+                {creationMode !== 'agent' ? (
+                  <button type="button" className={`${styles.iterateBtn} btn-primary`} onClick={() => setIterationMode(true)}>Итерировать</button>
+                ) : null}
                 <button type="button" className="btn-secondary" onClick={() => navigate('/compare', { state: { taskInput: result.task_input || taskInput } })}>Сравнить</button>
                 <button
                   type="button"
@@ -894,26 +1334,33 @@ export default function Home() {
                 </div>
               )}
               {versions.length > 1 && (
-                <details className={styles.resultSection}>
-                  <summary>История версий ({versions.length})</summary>
-                  <div className={styles.versionList}>
-                    {([...versions].reverse()).map((item, idx) => {
+                <div className={styles.versionTimeline}>
+                  <div className={styles.versionTimelineHeader}>
+                    <span className={styles.versionTimelineLabel}>Версии</span>
+                    <span className={styles.versionTimelineCount}>{versions.length}</span>
+                  </div>
+                  <div className={styles.versionPills}>
+                    {([...versions].reverse()).map((item) => {
                       const v = item as Record<string, unknown>
+                      const m = (v.metrics || {}) as Record<string, unknown>
+                      const score = Number(m.completeness_score ?? m.quality_score ?? 0)
+                      const tok = Number(m.token_estimate ?? 0)
+                      const isCurrent = result?.prompt_block === String(v.final_prompt || '')
                       return (
-                        <div key={idx} className={styles.versionCard}>
-                          <div>
-                            <strong>v{String(v.version)}</strong> · {String(v.created_at || '')}
-                          </div>
-                          <div className={styles.actions}>
-                            <button onClick={() => setResult((prev) => prev ? { ...prev, prompt_block: String(v.final_prompt || '') } : prev)}>
-                              Загрузить
-                            </button>
-                          </div>
-                        </div>
+                        <button
+                          key={String(v.version)}
+                          type="button"
+                          className={`${styles.versionPill} ${isCurrent ? styles.versionPillActive : ''}`}
+                          title={`v${String(v.version)} · ${String(v.created_at || '')}${score ? ` · ${score}%` : ''}${tok ? ` · ≈${tok} tok` : ''}`}
+                          onClick={() => setResult((prev) => prev ? { ...prev, prompt_block: String(v.final_prompt || '') } : prev)}
+                        >
+                          <span className={styles.versionPillNum}>v{String(v.version)}</span>
+                          {score > 0 && <span className={styles.versionPillScore}>{score}%</span>}
+                        </button>
                       )
                     })}
                   </div>
-                </details>
+                </div>
               )}
             </>
           )}
@@ -934,69 +1381,252 @@ export default function Home() {
               </details>
             </div>
           )}
-          {result?.has_questions && !result?.has_prompt && (
-            <div className={styles.questionBox}>
-              <p className={styles.info}>
-                Отметь один или несколько вариантов (чекбоксы). При необходимости допиши свой ответ в поле ниже.
-              </p>
-              {(result.questions || []).map((q, idx) => {
-                const state = questionState[idx] || { options: [], custom: '' }
-                return (
-                  <div key={idx} className={styles.questionItem}>
-                    <strong>{idx + 1}. {q.question}</strong>
-                    <div className={checkboxList.optionChecks} role="group" aria-label={`Варианты для вопроса ${idx + 1}`}>
-                      {q.options.map((option, optIdx) => (
-                        <label key={`${idx}-${optIdx}-${option}`} className={checkboxList.optionCheck}>
+          {creationMode === 'classic' && result?.has_questions && !result?.has_prompt && renderQuestionsPanel('classic')}
+        </section>
+  )
+
+  return (
+    <div className={`${styles.home} ${styles.homeFlexFill}`}>
+      {loading && creationMode === 'classic' && (
+        <div className={styles.loadingBar}>
+          <div className={styles.loadingBarGradient} />
+          <span className={styles.loadingBarText}>
+            {iterationMode ? 'Обновляю промпт...' : 'Генерирую промпт...'}
+          </span>
+        </div>
+      )}
+
+      {creationMode === 'classic' ? (
+        <div ref={splitRootRef} className={`${styles.splitRoot} ${styles.splitRootFill}`}>
+          <div className={styles.splitPane} style={{ flex: `${splits.splitA} 1 0%`, minWidth: 0 }}>
+            {renderTaskColumn()}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Граница колонок «Задача» и «Разбор задачи» — перетащите для изменения ширины"
+            className={styles.splitGutter}
+            onMouseDown={startSplitDrag(1)}
+          />
+          <div className={styles.splitPane} style={{ flex: `${splits.splitB - splits.splitA} 1 0%`, minWidth: 0 }}>
+            {ideSection}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Граница колонок «Разбор задачи» и «Результат» — перетащите для изменения ширины"
+            className={styles.splitGutter}
+            onMouseDown={startSplitDrag(2)}
+          />
+          <div className={styles.splitPane} style={{ flex: `${1 - splits.splitB} 1 0%`, minWidth: 0 }}>
+            {resultSection}
+          </div>
+        </div>
+      ) : (
+        <div ref={agentSplitRootRef} className={`${styles.splitRoot} ${styles.splitRootFill}`}>
+          <div
+            className={`${styles.splitPane} ${styles.splitPaneAgentChat}`}
+            style={{ flex: `${agentSplit} 1 0%`, minWidth: 0 }}
+          >
+            <div className={styles.agentChatColumn}>
+              <div className={styles.agentChatHeader}>
+                <div className={styles.agentTaskTitleRow}>
+                  <h2 className="pageTitleGradient">Задача</h2>
+                  <button
+                    type="button"
+                    className={styles.creationModeFlip}
+                    title="Классический вид: три колонки"
+                    aria-label="Переключить на классический режим"
+                    onClick={() => setCreationMode('classic')}
+                  >
+                    ▦
+                  </button>
+                </div>
+                <button type="button" className={styles.agentNewChatBtn} onClick={resetAgentDialog}>
+                  Новый диалог
+                </button>
+              </div>
+              <div className={styles.agentChatBody}>
+                <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
+                  {chatMessages.map((m) => {
+                    const isThinking = m.role === 'assistant' && m.content.startsWith('__thinking__\n')
+                    const displayContent = isThinking ? m.content.slice('__thinking__\n'.length) : m.content
+                    return (
+                      <div
+                        key={m.id}
+                        className={
+                          m.role === 'user'
+                            ? styles.chatBubbleUser
+                            : isThinking
+                              ? styles.chatBubbleThinking
+                              : styles.chatBubbleAssistant
+                        }
+                      >
+                        {isThinking && <span className={styles.thinkingLabel}>Размышления</span>}
+                        <MarkdownOutput>{displayContent}</MarkdownOutput>
+                      </div>
+                    )
+                  })}
+                  {loading && (
+                    <div className={styles.agentThinking} aria-live="polite">
+                      <span className={styles.agentThinkingInner}>Думаю над промптом и уточнениями…</span>
+                    </div>
+                  )}
+                  {result?.has_questions && !result?.has_prompt && renderQuestionsPanel('agent')}
+                  {error && <p className={styles.error}>{error}</p>}
+                </div>
+              </div>
+              <div className={styles.agentChatComposerHost}>
+              <div className={cb.composer}>
+                <AutoTextarea
+                  className={cb.composerTextarea}
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Опишите задачу или попросите изменить промпт…"
+                  minHeightPx={72}
+                  maxHeightPx={280}
+                  spellCheck
+                />
+                <div className={cb.composerFooter}>
+                  <div className={cb.composerFooterRow}>
+                    <div className={cb.composerFooterMid}>
+                      <SelectDropdown
+                        value={genModel}
+                        options={genModelSelectOptions}
+                        onChange={setGenModel}
+                        aria-label="Модель генерации"
+                        variant="composer"
+                        footerLink={{ to: '/models', label: 'Добавить модель' }}
+                      />
+                      <WorkspacePicker workspaces={workspaces} workspaceId={workspaceId} onSelect={setWorkspaceId} />
+                      <SelectDropdown
+                        value={targetModel}
+                        options={targetModelSelectOptions}
+                        onChange={setTargetModel}
+                        aria-label="Модель, для которой пишется промпт"
+                        variant="composer"
+                        footerLink={{ to: '/models', label: 'Каталог моделей' }}
+                        triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
+                        triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
+                      />
+                      <button
+                        type="button"
+                        className={styles.techModeMicro}
+                        title={techniqueMode === 'auto' ? 'Техники: авто — нажмите для выбора вручную' : 'Техники: вручную — нажмите для авто'}
+                        aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
+                        aria-pressed={techniqueMode === 'manual'}
+                        onClick={() => setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))}
+                      >
+                        {techniqueMode === 'auto' ? 'A' : '✎'}
+                      </button>
+                      <button
+                        type="button"
+                        className={cb.composerGhostBtn}
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                      >
+                        {showAdvanced ? 'Меньше' : 'Доп.'}
+                      </button>
+                    </div>
+                    <div className={cb.composerFooterEnd}>
+                      <button
+                        type="button"
+                        className={cb.composerSend}
+                        onClick={handleAgentSend}
+                        disabled={!chatInput.trim() || loading}
+                        title="Отправить в чат"
+                        aria-label="Отправить в чат"
+                      >
+                        {loading ? <span className={cb.composerSendSpinner} aria-hidden /> : <span aria-hidden>↑</span>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {techniqueMode === 'manual' && (
+                  <div className={`${cb.composerInset} ${styles.techPickerInset}`}>
+                    <div className={styles.techPickerHead}>
+                      <span className={styles.techListLabel}>Техники</span>
+                      {manualTechs.length > 0 ? (
+                        <span className={styles.techPickCount}>Выбрано: {manualTechs.length}</span>
+                      ) : null}
+                    </div>
+                    <div className={checkboxList.gridWrap} role="group" aria-label="Выбор техник для генерации">
+                      {techniques.map((t) => (
+                        <label key={t.id} className={checkboxList.optionCheck}>
                           <input
                             type="checkbox"
-                            checked={state.options.includes(option)}
+                            checked={manualTechs.includes(t.id)}
                             onChange={() => {
-                              setQuestionState((prev) => {
-                                const cur = prev[idx] ?? { options: [], custom: '' }
-                                const on = cur.options.includes(option)
-                                const nextOpts = on
-                                  ? cur.options.filter((x) => x !== option)
-                                  : [...cur.options, option]
-                                return { ...prev, [idx]: { ...cur, options: nextOpts } }
-                              })
+                              setManualTechs((prev) =>
+                                prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                              )
                             }}
                           />
-                          <span>{option}</span>
+                          <span>{t.name}</span>
                         </label>
                       ))}
                     </div>
-                    <input
-                      value={state.custom}
-                      placeholder="Свой ответ (добавится к выбранным)"
-                      onChange={(e) => setQuestionState((prev) => {
-                        const cur = prev[idx] ?? { options: [], custom: '' }
-                        return { ...prev, [idx]: { ...cur, custom: e.target.value } }
-                      })}
-                    />
                   </div>
-                )
-              })}
-              <div className={styles.actions}>
-                <button type="button" className="btn-ghost" onClick={() => handleGenerate([])}>Пропустить все</button>
-                <button
-                  type="button"
-                  className={`${styles.primaryAction} btn-primary`}
-                  onClick={() => handleGenerate((result.questions || []).map((q, idx) => ({
-                    question: q.question,
-                    answers: [
-                      ...(questionState[idx]?.options || []),
-                      ...((questionState[idx]?.custom || '').trim() ? [questionState[idx].custom.trim()] : []),
-                    ],
-                  })))}
-                >
-                  Создать промпт с этими ответами
-                </button>
+                )}
+                {showAdvanced && (
+                  <div className={cb.composerInset}>
+                    <div className={styles.advancedInline}>
+                      <label className={styles.advancedInlineField}>
+                        Т° {temperature}
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={1}
+                          step={0.1}
+                          value={temperature}
+                          onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                        />
+                      </label>
+                      <label className={styles.advancedInlineField}>
+                        Top-P {topP.toFixed(2)}
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={topP}
+                          onChange={(e) => setTopP(parseFloat(e.target.value))}
+                        />
+                      </label>
+                      <label className={styles.advancedInlineField}>
+                        Top-K
+                        <input
+                          type="number"
+                          value={topK}
+                          onChange={(e) => setTopK(e.target.value ? Number(e.target.value) : '')}
+                          className={styles.topKInput}
+                        />
+                      </label>
+                      <label className={styles.questionsCompact}>
+                        <input type="checkbox" checked={questionsMode} onChange={(e) => setQuestionsMode(e.target.checked)} />
+                        <span>Вопросы</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
               </div>
             </div>
-          )}
-        </section>
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Граница «Задача» и «Результат» — перетащите для изменения ширины"
+            className={styles.splitGutter}
+            onMouseDown={startAgentSplitDrag}
+          />
+          <div
+            className={`${styles.splitPane} ${styles.splitPaneAgentRight}`}
+            style={{ flex: `${1 - agentSplit} 1 0%`, minWidth: 0, overflow: 'auto' }}
+          >
+            {resultSection}
           </div>
         </div>
+      )}
     </div>
   )
 }

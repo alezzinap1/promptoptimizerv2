@@ -6,6 +6,19 @@ import SkillsPanel from './SkillsPanel'
 import Techniques from '../Techniques'
 import hubStyles from './LibraryHub.module.css'
 
+const GRID_KEY = 'prompt-engineer-library-grid-cols'
+type GridCols = 3 | 4
+
+function loadGridCols(): GridCols {
+  try {
+    const v = localStorage.getItem(GRID_KEY)
+    if (v === '4') return 4
+  } catch {
+    /* ignore */
+  }
+  return 3
+}
+
 const TABS = [
   { id: 'prompts', label: 'Промпты' },
   { id: 'techniques', label: 'Техники' },
@@ -26,6 +39,7 @@ export default function LibraryHub() {
   const index = idx >= 0 ? idx : 0
 
   const [counts, setCounts] = useState({ prompts: 0, techniques: 0, skills: 0 })
+  const [gridCols, setGridCols] = useState<GridCols>(() => loadGridCols())
 
   const refreshPromptCount = useCallback(() => {
     api.getLibraryStats().then((s) => setCounts((c) => ({ ...c, prompts: s.total })))
@@ -48,9 +62,36 @@ export default function LibraryHub() {
     setSearchParams(id === 'prompts' ? {} : { tab: id })
   }
 
+  const setGrid = (n: GridCols) => {
+    setGridCols(n)
+    localStorage.setItem(GRID_KEY, String(n))
+  }
+
   return (
     <div className={hubStyles.hub}>
-      <h1 className={`pageTitleGradient ${hubStyles.title}`}>Библиотека</h1>
+      <div className={hubStyles.titleRow}>
+        <h1 className={`pageTitleGradient ${hubStyles.title}`}>Библиотека</h1>
+        <div className={hubStyles.gridToggle} role="group" aria-label="Количество колонок сетки">
+          <button
+            type="button"
+            className={gridCols === 3 ? hubStyles.gridToggleBtnActive : hubStyles.gridToggleBtn}
+            aria-pressed={gridCols === 3}
+            onClick={() => setGrid(3)}
+            title="Три колонки"
+          >
+            3
+          </button>
+          <button
+            type="button"
+            className={gridCols === 4 ? hubStyles.gridToggleBtnActive : hubStyles.gridToggleBtn}
+            aria-pressed={gridCols === 4}
+            onClick={() => setGrid(4)}
+            title="Четыре колонки"
+          >
+            4
+          </button>
+        </div>
+      </div>
 
       <div className={hubStyles.segmented} role="tablist" aria-label="Разделы библиотеки">
         {TABS.map((t) => (
@@ -76,13 +117,13 @@ export default function LibraryHub() {
           style={{ transform: `translateX(calc(-${index} * 100% / 3))` }}
         >
           <div className={hubStyles.panel}>
-            <PromptsPanel onPromptCountChanged={refreshPromptCount} />
+            <PromptsPanel onPromptCountChanged={refreshPromptCount} gridCols={gridCols} />
           </div>
           <div className={hubStyles.panel}>
-            <Techniques variant="embedded" onCatalogChanged={refreshTechniqueCount} />
+            <Techniques variant="embedded" onCatalogChanged={refreshTechniqueCount} gridCols={gridCols} />
           </div>
           <div className={hubStyles.panel}>
-            <SkillsPanel onCountChange={handleSkillsCount} />
+            <SkillsPanel onCountChange={handleSkillsCount} gridCols={gridCols} />
           </div>
         </div>
       </div>

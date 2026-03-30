@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import menuStyles from './DropdownMenu.module.css'
@@ -28,6 +29,10 @@ type Props = {
   disabled?: boolean
   /** Ссылка внизу меню (разделитель + пункт), например каталог моделей */
   footerLink?: { to: string; label: string }
+  /** Заменить текст на кнопке (иконка и т.д.), подпись остаётся в title */
+  triggerContent?: ReactNode
+  /** Доп. class на кнопку-триггер */
+  triggerClassName?: string
 }
 
 export default function SelectDropdown({
@@ -39,6 +44,8 @@ export default function SelectDropdown({
   className = '',
   disabled = false,
   footerLink,
+  triggerContent,
+  triggerClassName = '',
 }: Props) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -52,14 +59,16 @@ export default function SelectDropdown({
         ref={btnRef}
         type="button"
         disabled={disabled}
-        className={`${styles.trigger} ${triggerVariant}`}
+        className={`${styles.trigger} ${triggerVariant} ${triggerClassName}`.trim()}
         aria-label={ariaLabel}
         title={selected?.title || selected?.label || ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => !disabled && setOpen((v) => !v)}
       >
-        <span className={styles.triggerLabel}>{selected?.label ?? (options.length ? '—' : 'Нет моделей')}</span>
+        <span className={styles.triggerLabel}>
+          {triggerContent ?? (selected?.label ?? (options.length ? '—' : 'Нет моделей'))}
+        </span>
         <Chevron />
       </button>
       <PortalDropdown open={open} onClose={() => setOpen(false)} anchorRef={btnRef} minWidth={220} align="left">

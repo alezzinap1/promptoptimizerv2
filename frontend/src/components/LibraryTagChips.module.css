@@ -1,0 +1,41 @@
+.row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+}
+
+.colorPick {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0.01;
+  bottom: 0;
+  right: 0;
+  pointer-events: auto;
+}
+
+.chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1.25;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='light'] .chip:hover {
+  background: rgba(15, 23, 42, 0.05);
+}

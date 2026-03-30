@@ -18,12 +18,17 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: var(--font-ui);
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
   position: relative;
   font-size: 14px;
   overflow-x: hidden;
@@ -37,7 +42,18 @@ pre {
 
 #root {
   position: relative;
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Один корневой узел под Provider’ами — иначе height: 100% не доходит до Layout */
+.appRoot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Заголовки страниц: h1 — на 2px больше основного текста, h2 секций — как основной текст */

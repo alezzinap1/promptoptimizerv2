@@ -14,7 +14,9 @@ from core.context_builder import CLARIFICATION_ANSWERS_PROVIDED, ContextBuilder
 from core.domain_templates import get_domain_techniques
 from core.parsing import diagnose_generation_response, parse_questions, parse_reply
 from core.prompt_spec import build_generation_brief
+from core.model_taxonomy import classify_model, ModelType, SUPPRESS_FOR_REASONING
 from core.quality_metrics import analyze_prompt
+from core.tokenizer import count_tokens
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -262,7 +264,7 @@ def generate_prompt(
         generation_issue = "questions_unparsed"
     elif gen_flags["weak_question_options"]:
         generation_issue = "weak_question_options"
-    metrics = analyze_prompt(parsed.get("prompt_block", "")) if parsed.get("has_prompt") else {}
+    metrics = analyze_prompt(parsed.get("prompt_block", ""), model_id=req.target_model) if parsed.get("has_prompt") else {}
     latency_ms = round((time.perf_counter() - started_at) * 1000, 1)
     outcome = "prompt" if parsed.get("has_prompt") else "questions" if parsed.get("has_questions") else "raw_text"
 
@@ -334,6 +336,8 @@ def generate_prompt(
             user_id=int(user["id"]),
         )
 
+    target_model_type = classify_model(req.target_model)
+
     return {
         **parsed,
         "llm_raw": full_text,
@@ -347,6 +351,7 @@ def generate_prompt(
         "task_input": req.task_input,
         "gen_model": req.gen_model,
         "target_model": req.target_model,
+        "target_model_type": target_model_type.value,
         "metrics": metrics,
         "prompt_spec": prompt_spec,
         "evidence": evidence,

@@ -2,14 +2,10 @@
   max-width: 1200px;
 }
 
-.header {
-  margin-bottom: 16px;
-}
-
-.lead {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.5;
+.leadCompact {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  line-height: 1.45;
   color: var(--muted);
   max-width: 720px;
 }
@@ -22,14 +18,31 @@
   align-items: center;
 }
 
+.toolbarCompact {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search {
+  flex: 1 1 200px;
+  min-width: 140px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border-radius: 7px;
+  border: 1px solid var(--stroke);
+  background: var(--select-surface);
+  color: var(--text);
+}
+
 .primary {
   padding: 10px 18px;
   border-radius: 9px;
   font-weight: 700;
 }
 
-.export {
-  font-size: 13px;
+.primarySmall {
+  padding: 6px 12px !important;
+  font-size: 0.78rem !important;
 }
 
 .empty {
@@ -43,8 +56,29 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  gap: 12px;
+}
+
+.grid3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .grid3,
+  .grid4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .grid3,
+  .grid4 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -160,6 +194,12 @@
   font-size: 13px;
   line-height: 1.45;
   min-height: 200px;
+}
+
+.sortSelect {
+  flex: 0 1 160px;
+  min-width: 120px;
+  max-width: 160px;
 }
 
 .modalActions {

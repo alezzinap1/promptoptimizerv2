@@ -1,10 +1,11 @@
-"""Prompt library CRUD."""
+"""Prompt library CRUD + evaluation."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
+from core.quality_metrics import analyze_prompt
 from db.manager import DBManager
 
 router = APIRouter()
@@ -66,6 +67,7 @@ def save_to_library(
 
 class UpdateLibraryRequest(BaseModel):
     title: str | None = None
+    prompt: str | None = None
     tags: list[str] | None = None
     notes: str | None = None
     rating: int | None = None
@@ -81,6 +83,7 @@ def update_library(
     db.update_library_item(
         item_id,
         title=req.title,
+        prompt=req.prompt,
         tags=req.tags,
         notes=req.notes,
         rating=req.rating,
@@ -97,3 +100,18 @@ def delete_from_library(
 ):
     db.delete_from_library(item_id, user_id=int(user["id"]))
     return {"ok": True}
+
+
+class EvaluatePromptRequest(BaseModel):
+    prompt: str
+    target_model: str = ""
+
+
+@router.post("/library/evaluate")
+def evaluate_prompt(
+    req: EvaluatePromptRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Evaluate a prompt's quality without saving it."""
+    metrics = analyze_prompt(req.prompt, model_id=req.target_model)
+    return {"metrics": metrics}
