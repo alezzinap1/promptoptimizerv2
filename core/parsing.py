@@ -102,34 +102,73 @@ def parse_reply(reply: str) -> dict:
     }
 
 
+def _is_option_line(line: str) -> bool:
+    return bool(line) and line[0] in "-*•"
+
+
 def parse_questions(questions_raw: str) -> list[dict] | None:
-    """Parse [QUESTIONS] block into structured list of questions with options."""
+    """Parse [QUESTIONS] block into structured list of questions with options.
+
+    Поддерживается канонический формат «1. Вопрос» + строки «- вариант», а также
+    частый вывод моделей: заголовок вопроса без номера, сразу список «- …».
+    """
     if not questions_raw.strip():
         return None
 
     questions: list[dict] = []
     current_q: dict | None = None
+    # Строки текста до первого «N.» или списка вариантов — станут текстом вопроса
+    pending_header_parts: list[str] = []
 
-    for line in questions_raw.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        m = re.match(r"^\d+\.\s*(.+)$", line)
-        if m:
-            if current_q is not None:
-                if not current_q.get("options"):
-                    current_q["options"] = ["Пропустить"]
-                questions.append(current_q)
-            current_q = {"question": m.group(1).strip(), "options": []}
-        elif line.startswith(("-", "*", "•")) and current_q is not None:
-            opt = line.lstrip("-*•").strip()
-            if opt:
-                current_q["options"].append(opt)
-
-    if current_q is not None:
+    def flush_current() -> None:
+        nonlocal current_q
+        if current_q is None:
+            return
         if not current_q.get("options"):
             current_q["options"] = ["Пропустить"]
         questions.append(current_q)
+        current_q = None
+
+    def start_question_from_pending() -> None:
+        nonlocal current_q, pending_header_parts
+        if current_q is not None or not pending_header_parts:
+            return
+        text = " ".join(pending_header_parts).strip()
+        pending_header_parts = []
+        if text:
+            current_q = {"question": text, "options": []}
+
+    for raw_line in questions_raw.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        m = re.match(r"^\d+\.\s*(.+)$", line)
+        if m:
+            pending_header_parts.clear()
+            flush_current()
+            current_q = {"question": m.group(1).strip(), "options": []}
+            continue
+
+        if _is_option_line(line):
+            opt = line.lstrip("-*•").strip()
+            if not opt:
+                continue
+            if current_q is None:
+                start_question_from_pending()
+            if current_q is None:
+                current_q = {"question": "Уточнение", "options": []}
+            current_q["options"].append(opt)
+            continue
+
+        # Обычная строка текста (не нумерация, не маркер списка)
+        flush_current()
+        pending_header_parts.append(line)
+
+    if pending_header_parts and current_q is None:
+        start_question_from_pending()
+
+    flush_current()
 
     if not questions:
         return None

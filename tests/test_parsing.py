@@ -82,6 +82,24 @@ class ParsingTests(unittest.TestCase):
         self.assertGreaterEqual(len(questions[0]["options"]), 2)
         self.assertIn("Пропустить", questions[0]["options"])
 
+    def test_parse_questions_implicit_header_before_bullets(self) -> None:
+        """Модель часто пишет вопрос без «1.», сразу список «- …»."""
+        raw = """
+Какую задачу нужно оформить промптом?
+- Ответ на вопрос
+- Объяснение темы
+- Составление текста
+""".strip()
+
+        questions = parse_questions(raw)
+        self.assertIsNotNone(questions)
+        assert questions is not None
+        self.assertEqual(len(questions), 1)
+        self.assertIn("оформить промптом", questions[0]["question"])
+        self.assertGreaterEqual(len(questions[0]["options"]), 2)
+        parsed_block = {"has_prompt": False, "has_questions": True}
+        self.assertFalse(diagnose_generation_response(parsed_block, questions)["questions_unparsed"])
+
     def test_parse_reply_prompt_without_closing_tag(self) -> None:
         """Модель часто не пишет [/PROMPT] — блок всё равно извлекается."""
         reply = """
