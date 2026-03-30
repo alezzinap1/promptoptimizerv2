@@ -84,7 +84,21 @@
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.logoWordMeta {
+  color: var(--primary);
+}
+
+.logoWordPrompt {
   color: var(--text);
+}
+
+[data-theme='light'] .logoWordPrompt {
+  color: #0f172a;
 }
 
 .modeSwitch {

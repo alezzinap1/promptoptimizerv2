@@ -249,9 +249,11 @@
   inset: 0;
   z-index: 10;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 16px;
+  padding: max(8px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -268,19 +270,45 @@
 }
 
 .wizardOverlay .questionBox {
-  max-width: 420px;
+  max-width: 400px;
   width: 100%;
-  max-height: 78vh;
-  overflow-y: auto;
-  border-radius: 14px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  margin: 0;
+}
+
+.wizardShellCompact {
+  display: flex;
+  flex-direction: column;
+  max-height: min(520px, calc(100dvh - 32px));
+  max-height: min(520px, calc(100vh - 32px));
+  overflow: hidden;
+}
+
+.wizardScrollBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wizardFooter {
+  flex-shrink: 0;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--stroke);
+}
+
+.wizardFooterCompact {
+  padding-top: 6px;
+  margin-top: 2px;
 }
 
 .wizardOverlay .questionBoxCompact {
-  padding: 10px 12px;
-  gap: 6px;
+  padding: 8px 10px;
+  gap: 4px;
 }
 
 .wizardInfoCompact {

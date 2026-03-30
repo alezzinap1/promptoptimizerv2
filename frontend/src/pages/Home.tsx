@@ -994,8 +994,24 @@ export default function Home() {
     const q = qs[idx]
     const state = questionState[idx] || { options: [], custom: '' }
 
+    const submitWizardAnswers = () =>
+      handleGenerate(
+        qs.map((qq, i) => ({
+          question: qq.question,
+          answers: [
+            ...(questionState[i]?.options || []),
+            ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
+          ],
+        })),
+        questionGenOpts,
+      )
+
     return (
-      <div className={`${styles.questionBox} ${compact ? styles.questionBoxCompact : ''} ${styles.questionCarousel}`}>
+      <div
+        className={`${styles.questionBox} ${compact ? styles.questionBoxCompact : ''} ${styles.questionCarousel} ${
+          compact ? styles.wizardShellCompact : ''
+        }`}
+      >
         <div className={styles.wizardProgressWrap}>
           <div className={styles.wizardProgressBar}>
             <div className={styles.wizardProgressFill} style={{ width: `${((idx + 1) / total) * 100}%` }} />
@@ -1004,9 +1020,7 @@ export default function Home() {
             {idx + 1} / {total}
           </span>
         </div>
-        <p className={`${styles.info} ${compact ? styles.wizardInfoCompact : ''}`}>
-          Ответ на каждый вопрос необязателен. Дойдите до последнего — там кнопка создания промпта.
-        </p>
+        <div className={compact ? styles.wizardScrollBody : undefined}>
         <div className={`${styles.questionItem} ${compact ? styles.questionItemCompact : ''}`}>
           <strong>
             {idx + 1}. {q.question}
@@ -1041,6 +1055,8 @@ export default function Home() {
             }
           />
         </div>
+        </div>
+        <div className={`${styles.wizardFooter} ${compact ? styles.wizardFooterCompact : ''}`}>
         <div className={styles.questionCarouselNav}>
           <button
             type="button"
@@ -1066,27 +1082,16 @@ export default function Home() {
           <button type="button" className="btn-ghost" disabled={loading} onClick={() => handleGenerate([], questionGenOpts)}>
             Пропустить ответы
           </button>
-          {idx >= total - 1 ? (
-            <button
-              type="button"
-              className={`${styles.primaryAction} btn-primary`}
-              disabled={loading}
-              onClick={() =>
-                handleGenerate(
-                  qs.map((qq, i) => ({
-                    question: qq.question,
-                    answers: [
-                      ...(questionState[i]?.options || []),
-                      ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
-                    ],
-                  })),
-                  questionGenOpts,
-                )
-              }
-            >
-              Создать промпт с этими ответами
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className={`${styles.primaryAction} btn-primary`}
+            disabled={loading}
+            title="Собираются ответы со всех шагов; на непросмотренных вопросах ответы пустые"
+            onClick={() => submitWizardAnswers()}
+          >
+            Создать промпт
+          </button>
+        </div>
         </div>
       </div>
     )

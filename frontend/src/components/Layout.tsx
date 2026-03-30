@@ -99,13 +99,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const workspaceLabel = showSidebar ? pickWorkspaceName(workspaces, activeWorkspaceId) : null
 
+  const logoWordmark = (
+    <span className={styles.logoText}>
+      <span className={styles.logoWordMeta}>meta</span>
+      <span className={styles.logoWordPrompt}>prompt</span>
+    </span>
+  )
+
   if (isLanding && !user) {
     return (
       <div className={styles.publicShell}>
         <header className={styles.publicHeader}>
           <NavLink to="/" className={styles.logo}>
             <span className={styles.logoGlyph} aria-hidden />
-            <span className={styles.logoText}>metaprompt</span>
+            {logoWordmark}
           </NavLink>
           <NavLink to="/login" className={styles.loginBtn}>
             Войти
@@ -133,7 +140,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className={styles.headerLeft}>
               <NavLink to="/home" className={styles.logo} aria-label="На главную">
                 <span className={styles.logoGlyph} aria-hidden />
-                <span className={styles.logoText}>metaprompt</span>
+                {logoWordmark}
               </NavLink>
               {user ? (
                 <div className={styles.modeSwitch} role="group" aria-label="Режим работы">
