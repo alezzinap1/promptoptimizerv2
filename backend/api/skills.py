@@ -19,29 +19,44 @@ Given the user's short description, produce ONE complete skill.
 
 ## Output format (exactly this structure, no outer markdown fences)
 
+YAML frontmatter compatible with prompts.chat / skills-style agents:
+
 ---
 name: <short title, max ~80 chars>
-description: <one or two sentences: who it helps and what outcome they get>
-tags: <comma-separated keywords for search, lowercase, English or same language as user>
+description: <1–2 sentences: when the agent should auto-use this skill; who it helps>
+version: 1.0
+tags: <comma-separated keywords, lowercase, same language as user where possible>
+target_agents: <e.g. claude-code, cursor, windsurf — or "universal">
 ---
 
-## Role & scope
-<what persona the model adopts, what is in/out of scope>
+# <Skill title>
 
-## Operating principles
-<3–7 bullet-level rules: tone, safety, when to ask clarifying questions, when to refuse>
+## Role & mission
+<who the agent becomes; scope in/out>
 
-## Procedure
-<numbered or clear steps the model follows when the skill is active>
+## When to use this skill
+<triggers and scenarios — must answer "when should I load this skill?">
 
-## Output contract
-<exactly what the user receives: sections, format, length, code vs prose, language>
+## Core competencies
+<what the agent can do in this domain>
 
-## Quality checklist (self-check before answering)
-<what the model must verify before sending the final reply>
+## Core rules & constraints
+<non-negotiable behaviour; concrete verbs: "always validate X", not "be careful">
+
+## Process & approach
+<step-by-step methodology when the domain has a clear workflow>
+
+## Output format
+<expected structure of agent outputs>
+
+## Anti-patterns (do NOT)
+<common failure modes — explicit>
 
 ## Edge cases
-<ambiguity, missing data, conflicting instructions — how to handle>
+<ambiguity, missing data, conflicts — how to handle>
+
+## Examples
+<1–2 short realistic good examples>
 
 ## Optional: mini example
 <one short fictional example of input → excerpt of good output — only if it clarifies format>

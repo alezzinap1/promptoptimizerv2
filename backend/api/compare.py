@@ -128,8 +128,12 @@ def compare_prompts(
     prompt_a = parsed_a.get("prompt_block") or result_a_text
     prompt_b = parsed_b.get("prompt_block") or result_b_text
 
-    metrics_a = analyze_prompt(prompt_a, model_id=req.target_model)
-    metrics_b = analyze_prompt(prompt_b, model_id=req.target_model)
+    metrics_a = analyze_prompt(
+        prompt_a, req.target_model, prompt_type=req.prompt_type or "text", task_input=req.task_input,
+    )
+    metrics_b = analyze_prompt(
+        prompt_b, req.target_model, prompt_type=req.prompt_type or "text", task_input=req.task_input,
+    )
     score_a = _score(metrics_a)
     score_b = _score(metrics_b)
     winner = "a" if score_a > score_b else "b" if score_b > score_a else "tie"

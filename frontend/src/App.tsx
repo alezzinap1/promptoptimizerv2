@@ -12,6 +12,7 @@ import Models from './pages/Models'
 import Settings from './pages/Settings'
 import UserInfo from './pages/UserInfo'
 import Workspaces from './pages/Workspaces'
+import Presets from './pages/Presets'
 import SimpleImprove from './pages/SimpleImprove'
 import Community from './pages/Community'
 import Help from './pages/Help'
@@ -50,6 +51,7 @@ function AppShell() {
         <Route path="/community" element={<RequireAuth><Community /></RequireAuth>} />
         <Route path="/techniques" element={<RequireAuth><Navigate to="/library?tab=techniques" replace /></RequireAuth>} />
         <Route path="/workspaces" element={<RequireAuth><Workspaces /></RequireAuth>} />
+        <Route path="/presets" element={<RequireAuth><Presets /></RequireAuth>} />
         <Route path="/models" element={<RequireAuth><Models /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
         <Route path="/user-info" element={<RequireAuth><UserInfo /></RequireAuth>} />

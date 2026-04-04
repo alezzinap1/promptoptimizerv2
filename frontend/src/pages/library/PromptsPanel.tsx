@@ -139,7 +139,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
     setEvalId(item.id)
     setEvalLoading(true)
     try {
-      const res = await api.evaluatePrompt(item.prompt, item.target_model)
+      const res = await api.evaluatePrompt(item.prompt, item.target_model, isImagePrompt(item) ? 'image' : 'text')
       setEvalData(res.metrics)
     } catch {
       setEvalData(null)

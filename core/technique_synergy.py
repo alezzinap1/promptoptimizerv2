@@ -261,17 +261,12 @@ def _family_slot_available(technique_id: str, family_counts: dict[str, int], com
 
 
 def _effective_task_types_for_prompt_mode(task_types: list[str], prompt_type: str) -> list[str]:
-    """Bias classifier labels toward image / skill generation when the UI mode demands it."""
-    tt = list(task_types) if task_types else ["general"]
+    """Под режим UI: не смешивать с «general», иначе набор техник стабильно тянет Role/CoT/Constraints как у текста."""
     if prompt_type == "image":
-        if "image_generation" not in tt:
-            return ["image_generation", *tt]
+        return ["image_generation"]
     if prompt_type == "skill":
-        merged = ["instruction", "writing"]
-        for x in tt:
-            if x not in merged:
-                merged.append(x)
-        return merged[:6]
+        return ["instruction", "writing"]
+    tt = list(task_types) if task_types else ["general"]
     return tt
 
 

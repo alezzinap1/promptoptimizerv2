@@ -500,14 +500,6 @@
   min-width: 8px;
 }
 
-.agentDraftHint {
-  font-size: 0.68rem;
-  line-height: 1.35;
-  color: var(--muted);
-  margin: 0 0 6px;
-  padding: 0 2px;
-}
-
 .clarificationRecap {
   margin-top: 8px;
   border-radius: 8px;
@@ -718,6 +710,74 @@ details[open].chatBubbleThinking .thinkingSummary::before {
 .promptTypeTabActive {
   background: var(--primary);
   color: #fff;
+}
+
+.imageBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
+  padding: 0 2px 4px;
+}
+
+.imageBadgeLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding-top: 4px;
+  flex-shrink: 0;
+}
+
+.imageBadgeWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.imageBadge {
+  border: 1px solid var(--stroke);
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.imageBadge:hover {
+  color: var(--text);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.imageBadgeOn {
+  border-color: var(--primary);
+  color: #fff;
+  background: rgba(56, 189, 248, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+
+.imageEngineRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 0 2px 8px;
+}
+
+.imageDeepLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.imageDeepLabel input {
+  accent-color: var(--primary);
 }
 
 .thinkingBody {

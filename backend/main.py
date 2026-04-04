@@ -1,6 +1,9 @@
 """
 Prompt Engineer — FastAPI backend.
 API for prompt generation (streaming), library, techniques.
+
+API собрано в отдельном под-приложении и смонтировано на /api, чтобы catch-all SPA
+(/{path:path} → index.html) никогда не перехватывал запросы к /api/*.
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ sys.path.insert(0, str(ROOT))
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 from dotenv import load_dotenv
+
 load_dotenv(ROOT / ".env")
 
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
@@ -29,9 +33,11 @@ from backend.api import (
     compare,
     config,
     generate,
+    image_meta,
     library,
     metrics,
     models,
+    presets,
     prompt_ide,
     sessions,
     settings,
@@ -43,9 +49,42 @@ from backend.api import (
     workspaces,
 )
 
-app = FastAPI(
+api_app = FastAPI(
     title="Prompt Engineer API",
     description="Professional prompt engineering tool",
+    version="1.0.0",
+)
+
+api_app.include_router(config.router, tags=["config"])
+api_app.include_router(auth.router, tags=["auth"])
+api_app.include_router(settings.router, tags=["settings"])
+api_app.include_router(user_info.router, tags=["user-info"])
+api_app.include_router(models.router, tags=["models"])
+api_app.include_router(workspaces.router, tags=["workspaces"])
+api_app.include_router(presets.router, tags=["presets"])
+api_app.include_router(metrics.router, tags=["metrics"])
+api_app.include_router(sessions.router, tags=["sessions"])
+api_app.include_router(prompt_ide.router, tags=["prompt-ide"])
+api_app.include_router(agent_route.router, tags=["agent"])
+api_app.include_router(generate.router, tags=["generate"])
+api_app.include_router(simple_improve.router, tags=["simple-improve"])
+api_app.include_router(compare.router, tags=["compare"])
+api_app.include_router(library.router, tags=["library"])
+api_app.include_router(community.router, tags=["community"])
+api_app.include_router(skills.router, tags=["skills"])
+api_app.include_router(techniques.router, tags=["techniques"])
+api_app.include_router(tokenizer.router, tags=["tokenizer"])
+api_app.include_router(image_meta.router, tags=["meta"])
+
+
+@api_app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+app = FastAPI(
+    title="Prompt Engineer",
+    description="MetaPrompt — UI + mounted API at /api",
     version="1.0.0",
 )
 
@@ -57,34 +96,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(config.router, prefix="/api", tags=["config"])
-app.include_router(auth.router, prefix="/api", tags=["auth"])
-app.include_router(settings.router, prefix="/api", tags=["settings"])
-app.include_router(user_info.router, prefix="/api", tags=["user-info"])
-app.include_router(models.router, prefix="/api", tags=["models"])
-app.include_router(workspaces.router, prefix="/api", tags=["workspaces"])
-app.include_router(metrics.router, prefix="/api", tags=["metrics"])
-app.include_router(sessions.router, prefix="/api", tags=["sessions"])
-app.include_router(prompt_ide.router, prefix="/api", tags=["prompt-ide"])
-app.include_router(agent_route.router, prefix="/api", tags=["agent"])
-app.include_router(generate.router, prefix="/api", tags=["generate"])
-app.include_router(simple_improve.router, prefix="/api", tags=["simple-improve"])
-app.include_router(compare.router, prefix="/api", tags=["compare"])
-app.include_router(library.router, prefix="/api", tags=["library"])
-app.include_router(community.router, prefix="/api", tags=["community"])
-app.include_router(skills.router, prefix="/api", tags=["skills"])
-app.include_router(techniques.router, prefix="/api", tags=["techniques"])
-app.include_router(tokenizer.router, prefix="/api", tags=["tokenizer"])
-
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok"}
-
-
 UPLOAD_DIR = ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# Узкий mount — должен быть раньше общего /api, иначе uploads уйдут в api_app и дадут 404.
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
+app.mount("/api", api_app)
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")

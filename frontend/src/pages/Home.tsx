@@ -5,6 +5,8 @@ import {
   type GenerateRequest,
   type GenerateResult,
   type GenerationIssue,
+  type ImageMetaResponse,
+  type UserPresetRecord,
   type OpenRouterModel,
   type PromptIdePreviewResponse,
   type Workspace,
@@ -17,7 +19,13 @@ import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
 import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
-import { clearAgentDraft, loadAgentDraft, saveAgentDraft } from '../lib/agentDraft'
+import { clearAgentDraftV2, loadAgentDraftV2, saveAgentDraftV2 } from '../lib/agentDraft'
+import {
+  createEmptyStudioSnapshot,
+  defaultWelcomeForMode,
+  type AgentStudioSnapshot,
+  type PromptStudioMode,
+} from '../lib/agentStudioModes'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
 import PublishToCommunityModal, { type PublishToCommunityInitial } from '../components/PublishToCommunityModal'
 import {
@@ -43,9 +51,6 @@ const HOME_SPLIT_KEY = 'prompt-engineer-home-split'
 const HOME_MODE_KEY = 'prompt-engineer-home-creation-mode'
 const HOME_AGENT_SPLIT_KEY = 'prompt-engineer-home-agent-split'
 type CreationMode = 'classic' | 'agent'
-
-const AGENT_WELCOME =
-  'Опишите задачу в чате — при необходимости задам уточнения, затем соберу промпт справа. Модель генерации, целевая модель и рабочую область можно выбрать внизу.'
 
 /** Минимальная доля ширины на колонку (0–1) */
 const MIN_COL_FRAC = 0.14
@@ -100,6 +105,28 @@ const AGENT_THINKING_PHASES = [
   'Собираю формулировку промпта…',
   'Проверяю согласованность и полноту…',
 ]
+
+/** Быстрые метки для режима «Фото» — уходят в запрос как image_prompt_tags */
+const IMAGE_STYLE_BADGES: { id: string; label: string }[] = [
+  { id: 'realism', label: 'Реализм' },
+  { id: 'minimal', label: 'Минимализм' },
+  { id: 'cartoon', label: 'Мультфильм' },
+  { id: 'cinematic', label: 'Кино' },
+  { id: 'illustration', label: 'Иллюстрация' },
+  { id: '3d_render', label: '3D' },
+  { id: 'dark_mood', label: 'Тёмная атмосфера' },
+  { id: 'bright_palette', label: 'Светлая палитра' },
+]
+
+/** Если /meta/image-options ещё без engines — те же id, что в backend `image_meta.IMAGE_ENGINES_UI` */
+const FALLBACK_IMAGE_ENGINE_OPTIONS = [
+  { value: 'auto', label: 'Авто / универсально' },
+  { value: 'midjourney', label: 'Midjourney' },
+  { value: 'dalle', label: 'DALL·E' },
+  { value: 'sd', label: 'Stable Diffusion / SDXL' },
+  { value: 'flux', label: 'Flux' },
+  { value: 'leonardo', label: 'Leonardo AI' },
+] as const
 
 const DEFAULT_AGENT_SPLIT = 0.38
 function loadAgentSplit(): number {
@@ -184,7 +211,106 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [promptType, setPromptType] = useState<'text' | 'image' | 'skill'>('text')
+  const [imagePromptTags, setImagePromptTags] = useState<string[]>([])
+  const [imageMeta, setImageMeta] = useState<ImageMetaResponse | null>(null)
+  const [userPresetsImage, setUserPresetsImage] = useState<UserPresetRecord[]>([])
+  const [userPresetsSkill, setUserPresetsSkill] = useState<UserPresetRecord[]>([])
+  const [imagePresetId, setImagePresetId] = useState('')
+  const [imageEngine, setImageEngine] = useState('auto')
+  const [imageDeepMode, setImageDeepMode] = useState(false)
+  const [skillPresetId, setSkillPresetId] = useState('')
   const [baseTaskRef, setBaseTaskRef] = useState('')
+  const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
+  const [quickSaved, setQuickSaved] = useState(false)
+  /** Снимки студии по вкладкам «Текст / Фото / Скилл» — при переключении не смешиваем чаты и сессии. */
+  const studioModesRef = useRef<Record<PromptStudioMode, AgentStudioSnapshot>>({
+    text: createEmptyStudioSnapshot('text'),
+    image: createEmptyStudioSnapshot('image'),
+    skill: createEmptyStudioSnapshot('skill'),
+  })
+
+  const hydrateFromSnapshot = useCallback((s: AgentStudioSnapshot) => {
+    setChatMessages(s.chatMessages as ChatMessage[])
+    setTaskInput(s.taskInput)
+    setBaseTaskRef(s.baseTaskRef)
+    setFeedback(s.feedback)
+    setResult(s.result)
+    setSessionId(s.sessionId)
+    setIterationMode(s.iterationMode)
+    setQuestionState(s.questionState)
+    setQuestionCarouselIdx(s.questionCarouselIdx)
+    setQuickSaved(s.quickSaved)
+    setImagePromptTags(s.imagePromptTags)
+    setImagePresetId(s.imagePresetId)
+    setImageEngine(s.imageEngine)
+    setImageDeepMode(s.imageDeepMode)
+    setSkillPresetId(s.skillPresetId)
+    const pendingClar = [...s.chatMessages]
+      .reverse()
+      .find(
+        (m) =>
+          m.role === 'assistant' &&
+          m.content.includes('Нужны уточнения') &&
+          m.clarificationQA === undefined,
+      )
+    lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
+  }, [])
+
+  const persistCurrentModeToRef = useCallback(() => {
+    studioModesRef.current[promptType] = {
+      chatMessages,
+      taskInput,
+      baseTaskRef,
+      feedback,
+      result,
+      sessionId,
+      iterationMode,
+      questionState,
+      questionCarouselIdx,
+      quickSaved,
+      imagePromptTags,
+      imagePresetId,
+      imageEngine,
+      imageDeepMode,
+      skillPresetId,
+    }
+  }, [
+    promptType,
+    chatMessages,
+    taskInput,
+    baseTaskRef,
+    feedback,
+    result,
+    sessionId,
+    iterationMode,
+    questionState,
+    questionCarouselIdx,
+    quickSaved,
+    imagePromptTags,
+    imagePresetId,
+    imageEngine,
+    imageDeepMode,
+    skillPresetId,
+  ])
+
+  const handlePromptTypeChange = useCallback(
+    (next: PromptStudioMode) => {
+      if (next === promptType) return
+      persistCurrentModeToRef()
+      const incoming = studioModesRef.current[next]
+      hydrateFromSnapshot(incoming)
+      setPromptType(next)
+      if (incoming.sessionId?.trim()) {
+        localStorage.setItem(ACTIVE_SESSION_KEY, incoming.sessionId)
+      } else {
+        localStorage.removeItem(ACTIVE_SESSION_KEY)
+      }
+      setError(null)
+      setIssueBannerDismissed(false)
+    },
+    [promptType, persistCurrentModeToRef, hydrateFromSnapshot],
+  )
+
   const splitRootRef = useRef<HTMLDivElement>(null)
   const agentSplitRootRef = useRef<HTMLDivElement>(null)
   const agentChatScrollRef = useRef<HTMLDivElement>(null)
@@ -196,7 +322,6 @@ export default function Home() {
   const [agentThinkingIdx, setAgentThinkingIdx] = useState(0)
   const [publishCommunityOpen, setPublishCommunityOpen] = useState(false)
   const [inputTokens, setInputTokens] = useState<{ tokens: number; method: string } | null>(null)
-  const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
 
   const GENERATION_ISSUE_TEXT: Record<GenerationIssue, string> = {
     format_failure:
@@ -244,8 +369,84 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    api
+      .getImageOptions()
+      .then(setImageMeta)
+      .catch(() => setImageMeta({ presets: [] }))
+  }, [])
+
+  const reloadUserPresets = useCallback(() => {
+    api
+      .listPresets('image')
+      .then((r) => setUserPresetsImage(r.items))
+      .catch(() => setUserPresetsImage([]))
+    api
+      .listPresets('skill')
+      .then((r) => setUserPresetsSkill(r.items))
+      .catch(() => setUserPresetsSkill([]))
+  }, [])
+
+  useEffect(() => {
+    reloadUserPresets()
+    const onRefresh = () => reloadUserPresets()
+    window.addEventListener('metaprompt-presets-refresh', onRefresh)
+    return () => window.removeEventListener('metaprompt-presets-refresh', onRefresh)
+  }, [reloadUserPresets])
+
+  useEffect(() => {
     localStorage.setItem(HOME_MODE_KEY, creationMode)
   }, [creationMode])
+
+  const toggleImageTag = useCallback((id: string) => {
+    setImagePromptTags((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }, [])
+
+  const imagePresetSelectOptions = useMemo(() => {
+    const presets = imageMeta?.presets ?? []
+    return [
+      { value: '', label: 'Без пресета' },
+      ...presets.map((p) => ({ value: p.id, label: p.name, title: p.description })),
+      ...userPresetsImage.map((p) => ({
+        value: `u_${p.id}`,
+        label: p.name,
+        title: p.description || undefined,
+      })),
+    ]
+  }, [imageMeta, userPresetsImage])
+
+  const imageEngineSelectOptions = useMemo(() => {
+    const eng = imageMeta?.engines
+    if (eng && eng.length > 0) {
+      return eng.map((e) => ({ value: e.id, label: e.label, title: e.label }))
+    }
+    return FALLBACK_IMAGE_ENGINE_OPTIONS.map((e) => ({ ...e, title: e.label }))
+  }, [imageMeta?.engines])
+
+  const skillPresetSelectOptions = useMemo(
+    () => [
+      { value: '', label: 'Без пресета' },
+      ...userPresetsSkill.map((p) => ({
+        value: `u_${p.id}`,
+        label: p.name,
+        title: p.description || undefined,
+      })),
+    ],
+    [userPresetsSkill],
+  )
+
+  useEffect(() => {
+    const allowed = new Set([
+      '',
+      ...(imageMeta?.presets ?? []).map((p) => p.id),
+      ...userPresetsImage.map((p) => `u_${p.id}`),
+    ])
+    if (imagePresetId && !allowed.has(imagePresetId)) setImagePresetId('')
+  }, [imageMeta, userPresetsImage, imagePresetId])
+
+  useEffect(() => {
+    const allowed = new Set(['', ...userPresetsSkill.map((p) => `u_${p.id}`)])
+    if (skillPresetId && !allowed.has(skillPresetId)) setSkillPresetId('')
+  }, [userPresetsSkill, skillPresetId])
 
   useLayoutEffect(() => {
     const state = location.state as { restoreSessionId?: string } | null
@@ -266,7 +467,7 @@ export default function Home() {
         )
       lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
     } else {
-      setChatMessages([{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }])
+      setChatMessages([{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }])
       lastClarificationsMsgIdRef.current = null
     }
     navigate(location.pathname, { replace: true, state: null })
@@ -284,36 +485,21 @@ export default function Home() {
       return
     }
     agentStudioBootstrappedRef.current = true
-    const draft = loadAgentDraft()
-    if (draft && draft.chatMessages.length > 0) {
-      const msgs = draft.chatMessages as ChatMessage[]
-      setChatMessages(msgs)
-      setBaseTaskRef(draft.baseTaskRef)
-      setTaskInput(draft.taskInput)
-      setFeedback(draft.feedback)
-      setResult(draft.result)
-      setSessionId(draft.sessionId)
-      setIterationMode(draft.iterationMode)
-      setQuestionState(draft.questionState)
-      setQuestionCarouselIdx(draft.questionCarouselIdx)
-      setQuickSaved(draft.quickSaved)
-      if (draft.sessionId) localStorage.setItem(ACTIVE_SESSION_KEY, draft.sessionId)
-      const pendingClar = [...msgs]
-        .reverse()
-        .find(
-          (m) =>
-            m.role === 'assistant' &&
-            m.content.includes('Нужны уточнения') &&
-            m.clarificationQA === undefined,
-        )
-      lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
+    const draft = loadAgentDraftV2()
+    if (draft) {
+      studioModesRef.current = draft.modes
+      setPromptType(draft.activePromptType)
+      hydrateFromSnapshot(draft.modes[draft.activePromptType])
+      const sid = draft.modes[draft.activePromptType].sessionId
+      if (sid?.trim()) localStorage.setItem(ACTIVE_SESSION_KEY, sid)
+      else localStorage.removeItem(ACTIVE_SESSION_KEY)
       return
     }
     setChatMessages((msgs) => {
       if (msgs.length > 0) return msgs
-      return [{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }]
+      return [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
     })
-  }, [creationMode])
+  }, [creationMode, hydrateFromSnapshot])
 
   useEffect(() => {
     const state = location.state as {
@@ -327,7 +513,7 @@ export default function Home() {
       setBaseTaskRef(t)
       if (creationMode === 'agent') {
         setChatMessages([
-          { id: 'welcome', role: 'assistant', content: AGENT_WELCOME },
+          { id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') },
           { id: crypto.randomUUID(), role: 'user', content: t },
         ])
       }
@@ -496,7 +682,7 @@ export default function Home() {
       try {
         const res = await api.previewPromptIde({
           task_input: taskInput,
-          target_model: targetModel,
+          target_model: promptType === 'text' ? targetModel : 'unknown',
           workspace_id: workspaceId || null,
           previous_prompt: iterationMode ? result?.prompt_block : undefined,
           technique_mode: techniqueMode,
@@ -537,6 +723,8 @@ export default function Home() {
     promptType,
   ])
 
+  const effectiveTargetModel = promptType === 'text' ? targetModel : 'unknown'
+
   type GenerateOptions = {
     taskInputOverride?: string
     feedbackOverride?: string
@@ -570,7 +758,7 @@ export default function Home() {
         task_input: effectiveTask,
         feedback: isIteration ? feedbackText : '',
         gen_model: genModel,
-        target_model: targetModel,
+        target_model: effectiveTargetModel,
         domain: 'auto',
         technique_mode: techniqueMode,
         manual_techs: techniqueMode === 'manual' ? manualTechs : [],
@@ -585,6 +773,11 @@ export default function Home() {
         prompt_spec_overrides: ideOverrides,
         evidence_decisions: evidenceDecisions,
         question_answers: questionAnswers || [],
+        image_prompt_tags: promptType === 'image' ? imagePromptTags : undefined,
+        image_preset_id: promptType === 'image' && imagePresetId ? imagePresetId : undefined,
+        image_engine: promptType === 'image' ? imageEngine : undefined,
+        image_deep_mode: promptType === 'image' ? imageDeepMode : undefined,
+        skill_preset_id: promptType === 'skill' && skillPresetId ? skillPresetId : undefined,
       }
       const res = normalizeClientGenerateResult(await api.generate(req))
       setResult(res)
@@ -645,7 +838,7 @@ export default function Home() {
             })
           }
           queueMicrotask(() => {
-            saveAgentDraft({
+            studioModesRef.current[promptType] = {
               chatMessages: next,
               baseTaskRef,
               taskInput,
@@ -656,6 +849,15 @@ export default function Home() {
               questionState: {},
               questionCarouselIdx: 0,
               quickSaved: false,
+              imagePromptTags,
+              imagePresetId,
+              imageEngine,
+              imageDeepMode,
+              skillPresetId,
+            }
+            saveAgentDraftV2({
+              activePromptType: promptType,
+              modes: { ...studioModesRef.current },
             })
           })
           return next
@@ -677,17 +879,12 @@ export default function Home() {
 
   const resetAgentDialog = () => {
     if (sessionId?.trim()) clearSessionAgentChat(sessionId)
-    clearAgentDraft()
-    lastClarificationsMsgIdRef.current = null
-    setChatMessages([{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }])
+    const fresh = createEmptyStudioSnapshot(promptType)
+    studioModesRef.current[promptType] = fresh
+    hydrateFromSnapshot(fresh)
     setChatInput('')
-    setBaseTaskRef('')
-    setTaskInput('')
-    setFeedback('')
-    setResult(null)
-    setSessionId(null)
-    setIterationMode(false)
-    setQuestionState({})
+    setQuestionCarouselIdx(0)
+    clearAgentDraftV2()
     setError(null)
     localStorage.removeItem(ACTIVE_SESSION_KEY)
   }
@@ -721,7 +918,7 @@ export default function Home() {
     if (result?.has_prompt && result.prompt_block) {
       const taskRef = (baseTaskRef || taskInput).trim()
       const snapshot = result
-      const tm = targetModel
+      const tm = effectiveTargetModel
       const sidRef = sessionId
 
       void (async () => {
@@ -769,7 +966,7 @@ export default function Home() {
             return
           }
           if (plan.type === 'eval_prompt') {
-            const { metrics } = await api.evaluatePrompt(snapshot.prompt_block, tm)
+            const { metrics } = await api.evaluatePrompt(snapshot.prompt_block, tm, promptType)
             const pretty = JSON.stringify(metrics, null, 2)
             pushAssistant(`Оценка текущего промпта (эвристика на сервере):\n\n\`\`\`json\n${pretty}\n\`\`\``)
             return
@@ -906,27 +1103,20 @@ export default function Home() {
     [splits.splitA, splits.splitB],
   )
 
-  const [quickSaved, setQuickSaved] = useState(false)
-
   useEffect(() => {
     if (creationMode !== 'agent') return
     const t = window.setTimeout(() => {
-      saveAgentDraft({
-        chatMessages,
-        baseTaskRef,
-        taskInput,
-        feedback,
-        result,
-        sessionId,
-        iterationMode,
-        questionState,
-        questionCarouselIdx,
-        quickSaved,
+      persistCurrentModeToRef()
+      saveAgentDraftV2({
+        activePromptType: promptType,
+        modes: { ...studioModesRef.current },
       })
     }, 450)
     return () => window.clearTimeout(t)
   }, [
     creationMode,
+    persistCurrentModeToRef,
+    promptType,
     chatMessages,
     baseTaskRef,
     taskInput,
@@ -937,6 +1127,10 @@ export default function Home() {
     questionState,
     questionCarouselIdx,
     quickSaved,
+    imagePresetId,
+    imageEngine,
+    imageDeepMode,
+    skillPresetId,
   ])
 
   const handleSaveToLibrary = async () => {
@@ -946,7 +1140,7 @@ export default function Home() {
       title,
       prompt: result.prompt_block,
       tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
-      target_model: targetModel,
+      target_model: effectiveTargetModel,
       task_type: result.task_types?.[0] || 'general',
       techniques: result.technique_ids,
       notes: saveNotes,
@@ -965,7 +1159,7 @@ export default function Home() {
       title,
       prompt: result.prompt_block,
       tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
-      target_model: targetModel,
+      target_model: effectiveTargetModel,
       task_type: result.task_types?.[0] || 'general',
       techniques: result.technique_ids,
     })
@@ -1751,7 +1945,9 @@ export default function Home() {
               )}
               {result?.has_prompt && (
                 <p className={styles.strategicHint} title={COMPLETENESS_SCORE_TITLE}>
-                  Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.
+                  {result.metrics?.prompt_analysis_mode === 'image'
+                    ? 'Оценка полноты для изображений: субъект, стиль, композиция, свет/палитра, негатив, техника (эвристика на сервере). Это не оценка художественного качества картинки.'
+                    : 'Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.'}
                 </p>
               )}
               <div className={styles.actions}>
@@ -1916,7 +2112,7 @@ export default function Home() {
                         key={pt}
                         type="button"
                         className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
-                        onClick={() => setPromptType(pt)}
+                        onClick={() => handlePromptTypeChange(pt)}
                       >
                         {pt === 'text' ? 'Текст' : pt === 'image' ? 'Фото' : 'Скилл'}
                       </button>
@@ -1936,9 +2132,42 @@ export default function Home() {
                   Новый диалог
                 </button>
               </div>
-              <p className={styles.agentDraftHint} title="Черновик студии хранится в браузере и подхватывается при возврате на эту страницу. Список «Сессии» в сайдбаре — отдельно, это сохранённые на сервере сессии с версиями.">
-                Черновик сохраняется в браузере при переходах по сайту. «Новый диалог» очищает его.
-              </p>
+              {promptType === 'image' && (
+                <div className={styles.imageBadgeRow} aria-label="Метки стиля для изображения">
+                  <span className={styles.imageBadgeLabel}>Стиль</span>
+                  <div className={styles.imageBadgeWrap}>
+                    {IMAGE_STYLE_BADGES.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        className={`${styles.imageBadge} ${imagePromptTags.includes(b.id) ? styles.imageBadgeOn : ''}`}
+                        onClick={() => toggleImageTag(b.id)}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {promptType === 'image' && (
+                <div className={styles.imageEngineRow}>
+                  <SelectDropdown
+                    value={imageEngine}
+                    options={imageEngineSelectOptions}
+                    onChange={setImageEngine}
+                    aria-label="Движок генерации изображения"
+                    variant="composer"
+                  />
+                  <label className={styles.imageDeepLabel}>
+                    <input
+                      type="checkbox"
+                      checked={imageDeepMode}
+                      onChange={(e) => setImageDeepMode(e.target.checked)}
+                    />
+                    Глубокий режим (анализ сцены)
+                  </label>
+                </div>
+              )}
               <div className={styles.agentChatBody}>
                 <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
                   {chatMessages.map((m) => {
@@ -2039,16 +2268,36 @@ export default function Home() {
                         onSelect={setWorkspaceId}
                         workspacesReady={workspacesReady}
                       />
-                      <SelectDropdown
-                        value={targetModel}
-                        options={targetModelSelectOptions}
-                        onChange={setTargetModel}
-                        aria-label="Модель, для которой пишется промпт"
-                        variant="composer"
-                        footerLink={{ to: '/models', label: 'Каталог моделей' }}
-                        triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
-                        triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
-                      />
+                      {promptType === 'image' ? (
+                        <SelectDropdown
+                          value={imagePresetId}
+                          options={imagePresetSelectOptions}
+                          onChange={setImagePresetId}
+                          aria-label="Пресет стиля для изображения"
+                          variant="composer"
+                          footerLink={{ to: '/presets', label: 'Создать пресет…' }}
+                        />
+                      ) : promptType === 'skill' ? (
+                        <SelectDropdown
+                          value={skillPresetId}
+                          options={skillPresetSelectOptions}
+                          onChange={setSkillPresetId}
+                          aria-label="Пресет для генерации скилла"
+                          variant="composer"
+                          footerLink={{ to: '/presets', label: 'Создать пресет…' }}
+                        />
+                      ) : (
+                        <SelectDropdown
+                          value={targetModel}
+                          options={targetModelSelectOptions}
+                          onChange={setTargetModel}
+                          aria-label="Модель, для которой пишется промпт"
+                          variant="composer"
+                          footerLink={{ to: '/models', label: 'Каталог моделей' }}
+                          triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
+                          triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
+                        />
+                      )}
                       <button
                         type="button"
                         className={styles.techModeMicro}

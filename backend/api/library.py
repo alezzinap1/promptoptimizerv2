@@ -105,6 +105,7 @@ def delete_from_library(
 class EvaluatePromptRequest(BaseModel):
     prompt: str
     target_model: str = ""
+    prompt_type: str = "text"
 
 
 @router.post("/library/evaluate")
@@ -113,5 +114,10 @@ def evaluate_prompt(
     user: dict = Depends(get_current_user),
 ):
     """Evaluate a prompt's quality without saving it."""
-    metrics = analyze_prompt(req.prompt, model_id=req.target_model)
+    metrics = analyze_prompt(
+        req.prompt,
+        req.target_model,
+        prompt_type=req.prompt_type or "text",
+        task_input=None,
+    )
     return {"metrics": metrics}

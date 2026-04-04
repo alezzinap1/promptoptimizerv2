@@ -93,6 +93,43 @@ export interface GenerateRequest {
   question_answers?: { question: string; answers: string[] }[]
   skill_body?: string
   prompt_type?: string
+  /** Метки стиля для режима «Фото» (передаются в промпт генерации) */
+  image_prompt_tags?: string[]
+  /** Пресет стиля: встроенный id или u_{id} пользовательский (режим «Фото») */
+  image_preset_id?: string | null
+  /** Целевой движок (MJ, SD, …) — подсказки синтаксиса на бэкенде, не путать с моделью генерации текста */
+  image_engine?: string | null
+  /** Двухшаговый режим: сначала дешёвый анализ сцены в JSON, затем основной промпт */
+  image_deep_mode?: boolean
+  /** Пользовательский пресет для режима «Скилл» (u_{id}) */
+  skill_preset_id?: string | null
+}
+
+export interface ImagePresetOption {
+  id: string
+  name: string
+  description: string
+  preview_keywords: string[]
+}
+
+export interface ImageEngineOption {
+  id: string
+  label: string
+}
+
+export interface ImageMetaResponse {
+  presets: ImagePresetOption[]
+  engines?: ImageEngineOption[]
+}
+
+export interface UserPresetRecord {
+  id: number
+  user_id: number
+  kind: 'image' | 'skill'
+  name: string
+  description: string
+  payload: { raw_text?: string; hint?: string }
+  created_at?: string
 }
 
 export type GenerationIssue =
@@ -324,12 +361,29 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     headers,
   })
 
+  const text = await res.text()
+
   if (!res.ok) {
-    const err = await res.text()
-    const msg = parseApiErrorBody(err, res.status)
+    const msg = parseApiErrorBody(text, res.status)
     throw new ApiError(msg, res.status)
   }
-  return res.json()
+
+  const ct = (res.headers.get('content-type') || '').toLowerCase()
+  const trimmed = text.trimStart()
+  if (!ct.includes('application/json') && (trimmed.startsWith('<!') || trimmed.startsWith('<'))) {
+    throw new ApiError(
+      'Сервер вернул HTML вместо JSON (часто index.html). Проверьте, что backend запущен и запросы к /api не отдают SPA.',
+      res.status,
+    )
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new ApiError(
+      'Ответ не JSON. Запустите backend (uvicorn) и при разработке — прокси Vite на порт API.',
+      res.status,
+    )
+  }
 }
 
 export const api = {
@@ -374,6 +428,20 @@ export const api = {
 
   generate: (req: GenerateRequest) =>
     fetchApi<GenerateResult>('/generate', { method: 'POST', body: JSON.stringify(req) }),
+  getImageOptions: () => fetchApi<ImageMetaResponse>('/meta/image-options'),
+  listPresets: (kind?: 'image' | 'skill') =>
+    fetchApi<{ items: UserPresetRecord[] }>(kind ? `/presets?kind=${kind}` : '/presets'),
+  createPreset: (req: {
+    kind: 'image' | 'skill'
+    name: string
+    description?: string
+    payload: { raw_text?: string; hint?: string }
+  }) => fetchApi<{ item: UserPresetRecord }>('/presets', { method: 'POST', body: JSON.stringify(req) }),
+  updatePreset: (
+    id: number,
+    req: { name?: string; description?: string; payload?: { raw_text?: string; hint?: string } },
+  ) => fetchApi<{ item: UserPresetRecord }>(`/presets/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  deletePreset: (id: number) => fetchApi<{ ok: boolean }>(`/presets/${id}`, { method: 'DELETE' }),
 
   semanticAgentRoute: (req: { text: string; has_prompt?: boolean }) =>
     fetchApi<{
@@ -478,10 +546,14 @@ export const api = {
       body: JSON.stringify({ text, model_id: modelId || '' }),
     }),
 
-  evaluatePrompt: (prompt: string, targetModel?: string) =>
+  evaluatePrompt: (prompt: string, targetModel?: string, promptType?: string) =>
     fetchApi<{ metrics: Record<string, unknown> }>('/library/evaluate', {
       method: 'POST',
-      body: JSON.stringify({ prompt, target_model: targetModel || '' }),
+      body: JSON.stringify({
+        prompt,
+        target_model: targetModel || '',
+        prompt_type: promptType || 'text',
+      }),
     }),
 
   // Community prompts

@@ -39,6 +39,15 @@ const FolderIcon = () => (
   </svg>
 )
 
+const PresetsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="13.5" cy="6.5" r="2.5" />
+    <circle cx="6.5" cy="13.5" r="2.5" />
+    <circle cx="17.5" cy="17.5" r="2.5" />
+    <path d="M11.5 8l-3 5M15.5 14l-3 5" />
+  </svg>
+)
+
 const MenuIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="4" y1="6" x2="20" y2="6" />
@@ -162,6 +171,16 @@ export default function AppSidebar({ collapsed, onToggleCollapse, counts, recent
                 <FolderIcon />
               </span>
               <span className={styles.label}>Пространства</span>
+            </NavLink>
+            <NavLink
+              to="/presets"
+              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              title="Пресеты студии"
+            >
+              <span className={styles.icon} aria-hidden>
+                <PresetsIcon />
+              </span>
+              <span className={styles.label}>Пресеты</span>
             </NavLink>
           </div>
 

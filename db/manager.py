@@ -172,6 +172,7 @@ class DBManager:
             self._migrate_phase7_user_auth_extended(conn)
             self._migrate_phase8_ui_color_mode(conn)
             self._migrate_phase9_community_and_skills(conn)
+            self._migrate_phase10_user_presets(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -301,6 +302,24 @@ class DBManager:
 
             CREATE INDEX IF NOT EXISTS idx_skills_user
                 ON skills(user_id);
+        """)
+
+    def _migrate_phase10_user_presets(self, conn: sqlite3.Connection) -> None:
+        """User-defined image/skill style presets (studio)."""
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS user_presets (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL,
+                kind         TEXT    NOT NULL CHECK (kind IN ('image', 'skill')),
+                name         TEXT    NOT NULL,
+                description  TEXT    DEFAULT '',
+                payload_json TEXT    NOT NULL DEFAULT '{}',
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_presets_user_kind
+                ON user_presets(user_id, kind);
         """)
 
     def _safe_add_column(
@@ -869,6 +888,113 @@ class DBManager:
                 conn.execute("DELETE FROM workspaces WHERE id = ?", (workspace_id,))
             else:
                 conn.execute("DELETE FROM workspaces WHERE id = ? AND user_id = ?", (workspace_id, user_id))
+
+    def list_user_presets(self, user_id: int, kind: str | None = None) -> list[dict]:
+        """List user presets, optionally filtered by kind ('image' or 'skill')."""
+        with self._conn() as conn:
+            if kind in ("image", "skill"):
+                rows = conn.execute(
+                    """
+                    SELECT id, user_id, kind, name, description, payload_json, created_at
+                    FROM user_presets WHERE user_id = ? AND kind = ?
+                    ORDER BY lower(name) ASC
+                    """,
+                    (user_id, kind),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, user_id, kind, name, description, payload_json, created_at
+                    FROM user_presets WHERE user_id = ?
+                    ORDER BY kind ASC, lower(name) ASC
+                    """,
+                    (user_id,),
+                ).fetchall()
+        out = []
+        for row in rows:
+            d = dict(row)
+            try:
+                d["payload"] = json.loads(d.pop("payload_json") or "{}")
+            except Exception:
+                d["payload"] = {}
+            out.append(d)
+        return out
+
+    def get_user_preset(self, preset_id: int, user_id: int) -> dict | None:
+        """Return one preset if it belongs to the user."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM user_presets WHERE id = ? AND user_id = ?",
+                (preset_id, user_id),
+            ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        try:
+            d["payload"] = json.loads(d.pop("payload_json") or "{}")
+        except Exception:
+            d["payload"] = {}
+        return d
+
+    def create_user_preset(
+        self,
+        user_id: int,
+        kind: str,
+        name: str,
+        description: str = "",
+        payload: dict | None = None,
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO user_presets (user_id, kind, name, description, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    kind,
+                    name.strip(),
+                    (description or "").strip(),
+                    json.dumps(payload or {}, ensure_ascii=False),
+                ),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def update_user_preset(
+        self,
+        preset_id: int,
+        user_id: int,
+        name: str | None = None,
+        description: str | None = None,
+        payload: dict | None = None,
+    ) -> None:
+        updates = []
+        params: list = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name.strip())
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description.strip())
+        if payload is not None:
+            updates.append("payload_json = ?")
+            params.append(json.dumps(payload, ensure_ascii=False))
+        if not updates:
+            return
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.extend([preset_id, user_id])
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE user_presets SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                params,
+            )
+
+    def delete_user_preset(self, preset_id: int, user_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "DELETE FROM user_presets WHERE id = ? AND user_id = ?",
+                (preset_id, user_id),
+            )
 
     def save_prompt_spec(
         self,

@@ -182,10 +182,79 @@ def get_improvement_tips(metrics: dict) -> list[str]:
     return tips
 
 
-def analyze_prompt(text: str, model_id: str = "") -> dict:
+def _cyrillic_letter_ratio(s: str) -> float:
+    letters = [c for c in s if c.isalpha()]
+    if not letters:
+        return 0.0
+    cyr = sum(1 for c in letters if "\u0400" <= c <= "\u04ff")
+    return cyr / len(letters)
+
+
+def _language_mismatch_tip(task_input: str | None, prompt_text: str) -> str | None:
+    if not task_input or not prompt_text or len(task_input.strip()) < 6:
+        return None
+    ti = task_input.strip()
+    pt = prompt_text.strip()
+    c_task = _cyrillic_letter_ratio(ti)
+    c_prompt = _cyrillic_letter_ratio(pt)
+    if c_task >= 0.45 and c_prompt < 0.2:
+        return (
+            "Задача преимущественно на русском, а промпт — на английском. "
+            "Если целевая модель не требует английских тегов, сформулируйте описание на языке задачи."
+        )
+    if c_task < 0.2 and c_prompt >= 0.45:
+        return "Задача на латинице, а промпт с большой долей кириллицы — проверьте согласованность с выбранным сервисом генерации."
+    return None
+
+
+def _image_has_section(text: str, patterns: list[str]) -> bool:
+    lower = text.lower()
+    for p in patterns:
+        if p in lower:
+            return True
+    return False
+
+
+def _image_contradiction_hint(text: str) -> str | None:
+    """Грубая эвристика противоречий свет/настроение (RU/EN)."""
+    lower = text.lower()
+    dark_signals = ("noir", "нуар", "тёмн", "dark mood", "night", "ночь", "low key", "chiaroscuro", "deep shadow")
+    bright_signals = ("bright", "светл", "sunny", "солнеч", "high key", "pastel", "воздуш", "daylight")
+    has_dark = any(s in lower for s in dark_signals)
+    has_bright = any(s in lower for s in bright_signals)
+    if has_dark and has_bright:
+        return (
+            "Возможное противоречие: одновременно «тёмная/ночная» и «светлая/солнечная» атмосфера. "
+            "Уточните доминирующее освещение или разделите на два варианта."
+        )
+    return None
+
+
+def _image_count_sections(text: str) -> int:
+    """Headers like **Subject:** or ## Style / Subject: at line start."""
+    n = 0
+    for line in text.splitlines():
+        s = line.strip().lower()
+        if re.match(r"^#{1,3}\s+\S", s):
+            n += 1
+        elif re.match(r"^\*\*[a-zа-яё0-9\s\-]{2,40}\*\*:", s):
+            n += 1
+        elif re.match(
+            r"^(subject|style|composition|details|negative|technical|субъект|стиль|композиц|детали|негатив|технич|параметр|освещен|палитр|кадр|ракурс)\s*:",
+            s,
+        ):
+            n += 1
+    return min(n, 8)
+
+
+def analyze_image_prompt(
+    text: str,
+    model_id: str = "",
+    task_input: str | None = None,
+) -> dict:
     """
-    Full prompt analysis. Returns metrics dict with quality score and tips.
-    *model_id* (OpenRouter id or short key) enables exact token counting.
+    Heuristic checklist for text-to-image prompts (structure + visual cues).
+    Separate from chat/LLM rubric — see metaprompt / image pipeline research.
     """
     if not text or not text.strip():
         return {
@@ -201,6 +270,152 @@ def analyze_prompt(text: str, model_id: str = "") -> dict:
             "completeness_score": 0.0,
             "completeness_label": "Минимальный",
             "improvement_tips": [],
+            "prompt_analysis_mode": "image",
+        }
+
+    tok = count_tokens(text, model_id) if model_id else {"tokens": estimate_tokens_quick(text), "method": "estimate"}
+    lower = text.lower()
+
+    style_hit = _image_has_section(
+        text,
+        [
+            "style:", "стиль", "aesthetic", "эстетик", "medium:", "oil", "watercolor", "3d render",
+            "cartoon", "мульт", "clay", "claymation", "anime", "realistic", "реализ", "illustration",
+            "cinematic", "pixar", "стиль:",
+        ],
+    )
+    comp_hit = _image_has_section(
+        text,
+        [
+            "composition", "композиц", "framing", "camera", "wide shot", "close-up", "close up", "angle",
+            "depth of field", "bokeh", "ракурс", "кадр", "план:", "shot:",
+        ],
+    )
+    light_color = _image_has_section(
+        text,
+        [
+            "lighting", "light", "освещ", "golden hour", "soft light", "palette", "color", "цвет",
+            "атмосфер", "mood", "настроен", "тени", "контраст",
+        ],
+    )
+    neg_hit = _image_has_section(
+        text,
+        [
+            "negative:", "негатив", "avoid", "избегай", "исключи", "without", "no ", "don't", "не добавляй",
+            "artifacts", "артефакт", "distort", "искаж",
+        ],
+    )
+    tech_hit = _image_has_section(
+        text,
+        [
+            "aspect", "16:9", "9:16", "4:3", "1:1", "соотношение", "--ar", "resolution", "8k", "4k", "hdr",
+            "quality", "качество", "technical", "параметр",
+        ],
+    )
+    subject_hit = _image_has_section(
+        text,
+        [
+            "subject:", "субъект", "scene:", "сцена", "main subject", "foreground", "background", "персонаж",
+            "объект", "герой",
+        ],
+    ) or len(text) > 180
+
+    section_n = _image_count_sections(text)
+    detail_bonus = min(15.0, max(0.0, (len(text) / 1200.0) * 15.0))
+
+    score = 0.0
+    if subject_hit:
+        score += 22.0
+    if style_hit:
+        score += 22.0
+    if comp_hit:
+        score += 16.0
+    if light_color:
+        score += 12.0
+    if neg_hit:
+        score += 14.0
+    if tech_hit:
+        score += 14.0
+    score += min(12.0, section_n * 3.0)
+    score += detail_bonus
+    score = min(100.0, score)
+
+    tips: list[str] = []
+    if not style_hit:
+        tips.append("Добавьте блок стиля: техника (иллюстрация, 3D, масло), референсы эпохи или художественного приёма.")
+    if not comp_hit:
+        tips.append("Уточните кадрирование: план (общий/средний), ракурс, глубина резкости.")
+    if not light_color:
+        tips.append("Добавьте свет и/или цветовую палитру (мягкий свет, золотой час, холодная гамма…).")
+    if not neg_hit:
+        tips.append("Добавьте негативный промпт: артефакты, лишние пальцы, шум, водяные знаки — что исключить.")
+    if not tech_hit:
+        tips.append("Укажите технические параметры: соотношение сторон (1:1, 16:9…), разрешение или качество, если важно.")
+
+    lang_tip = _language_mismatch_tip(task_input, text)
+    if lang_tip:
+        tips.insert(0, lang_tip)
+    contra = _image_contradiction_hint(text)
+    if contra:
+        tips.insert(0 if not lang_tip else 1, contra)
+
+    # Fields for compatibility with older UIs / eval chips
+    metrics = {
+        "token_estimate": tok["tokens"],
+        "token_method": tok["method"],
+        "instruction_count": section_n,
+        "constraint_count": sum(1 for w in ["avoid", "no ", "never", "without", "не ", "без "] if w in lower),
+        "has_role": subject_hit,
+        "has_output_format": tech_hit,
+        "has_examples": False,
+        "has_context": light_color,
+        "has_cot_trigger": False,
+        "has_subject": subject_hit,
+        "has_style": style_hit,
+        "has_composition": comp_hit,
+        "has_lighting_or_palette": light_color,
+        "has_negative_block": neg_hit,
+        "has_technical_params": tech_hit,
+        "completeness_score": score,
+        "completeness_label": get_completeness_label(score),
+        "improvement_tips": tips[:6],
+        "prompt_analysis_mode": "image",
+    }
+    metrics["quality_score"] = metrics["completeness_score"]
+    metrics["quality_label"] = metrics["completeness_label"]
+    return metrics
+
+
+def analyze_prompt(
+    text: str,
+    model_id: str = "",
+    *,
+    prompt_type: str = "text",
+    task_input: str | None = None,
+) -> dict:
+    """
+    Full prompt analysis. Returns metrics dict with quality score and tips.
+    *model_id* (OpenRouter id or short key) enables exact token counting.
+    For prompt_type=\"image\", uses a dedicated image-generation rubric.
+    """
+    if prompt_type == "image":
+        return analyze_image_prompt(text, model_id=model_id, task_input=task_input)
+
+    if not text or not text.strip():
+        return {
+            "token_estimate": 0,
+            "token_method": "none",
+            "instruction_count": 0,
+            "constraint_count": 0,
+            "has_role": False,
+            "has_output_format": False,
+            "has_examples": False,
+            "has_context": False,
+            "has_cot_trigger": False,
+            "completeness_score": 0.0,
+            "completeness_label": "Минимальный",
+            "improvement_tips": [],
+            "prompt_analysis_mode": "text",
         }
 
     tok = count_tokens(text, model_id) if model_id else {"tokens": estimate_tokens_quick(text), "method": "estimate"}
@@ -218,7 +433,12 @@ def analyze_prompt(text: str, model_id: str = "") -> dict:
     }
     metrics["completeness_score"] = compute_completeness_score(metrics)
     metrics["completeness_label"] = get_completeness_label(metrics["completeness_score"])
-    metrics["improvement_tips"] = get_improvement_tips(metrics)
+    tips = get_improvement_tips(metrics)
+    lang = _language_mismatch_tip(task_input, text)
+    if lang:
+        tips.insert(0, lang)
+    metrics["improvement_tips"] = tips[:8]
+    metrics["prompt_analysis_mode"] = "text"
     # Backward compatibility
     metrics["quality_score"] = metrics["completeness_score"]
     metrics["quality_label"] = metrics["completeness_label"]

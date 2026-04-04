@@ -1,11 +1,13 @@
 """Prompt generation."""
 from __future__ import annotations
 
+import json
+import re
 import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config.abuse import check_input_size, check_rate_limit
 from config.settings import BUDGET_GENERATIONS_PER_SESSION, TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
@@ -17,6 +19,9 @@ from core.prompt_spec import build_generation_brief
 from core.model_taxonomy import classify_model, ModelType, SUPPRESS_FOR_REASONING
 from core.quality_metrics import analyze_prompt
 from core.tokenizer import count_tokens
+from core.image_presets import format_active_style_preset_system_block, get_image_preset
+from core.image_style_tags import expand_image_tags_to_directives
+from core.image_target_syntax import get_image_engine_syntax_block
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -31,6 +36,116 @@ from services.prompt_workflow import (
 )
 
 router = APIRouter()
+
+IMAGE_PROMPT_MODE_BLOCK = (
+    "\n\n--- IMAGE PROMPT MODE ---\n"
+    "The user wants a prompt for AI image generation (Midjourney, DALL-E, Stable Diffusion, Flux, etc.).\n"
+    "\n"
+    "LANGUAGE (critical): The entire text inside [PROMPT] must be in the SAME language as the user's task "
+    "in the user message below (Russian task → Russian prompt; English → English). Do not default to English "
+    "only because many image prompts online are in English, unless the user explicitly asked for English tags.\n"
+    "\n"
+    "Structure the image prompt with clear sections, for example:\n"
+    "1. **Subject / Субъект** — who or what, action\n"
+    "2. **Style / Стиль** — medium, references (claymation, oil, 3D…)\n"
+    "3. **Composition / Композиция** — framing, camera, depth of field\n"
+    "4. **Lighting & palette / Свет и палитра**\n"
+    "5. **Negative / Негатив** — what to avoid\n"
+    "6. **Technical / Техника** — aspect ratio, quality, if relevant\n"
+    "\n"
+    "Use concrete visual language. Include technical parameters when useful.\n"
+    "--- END IMAGE PROMPT MODE ---"
+)
+
+IMAGE_QUESTIONS_APPEND = (
+    "\n\n[Image questions] When you output [QUESTIONS], ask about: aspect ratio (1:1, 16:9, 9:16…), "
+    "visual style (realism / cartoon / minimal / illustration / cinematic), lighting and mood, color palette, "
+    "detail level, single subject vs full scene. Each question must include short badge-like options (2–5 words) "
+    "and at least 2 meaningful alternatives per question. Use the same language as the user's task.\n"
+)
+
+# Режим вопросов: пока пользователь не ответил на уточнения и это не итерация промпта — жёстче требовать [QUESTIONS].
+IMAGE_QUESTIONS_STRICT = (
+    "\n\n--- IMAGE — ОБЯЗАТЕЛЬНЫЕ УТОЧНЕНИЯ (режим вопросов) ---\n"
+    "В этом запросе нет ответов на уточняющие вопросы и нет «улучшения существующего промпта» (первичная генерация).\n"
+    "Верни [QUESTIONS]...[/QUESTIONS], а не [PROMPT], если в формулировке пользователя не раскрыты явно: "
+    "соотношение сторон; визуальный стиль; тёплая/холодная/нейтральная палитра; ключевой свет и настроение; "
+    "уровень детализации; один объект или целая сцена.\n"
+    "Если пользователь уже дал исчерпывающее ТЗ по всем пунктам — можно [PROMPT]. "
+    "Язык вопросов — как у задачи пользователя; варианты строками «- ».\n"
+    "--- END IMAGE STRICT ---"
+)
+
+TEXT_QUESTIONS_STRICT = (
+    "\n\n--- TEXT — РЕЖИМ ВОПРОСОВ (строже) ---\n"
+    "Ответов на уточнения в сообщении нет; это первичная генерация (не итерация по готовому промпту).\n"
+    "Если цель, аудитория, формат ответа целевой модели или жёсткие ограничения не ясны — верни [QUESTIONS], не [PROMPT]. "
+    "Длинный текст без явной цели не считается достаточным основанием для [PROMPT].\n"
+    "--- END TEXT STRICT ---"
+)
+
+SKILL_QUESTIONS_STRICT = (
+    "\n\n--- SKILL — РЕЖИМ ВОПРОСОВ (строже) ---\n"
+    "Ответов на уточнения нет; первичная генерация скилла.\n"
+    "Если не ясны: среда (Cursor/Claude/общий), язык, глубина, формат вывода (YAML/Markdown), границы скилла — "
+    "верни [QUESTIONS], не [PROMPT].\n"
+    "--- END SKILL STRICT ---"
+)
+
+SCENE_ANALYSIS_SYSTEM = """You are a visual scene analyst for text-to-image workflows.
+Given the user's description (and any clarifications), output ONLY a single JSON object. No markdown fences, no commentary before or after.
+Keys (use the same language as the user for string values):
+- "subject": main subject and action
+- "setting": environment / location
+- "mood": emotional tone
+- "lighting": light quality and direction
+- "camera": framing, lens feel, shot scale if inferable
+- "style_notes": artistic direction
+- "negative": what to avoid visually (string, may be empty)
+Use empty string "" for unknown values rather than omitting keys."""
+
+
+def _extract_json_object(raw: str) -> dict | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if len(lines) >= 2:
+            inner = "\n".join(lines[1:])
+            if inner.rstrip().endswith("```"):
+                inner = inner[: inner.rfind("```")].rstrip()
+            text = inner.strip()
+    try:
+        val = json.loads(text)
+        return val if isinstance(val, dict) else None
+    except json.JSONDecodeError:
+        m = re.search(r"\{[\s\S]*\}", text)
+        if not m:
+            return None
+        try:
+            val = json.loads(m.group(0))
+            return val if isinstance(val, dict) else None
+        except json.JSONDecodeError:
+            return None
+
+
+def _scene_analysis_user_text(task_input: str, clarification_answers_text: str, feedback: str) -> str:
+    parts = [task_input.strip()]
+    if clarification_answers_text.strip():
+        parts.append("Уточнения:\n" + clarification_answers_text.strip())
+    if feedback.strip():
+        parts.append("Комментарий к улучшению:\n" + feedback.strip())
+    return "\n\n".join(parts)
+
+
+def _scene_analysis_provider(using_host_key: bool) -> str:
+    """Дешёвая модель: на пробном ключе — в пределах лимита цены."""
+    base = "gemini_flash"
+    if not using_host_key:
+        return "claude_haiku"
+    return base
+
 
 class GenerateRequest(BaseModel):
     task_input: str
@@ -52,6 +167,63 @@ class GenerateRequest(BaseModel):
     question_answers: list[dict] = []
     skill_body: str | None = None
     prompt_type: str = "text"
+    image_prompt_tags: list[str] = Field(default_factory=list)
+    image_preset_id: str | None = None
+    # Целевой движок картинки (MJ/SD/…): подсказки синтаксиса в system prompt, не путать с gen_model.
+    image_engine: str | None = None
+    image_deep_mode: bool = False
+    skill_preset_id: str | None = None
+
+
+def _is_primary_generation_with_unanswered_questions(req: GenerateRequest) -> bool:
+    """Первый проход: нет ответов на вопросы и не режим «улучшить промпт»."""
+    if not req.questions_mode:
+        return False
+    if req.question_answers and len(req.question_answers) > 0:
+        return False
+    if req.previous_prompt and str(req.previous_prompt).strip():
+        return False
+    return True
+
+
+def _resolve_image_preset_dict(preset_id: str | None, user_id: int, db: DBManager):
+    if not preset_id or not str(preset_id).strip():
+        return None
+    s = str(preset_id).strip()
+    if s.startswith("u_"):
+        try:
+            nid = int(s[2:])
+        except ValueError:
+            return None
+        row = db.get_user_preset(nid, user_id)
+        if not row or row.get("kind") != "image":
+            return None
+        pl = row.get("payload") or {}
+        return {
+            "id": s,
+            "name": row["name"],
+            "description": row.get("description") or "",
+            "raw_text": pl.get("raw_text", ""),
+        }
+    return get_image_preset(s)
+
+
+def _resolve_skill_preset_hint(preset_id: str | None, user_id: int, db: DBManager) -> str | None:
+    if not preset_id or not str(preset_id).strip():
+        return None
+    s = str(preset_id).strip()
+    if not s.startswith("u_"):
+        return None
+    try:
+        nid = int(s[2:])
+    except ValueError:
+        return None
+    row = db.get_user_preset(nid, user_id)
+    if not row or row.get("kind") != "skill":
+        return None
+    pl = row.get("payload") or {}
+    h = str(pl.get("hint", "")).strip()
+    return h or None
 
 
 def _check_session_budget(db: DBManager, user_id: int, auth_session_id: str | None) -> None:
@@ -231,27 +403,52 @@ def generate_prompt(
         combined_input += f"\n\nОтветы на уточняющие вопросы:\n{clarification_answers_text}"
     if req.feedback.strip():
         combined_input += f"\n\nКомментарий к улучшению: {req.feedback}"
+    if req.prompt_type == "image" and req.image_prompt_tags:
+        tag_block = expand_image_tags_to_directives(req.image_prompt_tags)
+        if tag_block:
+            combined_input += "\n\n" + tag_block
+
+    image_preset_dict = None
+    if req.prompt_type == "image":
+        image_preset_dict = _resolve_image_preset_dict(req.image_preset_id, user_id, db)
+
+    if req.prompt_type == "image" and req.image_deep_mode:
+        spa = _scene_analysis_provider(using_host_key)
+        if using_host_key:
+            cmid = _get_openrouter_model_id(spa)
+            if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
+                spa = "gemini_flash"
+        scene_user = _scene_analysis_user_text(req.task_input, clarification_answers_text, req.feedback)
+        raw_scene = llm.generate(SCENE_ANALYSIS_SYSTEM, scene_user, spa, temperature=0.35)
+        scene_obj = _extract_json_object(raw_scene)
+        if scene_obj:
+            combined_input += (
+                "\n\n--- STRUCTURED SCENE BRIEF (analyser output; treat as facts, expand into a rich image prompt) ---\n"
+                + json.dumps(scene_obj, ensure_ascii=False, indent=2)
+                + "\n--- END SCENE BRIEF ---"
+            )
+        if using_host_key:
+            c_raw = len(SCENE_ANALYSIS_SYSTEM) + len(scene_user) + len(raw_scene) + 200
+            model_id = _get_openrouter_model_id(spa)
+            pr, cp = get_model_pricing(model_id)
+            db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
 
     system_prompt = builder.build_system_prompt(
         technique_ids=technique_ids,
         target_model=req.target_model,
         domain=req.domain or "auto",
         questions_mode=req.questions_mode,
+        prompt_type=req.prompt_type or "text",
     )
     if req.prompt_type == "image":
-        system_prompt += (
-            "\n\n--- IMAGE PROMPT MODE ---\n"
-            "The user wants a prompt for AI image generation (Midjourney, DALL-E, Stable Diffusion, etc.).\n"
-            "Focus on visual description quality. Structure the output as:\n"
-            "1. **Subject**: Main subject with specific visual details\n"
-            "2. **Style**: Art style, medium, lighting, color palette\n"
-            "3. **Composition**: Camera angle, framing, depth of field\n"
-            "4. **Details**: Textures, materials, atmosphere, mood\n"
-            "5. **Negative**: What to avoid (artifacts, distortions, etc.)\n"
-            "Use descriptive, vivid language. Include technical parameters when relevant "
-            "(aspect ratio, quality tags, etc.).\n"
-            "--- END IMAGE PROMPT MODE ---"
-        )
+        system_prompt += IMAGE_PROMPT_MODE_BLOCK
+        if req.questions_mode:
+            system_prompt += IMAGE_QUESTIONS_APPEND
+        system_prompt += get_image_engine_syntax_block(req.image_engine)
+        if image_preset_dict:
+            system_prompt += format_active_style_preset_system_block(image_preset_dict)
+        if _is_primary_generation_with_unanswered_questions(req):
+            system_prompt += IMAGE_QUESTIONS_STRICT
     elif req.prompt_type == "skill":
         system_prompt += (
             "\n\n--- SKILL PROMPT MODE ---\n"
@@ -263,6 +460,18 @@ def generate_prompt(
             "The skill should be copy-paste ready and self-contained.\n"
             "--- END SKILL PROMPT MODE ---"
         )
+        sp_hint = _resolve_skill_preset_hint(req.skill_preset_id, user_id, db)
+        if sp_hint:
+            system_prompt += (
+                "\n\n--- USER SKILL PRESET ---\n"
+                "Дополнительные правила для этой генерации скилла (язык и структура — по запросу пользователя):\n"
+                + sp_hint
+                + "\n--- END USER SKILL PRESET ---"
+            )
+        if _is_primary_generation_with_unanswered_questions(req):
+            system_prompt += SKILL_QUESTIONS_STRICT
+    if req.prompt_type == "text" and _is_primary_generation_with_unanswered_questions(req):
+        system_prompt += TEXT_QUESTIONS_STRICT
     if req.skill_body and req.skill_body.strip():
         system_prompt += (
             "\n\n--- ACTIVE SKILL ---\n"
@@ -302,7 +511,16 @@ def generate_prompt(
         generation_issue = "questions_unparsed"
     elif gen_flags["weak_question_options"]:
         generation_issue = "weak_question_options"
-    metrics = analyze_prompt(parsed.get("prompt_block", ""), model_id=req.target_model) if parsed.get("has_prompt") else {}
+    metrics = (
+        analyze_prompt(
+            parsed.get("prompt_block", ""),
+            req.target_model,
+            prompt_type=req.prompt_type or "text",
+            task_input=req.task_input,
+        )
+        if parsed.get("has_prompt")
+        else {}
+    )
     latency_ms = round((time.perf_counter() - started_at) * 1000, 1)
     outcome = "prompt" if parsed.get("has_prompt") else "questions" if parsed.get("has_questions") else "raw_text"
 

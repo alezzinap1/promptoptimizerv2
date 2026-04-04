@@ -155,27 +155,44 @@ class TechniqueRegistry:
                         break
         return result[:max_techniques]
 
-    def build_technique_context(self, technique_ids: list[str]) -> str:
+    def build_technique_context(self, technique_ids: list[str], prompt_type: str = "text") -> str:
         """Build compact context string from technique cards for injection into system prompt."""
         parts: list[str] = []
+        use_image = (prompt_type or "text") == "image"
         for tid in technique_ids:
             tech = self._techniques.get(tid)
             if not tech:
                 continue
             lines = [f"## **Техника:** {tech.get('name', tid)}"]
 
-            why = tech.get("why_it_works", "")
-            if why:
-                lines.append(f"**Почему работает:** {why.strip()}")
-
-            core = tech.get("core_pattern", "")
-            if core:
-                lines.append(f"**Базовый шаблон:**\n{core.strip()}")
+            iv = tech.get("image_variant") if use_image else None
+            if isinstance(iv, dict) and iv:
+                why = iv.get("why_it_works") or tech.get("why_it_works", "")
+                if why:
+                    lines.append(f"**Почему работает (для image prompt):** {str(why).strip()}")
+                core = iv.get("core_pattern", "")
+                if core:
+                    lines.append(f"**Шаблон для визуального промпта:**\n{str(core).strip()}")
+                else:
+                    why = tech.get("why_it_works", "")
+                    if why:
+                        lines.append(f"**Почему работает:** {why.strip()}")
+                    core = tech.get("core_pattern", "")
+                    if core:
+                        lines.append(f"**Базовый шаблон:**\n{core.strip()}")
             else:
-                variants = tech.get("variants", [])
-                if variants:
-                    v = variants[0]
-                    lines.append(f"**Шаблон ({v.get('name', 'основной')}):**\n{v.get('pattern', '').strip()}")
+                why = tech.get("why_it_works", "")
+                if why:
+                    lines.append(f"**Почему работает:** {why.strip()}")
+
+                core = tech.get("core_pattern", "")
+                if core:
+                    lines.append(f"**Базовый шаблон:**\n{core.strip()}")
+                else:
+                    variants = tech.get("variants", [])
+                    if variants:
+                        v = variants[0]
+                        lines.append(f"**Шаблон ({v.get('name', 'основной')}):**\n{v.get('pattern', '').strip()}")
 
             anti = tech.get("anti_patterns", [])
             if anti:
