@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api } from '../../api/client'
 import LibraryTagChips from '../../components/LibraryTagChips'
 import MarkdownOutput from '../../components/MarkdownOutput'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
+import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import SelectDropdown from '../../components/SelectDropdown'
 import styles from './SkillsPanel.module.css'
 
@@ -84,6 +86,30 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'date' | 'name'>('date')
   const [tagPaintTick, setTagPaintTick] = useState(0)
+  const [generating, setGenerating] = useState(false)
+  const [genDescription, setGenDescription] = useState('')
+  const [publishSkill, setPublishSkill] = useState<SkillItem | null>(null)
+
+  const handleGenerate = useCallback(async () => {
+    const desc = genDescription.trim()
+    if (!desc) return
+    setGenerating(true)
+    try {
+      const r = await api.generateSkill(desc)
+      if (r.generated_body) {
+        const lines = r.generated_body.split('\n')
+        let name = desc.slice(0, 60)
+        const nameLine = lines.find((l) => l.startsWith('name:'))
+        if (nameLine) name = nameLine.replace('name:', '').trim()
+        const descLine = lines.find((l) => l.startsWith('description:'))
+        const genDesc = descLine ? descLine.replace('description:', '').trim() : ''
+        const bodyStart = r.generated_body.indexOf('---', r.generated_body.indexOf('---') + 1)
+        const body = bodyStart > 0 ? r.generated_body.slice(bodyStart + 3).trim() : r.generated_body
+        setDraft((d) => ({ ...d, title: d.title || name, description: d.description || genDesc, body }))
+      }
+    } catch { /* ignore */ }
+    setGenerating(false)
+  }, [genDescription])
 
   useEffect(() => {
     const onPaint = () => setTagPaintTick((t) => t + 1)
@@ -243,6 +269,14 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
               </div>
               <div className={styles.actions}>
                 <CopyIconButton text={it.body} title="Копировать тело скилла" />
+                <button
+                  type="button"
+                  className={styles.pubBtn}
+                  title="Опубликовать в сообществе"
+                  onClick={() => setPublishSkill(it)}
+                >
+                  Сообщество
+                </button>
                 <DownloadIconButton
                   title="Скачать скилл как .txt"
                   onClick={() => {
@@ -268,6 +302,30 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
         <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>{editingId ? 'Редактировать скилл' : 'Новый скилл'}</h3>
+            {!editingId && (
+              <div className={styles.field} style={{ background: 'var(--panel-strong)', padding: 10, borderRadius: 8 }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                  Сгенерировать с помощью ИИ
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={genDescription}
+                    onChange={(e) => setGenDescription(e.target.value)}
+                    placeholder="Опишите скилл: SEO-эксперт для блогов…"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleGenerate}
+                    disabled={generating || !genDescription.trim()}
+                    style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}
+                  >
+                    {generating ? 'Генерация…' : 'Сгенерировать'}
+                  </button>
+                </div>
+              </div>
+            )}
             <label className={styles.field}>
               Название
               <input
@@ -326,6 +384,20 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
             </div>
           </div>
         </div>
+      )}
+
+      {publishSkill && (
+        <PublishToCommunityModal
+          open
+          onClose={() => setPublishSkill(null)}
+          initial={{
+            title: publishSkill.title,
+            prompt: publishSkill.body,
+            description: publishSkill.description,
+            prompt_type: 'skill',
+            tags: [...publishSkill.tags, ...publishSkill.frameworks],
+          }}
+        />
       )}
     </div>
   )

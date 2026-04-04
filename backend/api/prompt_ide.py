@@ -21,6 +21,7 @@ class PromptIdePreviewRequest(BaseModel):
     manual_techs: list[str] = []
     overrides: dict | None = None
     evidence_decisions: dict | None = None
+    prompt_type: str = "text"
 
 
 @router.post("/prompt-ide/preview")
@@ -43,6 +44,7 @@ def preview_prompt_ide(
         registry=registry,
         technique_mode=req.technique_mode,
         manual_techs=req.manual_techs,
+        prompt_type=req.prompt_type or "text",
     )
     result["workspace"] = normalize_workspace(workspace)
     return result

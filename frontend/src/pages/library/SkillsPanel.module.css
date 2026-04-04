@@ -143,6 +143,21 @@
   border-top: 1px solid var(--stroke);
 }
 
+.pubBtn {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.pubBtn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;

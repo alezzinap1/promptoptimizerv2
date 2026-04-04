@@ -47,7 +47,7 @@ const MenuIcon = () => (
   </svg>
 )
 
-type Counts = { prompts: number; techniques: number; skills: number }
+type Counts = { prompts: number | null; techniques: number | null; skills: number }
 
 type Props = {
   collapsed: boolean
@@ -113,7 +113,7 @@ export default function AppSidebar({ collapsed, onToggleCollapse, counts, recent
                 <LibraryIcon />
               </span>
               <span className={styles.label}>Промпты</span>
-              <span className={styles.badge}>{counts.prompts}</span>
+              <span className={styles.badge}>{counts.prompts === null ? '…' : counts.prompts}</span>
             </NavLink>
             <NavLink
               to="/library?tab=techniques"
@@ -124,7 +124,7 @@ export default function AppSidebar({ collapsed, onToggleCollapse, counts, recent
                 <TechIcon />
               </span>
               <span className={styles.label}>Техники</span>
-              <span className={styles.badge}>{counts.techniques}</span>
+              <span className={styles.badge}>{counts.techniques === null ? '…' : counts.techniques}</span>
             </NavLink>
             <NavLink
               to="/library?tab=skills"
@@ -136,6 +136,18 @@ export default function AppSidebar({ collapsed, onToggleCollapse, counts, recent
               </span>
               <span className={styles.label}>Скиллы</span>
               <span className={styles.badge}>{counts.skills}</span>
+            </NavLink>
+          </div>
+
+          <div className={styles.section}>
+            <div className={styles.sectionLabel}>Сообщество</div>
+            <NavLink
+              to="/community"
+              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              title="Общая библиотека"
+            >
+              <span className={styles.icon} aria-hidden>&#127760;</span>
+              <span className={styles.label}>Промпты</span>
             </NavLink>
           </div>
 

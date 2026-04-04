@@ -13,6 +13,7 @@ import Settings from './pages/Settings'
 import UserInfo from './pages/UserInfo'
 import Workspaces from './pages/Workspaces'
 import SimpleImprove from './pages/SimpleImprove'
+import Community from './pages/Community'
 import Help from './pages/Help'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -46,6 +47,7 @@ function AppShell() {
         <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
         <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
         <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
+        <Route path="/community" element={<RequireAuth><Community /></RequireAuth>} />
         <Route path="/techniques" element={<RequireAuth><Navigate to="/library?tab=techniques" replace /></RequireAuth>} />
         <Route path="/workspaces" element={<RequireAuth><Workspaces /></RequireAuth>} />
         <Route path="/models" element={<RequireAuth><Models /></RequireAuth>} />

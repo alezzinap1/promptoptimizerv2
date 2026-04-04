@@ -91,12 +91,45 @@ class TechniqueRegistry:
         complexity: str = "medium",
         max_techniques: int = 3,
         target_model: str = "unknown",
+        user_input: str = "",
+        prompt_type: str = "text",
     ) -> list[dict[str, Any]]:
-        """Select optimal technique set for given task types and target model."""
+        """Select optimal technique set using scored synergy algorithm.
+
+        Falls back to legacy boolean matching when user_input is empty
+        (backward compat for callers that don't pass it).
+        """
+        if user_input:
+            from core.technique_synergy import select_techniques_scored
+
+            return select_techniques_scored(
+                task_types=task_types,
+                complexity=complexity,
+                user_input=user_input,
+                techniques_data=self._techniques,
+                max_techniques=max_techniques,
+                target_model=target_model,
+                prompt_type=prompt_type or "text",
+            )
+
+        return self._select_techniques_legacy(
+            task_types=task_types,
+            complexity=complexity,
+            max_techniques=max_techniques,
+            target_model=target_model,
+        )
+
+    def _select_techniques_legacy(
+        self,
+        task_types: list[str],
+        complexity: str = "medium",
+        max_techniques: int = 3,
+        target_model: str = "unknown",
+    ) -> list[dict[str, Any]]:
+        """Legacy boolean-match selection (kept for backward compatibility)."""
         seen: set[str] = set()
         selected: list[dict[str, Any]] = []
 
-        # Boost Claude-specific techniques if target is Claude
         is_claude = "claude" in target_model
 
         for task_type in task_types:
@@ -107,7 +140,6 @@ class TechniqueRegistry:
                     seen.add(tid)
                     selected.append(tech)
 
-        # Sort: Claude targets prefer claude-specific techniques
         if is_claude:
             selected.sort(key=lambda t: (0 if t["id"] in CLAUDE_PREFERRED else 1, t.get("priority", 99)))
         else:
@@ -115,7 +147,6 @@ class TechniqueRegistry:
 
         result = selected[:max_techniques]
         if not result:
-            # No technique matched task_types (e.g. "general", "data_analysis") — use fallback
             for tid in FALLBACK_TECHNIQUE_IDS:
                 tech = self._techniques.get(tid)
                 if tech and (target_model != "small_model" or tid not in AVOID_ON_SMALL_MODELS):

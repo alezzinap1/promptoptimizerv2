@@ -1,0 +1,51 @@
+.root {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  max-height: 280px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 0;
+}
+
+.rowEq,
+.rowDel,
+.rowIns {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 1px 10px 1px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.rowEq {
+  color: var(--muted);
+}
+
+.rowDel {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+}
+
+.rowIns {
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+}
+
+.mark {
+  flex: 0 0 1rem;
+  width: 1rem;
+  text-align: center;
+  opacity: 0.9;
+  user-select: none;
+}
+
+.line {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+  font-family: inherit;
+  font-size: inherit;
+}

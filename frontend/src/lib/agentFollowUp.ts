@@ -30,9 +30,36 @@ function looksLikeEditCommand(t: string): boolean {
   return false
 }
 
+/** Нормализация ввода: BOM, zero-width, все виды пробелов → один обычный. */
+export function normalizeAgentUserMessage(t: string): string {
+  return t
+    .replace(/\uFEFF/g, '')
+    .replace(/[\u200B-\u200D\u2060]/g, '')
+    .replace(/[\s\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g, ' ')
+    .trim()
+}
+
+/**
+ * Кнопка «+ Применить» подставляет «Примени совет: …».
+ * Не требуем строгого ASCII-двоеточия и начала строки — семантика иначе часто бьёт в chat.
+ */
+export function looksLikeApplyTipDirective(t: string): boolean {
+  const s = normalizeAgentUserMessage(t)
+  const low = s.toLowerCase()
+  if (low.startsWith('примени совет') || low.startsWith('применить совет')) return true
+  if (low.startsWith('apply tip')) return true
+  const head = low.slice(0, 56)
+  // Не используем \b у кириллицы: в JS граница слова только для [A-Za-z0-9_].
+  if (/примени(ть)?\s+совет/i.test(head)) return true
+  if (/apply\s+tip/i.test(head)) return true
+  return false
+}
+
 /** Явная правка промпта — имеет приоритет над семантическим классификатором. */
 export function looksLikeStrongEdit(t: string): boolean {
-  return looksLikeEditCommand(t.replace(/\s+/g, ' ').trim())
+  const s = normalizeAgentUserMessage(t)
+  if (looksLikeApplyTipDirective(s)) return true
+  return looksLikeEditCommand(s)
 }
 
 function looksLikeMetaOrProductQuestion(t: string): boolean {
@@ -77,8 +104,12 @@ export function parseTitleHint(t: string): string | undefined {
 
 /** Сообщение в чате после того, как промпт уже есть справа */
 export function classifyAgentFollowUp(text: string): FollowUpPlan {
-  const raw = text.replace(/\s+/g, ' ').trim()
+  const raw = normalizeAgentUserMessage(text)
   const low = raw.toLowerCase()
+
+  if (looksLikeApplyTipDirective(raw)) {
+    return { type: 'iterate', debug: 'apply_tip_button' }
+  }
 
   if (/сохрани|в\s+библиотек|save\s+to\s+library|добавь\s+в\s+библиотек/i.test(raw)) {
     return {

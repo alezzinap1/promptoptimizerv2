@@ -171,6 +171,7 @@ class DBManager:
             self._migrate_phase6_task_classifier_prefs(conn)
             self._migrate_phase7_user_auth_extended(conn)
             self._migrate_phase8_ui_color_mode(conn)
+            self._migrate_phase9_community_and_skills(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -247,6 +248,60 @@ class DBManager:
         self._safe_add_column(
             conn, "user_preferences", "color_mode", "TEXT DEFAULT 'dark'"
         )
+
+    def _migrate_phase9_community_and_skills(self, conn: sqlite3.Connection) -> None:
+        """Community prompt library, votes, and backend-persisted skills."""
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS community_prompts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                author_user_id  INTEGER NOT NULL,
+                title           TEXT    NOT NULL,
+                description     TEXT    DEFAULT '',
+                prompt          TEXT    NOT NULL,
+                prompt_type     TEXT    DEFAULT 'text',
+                category        TEXT    DEFAULT 'general',
+                tags            TEXT    DEFAULT '[]',
+                upvotes         INTEGER DEFAULT 0,
+                image_path      TEXT,
+                is_public       INTEGER DEFAULT 1,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_community_prompts_type
+                ON community_prompts(prompt_type);
+            CREATE INDEX IF NOT EXISTS idx_community_prompts_category
+                ON community_prompts(category);
+            CREATE INDEX IF NOT EXISTS idx_community_prompts_author
+                ON community_prompts(author_user_id);
+
+            CREATE TABLE IF NOT EXISTS community_votes (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id   INTEGER NOT NULL,
+                prompt_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (prompt_id) REFERENCES community_prompts(id) ON DELETE CASCADE,
+                UNIQUE(user_id, prompt_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS skills (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                name        TEXT    NOT NULL,
+                description TEXT    DEFAULT '',
+                body        TEXT    NOT NULL,
+                category    TEXT    DEFAULT 'general',
+                is_public   INTEGER DEFAULT 0,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_skills_user
+                ON skills(user_id);
+        """)
 
     def _safe_add_column(
         self,
@@ -1128,3 +1183,221 @@ class DBManager:
                 cur = conn.execute("SELECT DISTINCT task_type FROM prompt_library WHERE user_id = ?", (user_id,))
             types = [r[0] for r in cur.fetchall()]
         return {"total": total, "models": models, "task_types": types}
+
+    # ─── Community prompts ─────────────────────────────────────────────────
+
+    def create_community_prompt(
+        self,
+        author_user_id: int,
+        title: str,
+        prompt: str,
+        description: str = "",
+        prompt_type: str = "text",
+        category: str = "general",
+        tags: list[str] | None = None,
+        image_path: str | None = None,
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """INSERT INTO community_prompts
+                   (author_user_id, title, description, prompt, prompt_type, category, tags, image_path)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (author_user_id, title, description, prompt, prompt_type, category,
+                 json.dumps(tags or [], ensure_ascii=False), image_path),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def list_community_prompts(
+        self,
+        prompt_type: str | None = None,
+        category: str | None = None,
+        search: str | None = None,
+        sort: str = "newest",
+        limit: int = 50,
+        offset: int = 0,
+        viewer_user_id: int | None = None,
+    ) -> list[dict]:
+        query = "SELECT cp.*, u.username AS author_name FROM community_prompts cp LEFT JOIN users u ON cp.author_user_id = u.id WHERE cp.is_public = 1"
+        params: list = []
+        if prompt_type:
+            query += " AND cp.prompt_type = ?"
+            params.append(prompt_type)
+        if category:
+            query += " AND cp.category = ?"
+            params.append(category)
+        if search:
+            query += " AND (cp.title LIKE ? OR cp.description LIKE ? OR cp.prompt LIKE ?)"
+            term = f"%{search}%"
+            params.extend([term, term, term])
+        if sort == "popular":
+            query += " ORDER BY cp.upvotes DESC, cp.created_at DESC"
+        elif sort == "top":
+            query += " ORDER BY cp.upvotes DESC"
+        else:
+            query += " ORDER BY cp.created_at DESC"
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        with self._conn() as conn:
+            rows = conn.execute(query, params).fetchall()
+            items = []
+            for row in rows:
+                d = dict(row)
+                try:
+                    d["tags"] = json.loads(d["tags"]) if d["tags"] else []
+                except Exception:
+                    d["tags"] = []
+                if viewer_user_id:
+                    v = conn.execute(
+                        "SELECT 1 FROM community_votes WHERE user_id = ? AND prompt_id = ?",
+                        (viewer_user_id, d["id"]),
+                    ).fetchone()
+                    d["voted"] = v is not None
+                else:
+                    d["voted"] = False
+                items.append(d)
+            return items
+
+    def get_community_prompt(self, prompt_id: int, viewer_user_id: int | None = None) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT cp.*, u.username AS author_name FROM community_prompts cp LEFT JOIN users u ON cp.author_user_id = u.id WHERE cp.id = ?",
+                (prompt_id,),
+            ).fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["tags"] = json.loads(d["tags"]) if d["tags"] else []
+            except Exception:
+                d["tags"] = []
+            if viewer_user_id:
+                v = conn.execute(
+                    "SELECT 1 FROM community_votes WHERE user_id = ? AND prompt_id = ?",
+                    (viewer_user_id, d["id"]),
+                ).fetchone()
+                d["voted"] = v is not None
+            else:
+                d["voted"] = False
+            return d
+
+    def update_community_prompt(
+        self,
+        prompt_id: int,
+        user_id: int,
+        title: str | None = None,
+        description: str | None = None,
+        prompt: str | None = None,
+        tags: list[str] | None = None,
+        category: str | None = None,
+        image_path: str | None = None,
+    ) -> None:
+        updates: list[str] = []
+        params: list = []
+        if title is not None:
+            updates.append("title = ?"); params.append(title)
+        if description is not None:
+            updates.append("description = ?"); params.append(description)
+        if prompt is not None:
+            updates.append("prompt = ?"); params.append(prompt)
+        if tags is not None:
+            updates.append("tags = ?"); params.append(json.dumps(tags, ensure_ascii=False))
+        if category is not None:
+            updates.append("category = ?"); params.append(category)
+        if image_path is not None:
+            updates.append("image_path = ?"); params.append(image_path)
+        if not updates:
+            return
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.extend([prompt_id, user_id])
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE community_prompts SET {', '.join(updates)} WHERE id = ? AND author_user_id = ?",
+                params,
+            )
+
+    def delete_community_prompt(self, prompt_id: int, user_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "DELETE FROM community_prompts WHERE id = ? AND author_user_id = ?",
+                (prompt_id, user_id),
+            )
+
+    def toggle_community_vote(self, user_id: int, prompt_id: int) -> bool:
+        """Returns True if voted, False if unvoted."""
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT id FROM community_votes WHERE user_id = ? AND prompt_id = ?",
+                (user_id, prompt_id),
+            ).fetchone()
+            if existing:
+                conn.execute("DELETE FROM community_votes WHERE id = ?", (existing["id"],))
+                conn.execute(
+                    "UPDATE community_prompts SET upvotes = MAX(0, upvotes - 1) WHERE id = ?",
+                    (prompt_id,),
+                )
+                return False
+            else:
+                conn.execute(
+                    "INSERT INTO community_votes (user_id, prompt_id) VALUES (?, ?)",
+                    (user_id, prompt_id),
+                )
+                conn.execute(
+                    "UPDATE community_prompts SET upvotes = upvotes + 1 WHERE id = ?",
+                    (prompt_id,),
+                )
+                return True
+
+    # ─── Skills (backend-persisted) ────────────────────────────────────────
+
+    def create_skill(self, user_id: int, name: str, body: str, description: str = "", category: str = "general") -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO skills (user_id, name, description, body, category) VALUES (?, ?, ?, ?, ?)",
+                (user_id, name, description, body, category),
+            )
+            return cur.lastrowid  # type: ignore[return-value]
+
+    def list_skills(self, user_id: int) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM skills WHERE user_id = ? ORDER BY updated_at DESC",
+                (user_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_skill(self, skill_id: int, user_id: int) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM skills WHERE id = ? AND user_id = ?",
+                (skill_id, user_id),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def update_skill(
+        self, skill_id: int, user_id: int,
+        name: str | None = None, description: str | None = None,
+        body: str | None = None, category: str | None = None,
+    ) -> None:
+        updates: list[str] = []
+        params: list = []
+        if name is not None:
+            updates.append("name = ?"); params.append(name)
+        if description is not None:
+            updates.append("description = ?"); params.append(description)
+        if body is not None:
+            updates.append("body = ?"); params.append(body)
+        if category is not None:
+            updates.append("category = ?"); params.append(category)
+        if not updates:
+            return
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.extend([skill_id, user_id])
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE skills SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                params,
+            )
+
+    def delete_skill(self, skill_id: int, user_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM skills WHERE id = ? AND user_id = ?", (skill_id, user_id))

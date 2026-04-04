@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   api,
@@ -13,10 +13,13 @@ import AutoTextarea from '../components/AutoTextarea'
 import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
+import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
 import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { clearAgentDraft, loadAgentDraft, saveAgentDraft } from '../lib/agentDraft'
+import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
+import PublishToCommunityModal, { type PublishToCommunityInitial } from '../components/PublishToCommunityModal'
 import {
   isConversationalOnlyMessage,
   pickAfterPromptChatReply,
@@ -85,8 +88,18 @@ function loadCreationMode(): CreationMode {
   } catch {
     /* ignore */
   }
-  return 'classic'
+  return 'agent'
 }
+
+/** Ротация фраз в агентском режиме во время генерации */
+const AGENT_THINKING_PHASES = [
+  'Разбираю формулировку задачи…',
+  'Сопоставляю с типом задачи и контекстом…',
+  'Подбираю техники и структуру ответа…',
+  'Продумываю уточнения и ограничения…',
+  'Собираю формулировку промпта…',
+  'Проверяю согласованность и полноту…',
+]
 
 const DEFAULT_AGENT_SPLIT = 0.38
 function loadAgentSplit(): number {
@@ -135,6 +148,7 @@ export default function Home() {
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
   const [techniques, setTechniques] = useState<Technique[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspacesReady, setWorkspacesReady] = useState(false)
   const [genModel, setGenModel] = useState('')
   const [techniqueMode, setTechniqueMode] = useState<'auto' | 'manual'>('auto')
   const [manualTechs, setManualTechs] = useState<string[]>([])
@@ -169,6 +183,7 @@ export default function Home() {
   const [agentSplit, setAgentSplit] = useState(() => loadAgentSplit())
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
+  const [promptType, setPromptType] = useState<'text' | 'image' | 'skill'>('text')
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const splitRootRef = useRef<HTMLDivElement>(null)
   const agentSplitRootRef = useRef<HTMLDivElement>(null)
@@ -177,6 +192,9 @@ export default function Home() {
   const lastQuestionAnswersRef = useRef<{ question: string; answers: string[] }[] | undefined>(undefined)
   const lastClarificationsMsgIdRef = useRef<string | null>(null)
   const agentStudioBootstrappedRef = useRef(false)
+  const restoredFromSidebarRef = useRef(false)
+  const [agentThinkingIdx, setAgentThinkingIdx] = useState(0)
+  const [publishCommunityOpen, setPublishCommunityOpen] = useState(false)
   const [inputTokens, setInputTokens] = useState<{ tokens: number; method: string } | null>(null)
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
 
@@ -215,11 +233,13 @@ export default function Home() {
         }))
         setTechniques(items)
         setWorkspaces(workspaceRes.items)
+        setWorkspacesReady(true)
       })
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки данных')
         setWorkspaces([])
         setTechniques([])
+        setWorkspacesReady(true)
       })
   }, [])
 
@@ -227,12 +247,42 @@ export default function Home() {
     localStorage.setItem(HOME_MODE_KEY, creationMode)
   }, [creationMode])
 
+  useLayoutEffect(() => {
+    const state = location.state as { restoreSessionId?: string } | null
+    if (!state?.restoreSessionId) return
+    const sid = state.restoreSessionId
+    restoredFromSidebarRef.current = true
+    setSessionId(sid)
+    const stored = loadSessionAgentChat(sid)
+    if (stored && stored.length > 0) {
+      setChatMessages(stored as ChatMessage[])
+      const pendingClar = [...stored]
+        .reverse()
+        .find(
+          (m) =>
+            m.role === 'assistant' &&
+            m.content.includes('Нужны уточнения') &&
+            m.clarificationQA === undefined,
+        )
+      lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
+    } else {
+      setChatMessages([{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }])
+      lastClarificationsMsgIdRef.current = null
+    }
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.state, location.pathname, navigate])
+
   useEffect(() => {
     if (creationMode !== 'agent') {
       agentStudioBootstrappedRef.current = false
       return
     }
     if (agentStudioBootstrappedRef.current) return
+    if (restoredFromSidebarRef.current) {
+      agentStudioBootstrappedRef.current = true
+      restoredFromSidebarRef.current = false
+      return
+    }
     agentStudioBootstrappedRef.current = true
     const draft = loadAgentDraft()
     if (draft && draft.chatMessages.length > 0) {
@@ -271,11 +321,6 @@ export default function Home() {
       clearResult?: boolean
       restoreSessionId?: string
     } | null
-    if (state?.restoreSessionId) {
-      setSessionId(state.restoreSessionId)
-      navigate(location.pathname, { replace: true, state: null })
-      return
-    }
     if (state?.prefillTask) {
       const t = state.prefillTask
       setTaskInput(t)
@@ -308,14 +353,93 @@ export default function Home() {
   }, [workspaceId, workspaces])
 
   useEffect(() => {
-    if (sessionId) {
-      localStorage.setItem(ACTIVE_SESSION_KEY, sessionId)
-      api.getSessionVersions(sessionId).then((r) => setVersions(r.items)).catch(() => setVersions([]))
-    } else {
+    if (!workspacesReady || workspaceId <= 0) return
+    const has = workspaces.some((w) => Number(w.id ?? 0) === workspaceId)
+    if (has) return
+    let cancelled = false
+    api
+      .getWorkspace(workspaceId)
+      .then((r) => {
+        if (cancelled) return
+        setWorkspaces((prev) => {
+          if (prev.some((w) => Number(w.id ?? 0) === workspaceId)) return prev
+          return [...prev, r.item]
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [workspacesReady, workspaceId, workspaces])
+
+  useEffect(() => {
+    if (!sessionId) {
       localStorage.removeItem(ACTIVE_SESSION_KEY)
       setVersions([])
+      return
+    }
+    localStorage.setItem(ACTIVE_SESSION_KEY, sessionId)
+    let cancelled = false
+    api
+      .getSessionVersions(sessionId)
+      .then((r) => {
+        if (cancelled) return
+        const items = r.items
+        setVersions(items)
+        if (items.length > 0) {
+          const latest = items[items.length - 1] as Record<string, unknown>
+          const finalPrompt = String(latest.final_prompt || '')
+          if (finalPrompt) {
+            const techniqueIds = (Array.isArray(latest.techniques_used) ? latest.techniques_used : []) as string[]
+            setResult({
+              prompt_block: finalPrompt,
+              reasoning: String(latest.reasoning || ''),
+              has_prompt: true,
+              has_questions: false,
+              techniques: techniqueIds.map((id) => ({ id, name: id })),
+              technique_ids: techniqueIds,
+              task_types: (Array.isArray(latest.task_types) ? latest.task_types : []) as string[],
+              complexity: String(latest.complexity || 'medium'),
+              gen_model: String(latest.gen_model || ''),
+              target_model: String(latest.target_model || 'unknown'),
+              metrics: (typeof latest.metrics === 'object' && latest.metrics ? latest.metrics : {}) as Record<string, unknown>,
+              session_id: sessionId,
+            })
+            const ti = String(latest.task_input || '')
+            if (ti) {
+              setTaskInput(ti)
+              setBaseTaskRef(ti)
+            }
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setVersions([])
+      })
+    return () => {
+      cancelled = true
     }
   }, [sessionId])
+
+  useEffect(() => {
+    if (creationMode !== 'agent' || !sessionId?.trim()) return
+    const t = window.setTimeout(() => {
+      saveSessionAgentChat(sessionId, chatMessages)
+    }, 450)
+    return () => window.clearTimeout(t)
+  }, [creationMode, sessionId, chatMessages])
+
+  useEffect(() => {
+    if (!loading || creationMode !== 'agent') {
+      setAgentThinkingIdx(0)
+      return
+    }
+    setAgentThinkingIdx(Math.floor(Math.random() * AGENT_THINKING_PHASES.length))
+    const id = window.setInterval(() => {
+      setAgentThinkingIdx((i) => (i + 1) % AGENT_THINKING_PHASES.length)
+    }, 2600)
+    return () => window.clearInterval(id)
+  }, [loading, creationMode])
 
   useEffect(() => {
     setQuestionCarouselIdx(0)
@@ -364,6 +488,7 @@ export default function Home() {
       techniqueMode,
       manualTechs.join(','),
       result?.prompt_block || '',
+      promptType,
     ].join('|')
 
     const timer = window.setTimeout(async () => {
@@ -378,6 +503,7 @@ export default function Home() {
           manual_techs: manualTechs,
           overrides: ideOverrides,
           evidence_decisions: evidenceDecisions,
+          prompt_type: promptType,
         })
         setPreview(res)
         if (previewSeed !== seed) {
@@ -408,6 +534,7 @@ export default function Home() {
     ideOverrides,
     evidenceDecisions,
     previewSeed,
+    promptType,
   ])
 
   type GenerateOptions = {
@@ -449,6 +576,7 @@ export default function Home() {
         manual_techs: techniqueMode === 'manual' ? manualTechs : [],
         temperature,
         top_p: topP,
+        prompt_type: promptType,
         top_k: topK === '' ? undefined : topK,
         questions_mode: questionsMode && !questionAnswers?.length,
         session_id: sessionId || undefined,
@@ -513,7 +641,7 @@ export default function Home() {
               id: cid,
               role: 'assistant',
               content:
-                'Нужны уточнения: панель под чатом, листайте вопросы — в конце кнопка «Создать».',
+                'Нужны уточнения: панель под чатом, листайте вопросы — на последнем шаге нажмите «Подтвердить».',
             })
           }
           queueMicrotask(() => {
@@ -548,6 +676,7 @@ export default function Home() {
   }
 
   const resetAgentDialog = () => {
+    if (sessionId?.trim()) clearSessionAgentChat(sessionId)
     clearAgentDraft()
     lastClarificationsMsgIdRef.current = null
     setChatMessages([{ id: 'welcome', role: 'assistant', content: AGENT_WELCOME }])
@@ -567,7 +696,7 @@ export default function Home() {
     const text = chatInput.trim()
     if (!text || loading) return
     if (result?.has_questions && !result?.has_prompt) {
-      setError('Завершите уточнения в панели под чатом или нажмите «Создать».')
+      setError('Завершите уточнения в панели под чатом или нажмите «Подтвердить» на последнем вопросе.')
       return
     }
     setChatInput('')
@@ -866,6 +995,17 @@ export default function Home() {
   const previewIntentCount = preview?.intent_graph?.length || 0
   const tokenEstimate = Number(result?.metrics?.token_estimate ?? 0)
 
+  const communityPublishInitial: PublishToCommunityInitial = useMemo(
+    () => ({
+      title: suggestLibraryTitle(taskInput),
+      prompt: result?.prompt_block || '',
+      description: '',
+      prompt_type: promptType === 'image' ? 'image' : promptType === 'skill' ? 'skill' : 'text',
+      tags: [],
+    }),
+    [taskInput, result?.prompt_block, promptType],
+  )
+
   const taskPlaceholder = 'Опишите задачу подробно'
   const genModelSelectOptions = useMemo(
     () =>
@@ -967,7 +1107,12 @@ export default function Home() {
                   variant="composer"
                   footerLink={{ to: '/models', label: 'Добавить модель' }}
                 />
-                <WorkspacePicker workspaces={workspaces} workspaceId={workspaceId} onSelect={setWorkspaceId} />
+                <WorkspacePicker
+                  workspaces={workspaces}
+                  workspaceId={workspaceId}
+                  onSelect={setWorkspaceId}
+                  workspacesReady={workspacesReady}
+                />
                 <SelectDropdown
                   value={targetModel}
                   options={targetModelSelectOptions}
@@ -1111,10 +1256,10 @@ export default function Home() {
     return (
       <div
         className={`${styles.questionBox} ${compact ? styles.questionBoxCompact : ''} ${styles.questionCarousel} ${
-          compact ? styles.wizardShellCompact : ''
+          compact ? styles.wizardAgentMerged : styles.wizardShellCompact
         }`}
       >
-        <div className={styles.wizardProgressWrap}>
+        <div className={`${styles.wizardProgressWrap} ${compact ? styles.wizardProgressWrapTight : ''}`}>
           <div className={styles.wizardProgressBar}>
             <div className={styles.wizardProgressFill} style={{ width: `${((idx + 1) / total) * 100}%` }} />
           </div>
@@ -1122,7 +1267,7 @@ export default function Home() {
             {idx + 1} / {total}
           </span>
         </div>
-        <div className={compact ? styles.wizardScrollBody : undefined}>
+        <div className={compact ? styles.wizardQuestionBlockAgent : styles.wizardScrollBody}>
         <div className={`${styles.questionItem} ${compact ? styles.questionItemCompact : ''}`}>
           <strong>
             {idx + 1}. {q.question}
@@ -1161,29 +1306,43 @@ export default function Home() {
         <div className={`${styles.wizardFooter} ${compact ? styles.wizardFooterCompact : ''}`}>
           {compact ? (
             <div className={styles.wizardToolbar}>
+              {idx > 0 ? (
+                <button
+                  type="button"
+                  className={styles.wizIconBtn}
+                  aria-label="Назад"
+                  title="Назад"
+                  onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M15 18l-6-6 6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : (
+                <span className={styles.wizToolbarLeadSpacer} aria-hidden />
+              )}
               <button
                 type="button"
-                className={styles.wizIconBtn}
-                disabled={idx <= 0}
-                aria-label="Назад"
-                title="Назад"
-                onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
+                className={styles.wizTextBtn}
+                disabled={loading}
+                aria-label="Скип — без ответов на уточнения"
+                title="Пропустить все уточнения и сгенерировать промпт"
+                onClick={() => handleGenerate([], questionGenOpts)}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path
-                    d="M15 18l-6-6 6-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                Скип
               </button>
+              <span className={styles.wizToolbarGrow} aria-hidden />
               {idx < total - 1 ? (
                 <button
                   type="button"
                   className={`${styles.wizIconBtn} ${styles.wizIconBtnPrimary}`}
-                  aria-label={`Далее, вопрос ${idx + 2} из ${total}`}
+                  aria-label={`Вперёд: вопрос ${idx + 2} из ${total}`}
                   title={`Вопрос ${idx + 2} из ${total}`}
                   onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
                 >
@@ -1197,68 +1356,48 @@ export default function Home() {
                     />
                   </svg>
                 </button>
-              ) : null}
-              <span className={styles.wizToolbarGrow} aria-hidden />
-              <button
-                type="button"
-                className={styles.wizIconBtn}
-                disabled={loading}
-                aria-label="Пропустить ответы"
-                title="Пропустить ответы"
-                onClick={() => handleGenerate([], questionGenOpts)}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <path d="M6 18V6h2v12H6zm11-6l-6 4V8l6 4z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className={styles.wizCreateBtn}
-                disabled={loading}
-                title="Собираются ответы со всех шагов; на непросмотренных вопросах ответы пустые"
-                onClick={() => submitWizardAnswers()}
-              >
-                Создать
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className={styles.questionCarouselNav}>
+              ) : (
                 <button
                   type="button"
-                  className="btn-ghost"
-                  disabled={idx <= 0}
-                  onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
-                >
-                  ← Назад
-                </button>
-                {idx < total - 1 ? (
-                  <button
-                    type="button"
-                    className={`${styles.primaryAction} btn-primary ${styles.wizardNextPrimary}`}
-                    onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
-                  >
-                    Далее: вопрос {idx + 2} из {total} →
-                  </button>
-                ) : (
-                  <span className={styles.wizardNavTailSpacer} aria-hidden />
-                )}
-              </div>
-              <div className={styles.actions}>
-                <button type="button" className="btn-ghost" disabled={loading} onClick={() => handleGenerate([], questionGenOpts)}>
-                  Пропустить ответы
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.primaryAction} btn-primary`}
+                  className={styles.wizCreateBtn}
                   disabled={loading}
-                  title="Собираются ответы со всех шагов; на непросмотренных вопросах ответы пустые"
+                  title="Собрать ответы со всех шагов и сгенерировать промпт"
                   onClick={() => submitWizardAnswers()}
                 >
-                  Создать промпт
+                  Подтвердить
                 </button>
-              </div>
-            </>
+              )}
+            </div>
+          ) : (
+            <div className={styles.wizardNavUnified}>
+              {idx > 0 ? (
+                <button type="button" className="btn-ghost" onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}>
+                  Назад
+                </button>
+              ) : null}
+              <button type="button" className="btn-ghost" disabled={loading} onClick={() => handleGenerate([], questionGenOpts)}>
+                Скип
+              </button>
+              {idx < total - 1 ? (
+                <button
+                  type="button"
+                  className={`${styles.primaryAction} btn-primary ${styles.wizardNavUnifiedGrow}`}
+                  onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
+                >
+                  Вперёд
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.primaryAction} btn-primary ${styles.wizardNavUnifiedGrow}`}
+                  disabled={loading}
+                  title="Собрать ответы со всех шагов и сгенерировать промпт"
+                  onClick={() => submitWizardAnswers()}
+                >
+                  Подтвердить
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -1482,6 +1621,17 @@ export default function Home() {
                 <div className={styles.promptToolbar}>
                   <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
                   <TryInGeminiButton prompt={result.prompt_block} />
+                  <button
+                    type="button"
+                    className={styles.quickSaveBtn}
+                    title="Опубликовать в сообществе"
+                    onClick={() => setPublishCommunityOpen(true)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                  </button>
                   {creationMode === 'agent' && !quickSaved && (
                     <button
                       type="button"
@@ -1714,6 +1864,7 @@ export default function Home() {
 
   return (
     <div className={`${styles.home} ${styles.homeFlexFill}`}>
+      <FirstVisitHomeTip />
       {loading && creationMode === 'classic' && (
         <div className={styles.loadingBar}>
           <div className={styles.loadingBarGradient} />
@@ -1759,6 +1910,18 @@ export default function Home() {
               <div className={styles.agentChatHeader}>
                 <div className={styles.agentTaskTitleRow}>
                   <h2 className="pageTitleGradient">Задача</h2>
+                  <div className={styles.promptTypeTabs}>
+                    {(['text', 'image', 'skill'] as const).map((pt) => (
+                      <button
+                        key={pt}
+                        type="button"
+                        className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
+                        onClick={() => setPromptType(pt)}
+                      >
+                        {pt === 'text' ? 'Текст' : pt === 'image' ? 'Фото' : 'Скилл'}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     className={styles.creationModeFlip}
@@ -1827,28 +1990,35 @@ export default function Home() {
                   })}
                   {loading && (
                     <div className={styles.agentThinking} aria-live="polite">
-                      <span className={styles.agentThinkingInner}>Думаю над промптом и уточнениями…</span>
+                      <span className={styles.agentThinkingInner}>
+                        {AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]}
+                      </span>
                     </div>
                   )}
                   {error && <p className={styles.error}>{error}</p>}
                 </div>
+              </div>
+              <div
+                className={`${styles.agentChatComposerHost} ${
+                  result?.has_questions && !result?.has_prompt ? styles.agentComposerWithWizard : ''
+                }`}
+              >
                 {result?.has_questions && !result?.has_prompt && (
-                  <div className={styles.agentWizardDock} aria-label="Уточняющие вопросы">
-                    <p className={styles.agentWizardDockHint}>
-                      Ответьте по шагам — чат выше можно листать. Ниже — строка ввода для следующего сообщения.
-                    </p>
+                  <div className={styles.agentWizardInComposer} aria-label="Уточняющие вопросы">
                     {renderQuestionsPanel('agent')}
                   </div>
                 )}
-              </div>
-              <div className={styles.agentChatComposerHost}>
-              <div className={cb.composer}>
+              <div
+                className={`${cb.composer} ${
+                  result?.has_questions && !result?.has_prompt ? styles.agentComposerShellMerged : ''
+                }`}
+              >
                 <AutoTextarea
                   className={cb.composerTextarea}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder="Опишите задачу или попросите изменить промпт…"
-                  minHeightPx={72}
+                  minHeightPx={result?.has_questions && !result?.has_prompt ? 52 : 72}
                   maxHeightPx={280}
                   spellCheck
                 />
@@ -1863,7 +2033,12 @@ export default function Home() {
                         variant="composer"
                         footerLink={{ to: '/models', label: 'Добавить модель' }}
                       />
-                      <WorkspacePicker workspaces={workspaces} workspaceId={workspaceId} onSelect={setWorkspaceId} />
+                      <WorkspacePicker
+                        workspaces={workspaces}
+                        workspaceId={workspaceId}
+                        onSelect={setWorkspaceId}
+                        workspacesReady={workspacesReady}
+                      />
                       <SelectDropdown
                         value={targetModel}
                         options={targetModelSelectOptions}
@@ -1992,6 +2167,11 @@ export default function Home() {
           </div>
         </div>
       )}
+      <PublishToCommunityModal
+        open={publishCommunityOpen}
+        onClose={() => setPublishCommunityOpen(false)}
+        initial={communityPublishInitial}
+      />
     </div>
   )
 }

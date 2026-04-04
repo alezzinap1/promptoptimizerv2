@@ -69,6 +69,20 @@ TARGET_MODELS: dict[str, str] = {
 DEFAULT_PROVIDER = "deepseek"
 DEFAULT_TEMPERATURE = 0.7
 
+MODEL_TIERS: dict[str, list[str]] = {
+    "tier1": ["google/gemini-flash-1.5", "deepseek/deepseek-chat"],
+    "tier2": ["google/gemini-pro-1.5", "anthropic/claude-3-haiku", "deepseek/deepseek-chat"],
+    "tier3": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "deepseek/deepseek-r1"],
+}
+
+
+def get_model_for_tier(tier: str, preferred: str | None = None) -> str:
+    """Select an appropriate model for the given cost tier."""
+    if preferred and "/" in preferred:
+        return preferred
+    models = MODEL_TIERS.get(tier, MODEL_TIERS["tier2"])
+    return models[0]
+
 
 class LLMClient:
     """Synchronous LLM client for Streamlit compatibility."""

@@ -95,7 +95,7 @@ function loadPrefs(): { palette: PaletteId; font: FontId; mode: ColorMode } {
   } catch {
     /* ignore */
   }
-  return { palette: 'amber', font: 'plusjakarta', mode: 'dark' }
+  return { palette: 'amber', font: 'plusjakarta', mode: 'light' }
 }
 
 function savePrefs(palette: PaletteId, font: FontId, mode: ColorMode) {

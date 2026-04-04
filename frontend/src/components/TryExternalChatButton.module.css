@@ -1,0 +1,74 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-sm, 5px);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.trigger:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.triggerIcon {
+  display: inline-flex;
+  color: rgb(96, 165, 250);
+}
+
+.triggerLabel {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerChev {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.menuHint {
+  padding: 6px 10px 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  border-bottom: 1px solid var(--stroke);
+  margin-bottom: 4px;
+}
+
+.menuRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.menuBadge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}

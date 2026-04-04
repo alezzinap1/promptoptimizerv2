@@ -92,6 +92,72 @@
   min-height: 0;
 }
 
+/* Опрос уточнений — слеплен с композером: без отдельной «колоды» и без лишней прокрутки */
+.agentComposerWithWizard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.agentComposerShellMerged {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.agentWizardInComposer {
+  flex-shrink: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--panel) 96%, var(--primary) 4%);
+}
+
+.agentWizardInComposer .questionBox {
+  margin-top: 0;
+  padding: 8px 10px 6px;
+  gap: 6px;
+}
+
+.wizardAgentMerged {
+  display: flex;
+  flex-direction: column;
+  max-height: none;
+  overflow: visible;
+  gap: 6px;
+}
+
+.wizardQuestionBlockAgent {
+  overflow: visible;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.wizardQuestionBlockAgent .questionItemCompact strong {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.38;
+  margin-bottom: 6px;
+}
+
+.agentWizardInComposer .wizardFooterCompact {
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.wizardProgressWrapTight {
+  margin-bottom: 0;
+}
+
+.wizardProgressWrapTight .questionCarouselMeta {
+  margin: 0;
+  font-size: 0.72rem;
+}
+
 .agentChatHeader {
   display: flex;
   align-items: center;
@@ -118,6 +184,8 @@
 }
 
 .creationModeFlip {
+  position: relative;
+  z-index: 1;
   width: 28px;
   height: 28px;
   padding: 0;
@@ -239,36 +307,6 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.agentChatScroll .questionBox {
-  margin-top: 0;
-  flex-shrink: 0;
-}
-
-/* Уточнения в студии: док над полем ввода, без блюра и перекрытия чата */
-.agentWizardDock {
-  flex-shrink: 0;
-  border-top: 1px solid var(--stroke);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  padding: 8px 6px 10px;
-  max-height: min(38vh, 360px);
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.agentWizardDockHint {
-  margin: 0;
-  padding: 0 4px;
-  font-size: 0.72rem;
-  line-height: 1.35;
-  color: var(--muted);
-}
-
-.agentWizardDock .wizardShellCompact {
-  max-height: min(32vh, 300px);
-}
-
 .wizardOverlay {
   position: absolute;
   inset: 0;
@@ -343,6 +381,49 @@
 .wizToolbarGrow {
   flex: 1;
   min-width: 4px;
+}
+
+/* На 1-м вопросе нет «Назад» — сохраняем ширину под иконку, чтобы панель не прыгала */
+.wizToolbarLeadSpacer {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.wizTextBtn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.wizTextBtn:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--primary);
+}
+
+.wizTextBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.wizardNavUnified {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.wizardNavUnifiedGrow {
+  flex: 1 1 140px;
+  min-width: 0;
+  justify-content: center;
 }
 
 .wizIconBtn {
@@ -562,7 +643,7 @@
   line-height: 1.45;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(56, 189, 248, 0.04) 100%);
   border: 1px solid rgba(139, 92, 246, 0.15);
-  overflow: hidden;
+  overflow: clip;
 }
 
 .thinkingSummary {
@@ -610,9 +691,40 @@ details[open].chatBubbleThinking .thinkingSummary::before {
   flex-shrink: 0;
 }
 
+.promptTypeTabs {
+  display: flex;
+  gap: 2px;
+  background: var(--panel-strong);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.promptTypeTab {
+  background: none;
+  border: none;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.promptTypeTab:hover {
+  color: var(--text);
+}
+
+.promptTypeTabActive {
+  background: var(--primary);
+  color: #fff;
+}
+
 .thinkingBody {
   padding: 0 12px 10px;
   position: relative;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .thinkingBody::before {
@@ -763,6 +875,13 @@ details[open].chatBubbleThinking .thinkingSummary::before {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+/* Первая колонка поверх соседней — иначе overflow/stacking даёт «прозрачный» перехват кликов колонкой «Разбор задачи» */
+.splitRoot > .splitPane:first-of-type {
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
 }
 
 .splitGutter {

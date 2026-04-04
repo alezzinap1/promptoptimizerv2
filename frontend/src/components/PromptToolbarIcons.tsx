@@ -81,39 +81,8 @@ export function DownloadIconButton({
   )
 }
 
-export function TryInGeminiButton({
-  prompt,
-  title = 'Скопировать промпт и открыть Gemini',
-  className,
-}: {
-  prompt: string
-  title?: string
-  className?: string
-}) {
-  const handle = async () => {
-    try {
-      await navigator.clipboard.writeText(prompt)
-    } catch {
-      /* ignore — пользователь может вставить вручную */
-    }
-    window.open('https://gemini.google.com/app', '_blank', 'noopener')
-  }
-  return (
-    <button
-      type="button"
-      className={`${styles.iconBtn} ${styles.gemini} ${className || ''}`}
-      onClick={() => void handle()}
-      title={`${title}. Сайт не принимает текст из ссылки — промпт копируется в буфер, вставьте Ctrl+V в поле чата.`}
-      aria-label={title}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-      </svg>
-    </button>
-  )
-}
+/** @deprecated имя сохранено для совместимости; используйте TryExternalChatButton */
+export { TryExternalChatButton, TryExternalChatButton as TryInGeminiButton } from './TryExternalChatButton'
 
 export function TrashIconButton({
   onClick,

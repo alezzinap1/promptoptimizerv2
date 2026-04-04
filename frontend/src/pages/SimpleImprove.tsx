@@ -10,6 +10,8 @@ import AutoTextarea from '../components/AutoTextarea'
 import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import { TryExternalChatButton } from '../components/TryExternalChatButton'
+import SimpleLineDiff from '../components/SimpleLineDiff'
 import cb from '../styles/ComposerBar.module.css'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import styles from './SimpleImprove.module.css'
@@ -81,7 +83,8 @@ export default function SimpleImprove() {
         <div>
           <h1 className="pageTitleGradient">Простой режим</h1>
           <p className={styles.lead}>
-            Вставьте промпт и нажмите кнопку — получите улучшенный текст.{' '}
+            Быстрое улучшение готового текста промпта (пресеты, без базы YAML-техник и без Prompt IDE). Полный
+            контур MetaPrompt — на <Link to="/home">Студии</Link>.{' '}
             <Link to="/help">Справка</Link>
             {' · '}
             <Link to="/settings">Настройки пресета и мета-промпта</Link>
@@ -147,7 +150,12 @@ export default function SimpleImprove() {
               <h2 className={styles.colTitle}>Ответ</h2>
               <p className={styles.colHint}>Улучшенный вариант от модели</p>
             </div>
-            {result ? <CopyIconButton text={result} title="Копировать результат" /> : null}
+            {result ? (
+              <div className={styles.colHeadActions}>
+                <CopyIconButton text={result} title="Копировать результат" />
+                <TryExternalChatButton prompt={result} title="Скопировать результат и открыть чат ИИ" />
+              </div>
+            ) : null}
           </div>
           <div className={styles.answerPanel}>
             {result ? (
@@ -160,6 +168,15 @@ export default function SimpleImprove() {
               </p>
             )}
           </div>
+          {result && promptText.trim() ? (
+            <details className={styles.diffDetails}>
+              <summary>Построчное сравнение с исходным</summary>
+              <p className={styles.diffHint}>
+                Зелёным — добавленные или изменённые строки, красным — удалённые. Без изменений — нейтральный цвет.
+              </p>
+              <SimpleLineDiff before={promptText} after={result} />
+            </details>
+          ) : null}
         </div>
       </div>
 

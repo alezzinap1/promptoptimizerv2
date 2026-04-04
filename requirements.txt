@@ -1,11 +1,9 @@
-# Web app
-streamlit>=1.35.0
-
-# LLM client (sync, replaces AsyncOpenAI for web app)
+# LLM client
 openai>=1.57.0
 
-# Health server (Phase 1)
+# Web server
 fastapi>=0.115.0
+python-multipart>=0.0.9
 uvicorn>=0.32.0
 
 # Observability (Phase 1)

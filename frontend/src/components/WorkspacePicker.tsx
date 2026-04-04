@@ -16,15 +16,23 @@ type Props = {
   workspaces: Workspace[]
   workspaceId: number
   onSelect: (id: number) => void
+  /** После первого ответа getWorkspaces — чтобы не мигать «Workspace #N» до загрузки списка */
+  workspacesReady?: boolean
 }
 
-export default function WorkspacePicker({ workspaces, workspaceId, onSelect }: Props) {
+export default function WorkspacePicker({ workspaces, workspaceId, onSelect, workspacesReady = true }: Props) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   const current = workspaces.find((w) => Number(w.id ?? 0) === workspaceId)
   const summary =
-    workspaceId === 0 ? 'Без workspace' : current?.name?.trim() || `Workspace #${workspaceId}`
+    workspaceId === 0
+      ? 'Без workspace'
+      : current?.name?.trim()
+        ? current.name.trim()
+        : !workspacesReady
+          ? 'Загрузка…'
+          : `Пространство #${workspaceId}`
 
   return (
     <div className={styles.wrap}>

@@ -5,6 +5,7 @@ import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
 import LibraryTagChips from '../../components/LibraryTagChips'
 import SelectDropdown from '../../components/SelectDropdown'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
+import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
 import styles from '../Library.module.css'
 
@@ -42,6 +43,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
   const [evalData, setEvalData] = useState<Record<string, unknown> | null>(null)
   const [evalLoading, setEvalLoading] = useState(false)
   const [tagPaintTick, setTagPaintTick] = useState(0)
+  const [publishItem, setPublishItem] = useState<LibraryItem | null>(null)
 
   useEffect(() => {
     const onPaint = () => setTagPaintTick((t) => t + 1)
@@ -178,6 +180,20 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
 
       {error && <p className={styles.error}>{error}</p>}
 
+      {publishItem && (
+        <PublishToCommunityModal
+          open
+          onClose={() => setPublishItem(null)}
+          initial={{
+            title: publishItem.title,
+            prompt: publishItem.prompt,
+            description: publishItem.notes || '',
+            prompt_type: isImagePrompt(publishItem) ? 'image' : 'text',
+            tags: publishItem.tags,
+          }}
+        />
+      )}
+
       {loading ? (
         <p>Загрузка...</p>
       ) : items.length === 0 ? (
@@ -231,9 +247,21 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                 </button>
                 <TryInGeminiButton
                   prompt={item.prompt}
-                  title={isImagePrompt(item) ? 'Сгенерировать картинку в Gemini' : 'Попробовать в Gemini'}
+                  title={
+                    isImagePrompt(item)
+                      ? 'Скопировать и открыть чат ИИ (для изображений часто выбирают Gemini)'
+                      : 'Скопировать промпт и открыть чат ИИ'
+                  }
                 />
                 <CopyIconButton text={item.prompt} title="Копировать текст промпта в буфер обмена" />
+                <button
+                  type="button"
+                  className={styles.openBtn}
+                  title="Опубликовать в сообществе"
+                  onClick={() => setPublishItem(item)}
+                >
+                  Сообщество
+                </button>
                 <DownloadIconButton
                   title="Скачать этот промпт одним .txt файлом на диск"
                   onClick={() => {

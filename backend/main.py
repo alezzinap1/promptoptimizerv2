@@ -25,6 +25,7 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1
 from backend.api import (
     agent_route,
     auth,
+    community,
     compare,
     config,
     generate,
@@ -35,6 +36,7 @@ from backend.api import (
     sessions,
     settings,
     simple_improve,
+    skills,
     techniques,
     tokenizer,
     user_info,
@@ -69,6 +71,8 @@ app.include_router(generate.router, prefix="/api", tags=["generate"])
 app.include_router(simple_improve.router, prefix="/api", tags=["simple-improve"])
 app.include_router(compare.router, prefix="/api", tags=["compare"])
 app.include_router(library.router, prefix="/api", tags=["library"])
+app.include_router(community.router, prefix="/api", tags=["community"])
+app.include_router(skills.router, prefix="/api", tags=["skills"])
 app.include_router(techniques.router, prefix="/api", tags=["techniques"])
 app.include_router(tokenizer.router, prefix="/api", tags=["tokenizer"])
 
@@ -77,6 +81,10 @@ app.include_router(tokenizer.router, prefix="/api", tags=["tokenizer"])
 def health():
     return {"status": "ok"}
 
+
+UPLOAD_DIR = ROOT / "data" / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")

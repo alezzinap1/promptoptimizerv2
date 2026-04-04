@@ -83,6 +83,8 @@ def resolve_techniques(
     technique_mode: str,
     manual_techs: list[str],
     max_techniques: int = 4,
+    user_input: str = "",
+    prompt_type: str = "text",
 ) -> list[dict]:
     task_types = classification["task_types"]
     complexity = classification["complexity"]
@@ -90,7 +92,9 @@ def resolve_techniques(
         selected = [t for t in (registry.get(tid) for tid in manual_techs) if t]
     else:
         selected = registry.select_techniques(
-            task_types, complexity, max_techniques=max_techniques, target_model=target_model
+            task_types, complexity, max_techniques=max_techniques,
+            target_model=target_model, user_input=user_input,
+            prompt_type=prompt_type or "text",
         )
 
     model_type = classify_model(target_model)
@@ -110,6 +114,7 @@ def build_preview_payload(
     technique_mode: str = "auto",
     manual_techs: list[str] | None = None,
     classification_override: dict | None = None,
+    prompt_type: str = "text",
 ) -> dict:
     classification = classification_override if classification_override is not None else classify_task(raw_input)
     techniques = resolve_techniques(
@@ -119,6 +124,8 @@ def build_preview_payload(
         technique_mode=technique_mode,
         manual_techs=manual_techs or [],
         max_techniques=4,
+        user_input=raw_input,
+        prompt_type=prompt_type or "text",
     )
     prompt_spec = build_prompt_spec_with_overrides(
         raw_input=raw_input,

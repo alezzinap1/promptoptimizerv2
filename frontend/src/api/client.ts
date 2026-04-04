@@ -91,6 +91,8 @@ export interface GenerateRequest {
   prompt_spec_overrides?: Record<string, unknown>
   evidence_decisions?: Record<string, string>
   question_answers?: { question: string; answers: string[] }[]
+  skill_body?: string
+  prompt_type?: string
 }
 
 export type GenerationIssue =
@@ -199,6 +201,36 @@ export interface LibraryItem {
   updated_at: string
 }
 
+export interface CommunityPrompt {
+  id: number
+  author_user_id: number
+  author_name: string
+  title: string
+  description: string
+  prompt: string
+  prompt_type: string
+  category: string
+  tags: string[]
+  upvotes: number
+  image_path: string | null
+  is_public: number
+  voted: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SkillRecord {
+  id: number
+  user_id: number
+  name: string
+  description: string
+  body: string
+  category: string
+  is_public: number
+  created_at: string
+  updated_at: string
+}
+
 export interface OpenRouterModel {
   id: string
   name: string
@@ -243,6 +275,44 @@ export function setAuthSessionId(sessionId: string | null) {
   else localStorage.removeItem(AUTH_STORAGE_KEY)
 }
 
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+/** Разбирает тело ошибки FastAPI (`{"detail": ...}`) и отдаёт строку для UI */
+function parseApiErrorBody(text: string, status: number): string {
+  const t = text.trim()
+  if (!t) {
+    if (status === 401) return 'Требуется вход. Войдите в аккаунт.'
+    return `Ошибка ${status}`
+  }
+  try {
+    const j = JSON.parse(t) as { detail?: unknown }
+    const d = j.detail
+    if (typeof d === 'string') return d
+    if (Array.isArray(d)) {
+      return d
+        .map((x) => {
+          if (typeof x === 'string') return x
+          if (x && typeof x === 'object' && 'msg' in x && typeof (x as { msg: string }).msg === 'string') {
+            return (x as { msg: string }).msg
+          }
+          return JSON.stringify(x)
+        })
+        .join('; ')
+    }
+  } catch {
+    /* не JSON */
+  }
+  if (t.length > 400) return `${t.slice(0, 380)}…`
+  return t
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers)
   headers.set('Content-Type', 'application/json')
@@ -256,7 +326,8 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(err || `HTTP ${res.status}`)
+    const msg = parseApiErrorBody(err, res.status)
+    throw new ApiError(msg, res.status)
   }
   return res.json()
 }
@@ -298,6 +369,7 @@ export const api = {
     manual_techs?: string[]
     overrides?: Record<string, unknown>
     evidence_decisions?: Record<string, string>
+    prompt_type?: string
   }) => fetchApi<PromptIdePreviewResponse>('/prompt-ide/preview', { method: 'POST', body: JSON.stringify(req) }),
 
   generate: (req: GenerateRequest) =>
@@ -311,6 +383,15 @@ export const api = {
       backend: string
       rejected_reason?: string
     }>('/agent/semantic-route', { method: 'POST', body: JSON.stringify(req) }),
+
+  agentProcess: (req: { text: string; session_id?: string | null; has_prompt?: boolean; prompt_type?: string; current_prompt?: string }) =>
+    fetchApi<{
+      action: string
+      data: Record<string, unknown>
+      reasoning: string
+      classification?: Record<string, unknown>
+      features?: Record<string, boolean>
+    }>('/agent/process', { method: 'POST', body: JSON.stringify(req) }),
 
   getDomains: () => fetchApi<{ domains: { id: string; name: string }[] }>('/domains'),
 
@@ -401,5 +482,43 @@ export const api = {
     fetchApi<{ metrics: Record<string, unknown> }>('/library/evaluate', {
       method: 'POST',
       body: JSON.stringify({ prompt, target_model: targetModel || '' }),
+    }),
+
+  // Community prompts
+  getCommunity: (params?: { prompt_type?: string; category?: string; search?: string; sort?: string; limit?: number; offset?: number }) =>
+    fetchApi<{ items: CommunityPrompt[] }>(`/community${toQueryString(params)}`),
+  getCommunityPrompt: (id: number) =>
+    fetchApi<{ item: CommunityPrompt }>(`/community/${id}`),
+  createCommunityPrompt: (req: { title: string; prompt: string; description?: string; prompt_type?: string; category?: string; tags?: string[]; image_path?: string | null }) =>
+    fetchApi<{ id: number }>('/community', { method: 'POST', body: JSON.stringify(req) }),
+  updateCommunityPrompt: (id: number, req: { title?: string; description?: string; prompt?: string; tags?: string[]; category?: string }) =>
+    fetchApi<{ ok: boolean }>(`/community/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  deleteCommunityPrompt: (id: number) =>
+    fetchApi<{ ok: boolean }>(`/community/${id}`, { method: 'DELETE' }),
+  voteCommunityPrompt: (id: number) =>
+    fetchApi<{ voted: boolean }>(`/community/${id}/vote`, { method: 'POST' }),
+  uploadCommunityImage: async (file: File): Promise<{ path: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    const sessionId = localStorage.getItem('session_id')
+    if (sessionId) headers['X-Session-Id'] = sessionId
+    const res = await fetch(`${API_BASE}/community/upload-image`, { method: 'POST', body: formData, headers })
+    if (!res.ok) throw new ApiError(res.status, 'Upload failed')
+    return res.json()
+  },
+
+  // Skills
+  getSkills: () => fetchApi<{ items: SkillRecord[] }>('/skills'),
+  createSkill: (req: { name: string; body: string; description?: string; category?: string }) =>
+    fetchApi<{ id: number }>('/skills', { method: 'POST', body: JSON.stringify(req) }),
+  getSkill: (id: number) => fetchApi<{ item: SkillRecord }>(`/skills/${id}`),
+  updateSkill: (id: number, req: { name?: string; description?: string; body?: string; category?: string }) =>
+    fetchApi<{ ok: boolean }>(`/skills/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  deleteSkill: (id: number) => fetchApi<{ ok: boolean }>(`/skills/${id}`, { method: 'DELETE' }),
+  generateSkill: (description: string, genModel?: string) =>
+    fetchApi<{ generated_body: string }>('/skills/generate', {
+      method: 'POST',
+      body: JSON.stringify({ description, gen_model: genModel || '' }),
     }),
 }

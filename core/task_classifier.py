@@ -15,6 +15,12 @@ TASK_KEYWORDS: dict[str, list[str]] = {
         "unittest", "тест", "покрытие", "coverage", "dockerfile", "kubernetes",
         "regex", "регулярное выражение",
     ],
+    "image_generation": [
+        "фото", "картинк", "изображен", "midjourney", "dall-e", "dalle",
+        "stable diffusion", "генерация изображен", "image prompt", "промпт для фото",
+        "промпт для картин", "промпт для генерации фото", "промпт для генерации картин",
+        "нарисуй", "рисунок", "иллюстрац", "визуал", "photo prompt",
+    ],
     "analysis": [
         "анализ", "проанализируй", "оцени", "сравни", "сравнение", "найди паттерн",
         "исследуй", "изучи", "выяви", "определи", "рассмотри",
@@ -87,8 +93,30 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "decision_making": "принятие решений",
     "research": "исследование",
     "data_analysis": "анализ данных",
+    "image_generation": "генерация изображений",
     "general": "общая задача",
 }
+
+
+def detect_prompt_type(user_input: str) -> str:
+    """Detect whether the user wants a text prompt, image prompt, or skill."""
+    lower = user_input.lower()
+    image_signals = [
+        "фото", "картинк", "изображен", "midjourney", "dall-e", "dalle",
+        "stable diffusion", "image prompt", "промпт для фото", "промпт для картин",
+        "нарисуй", "рисунок", "иллюстрац", "photo prompt",
+    ]
+    skill_signals = [
+        "создай скилл", "создай навык", "skill for", "generate skill",
+        "навык для", "скилл для", "agent skill", "создай skill",
+    ]
+    img_hits = sum(1 for s in image_signals if s in lower)
+    skill_hits = sum(1 for s in skill_signals if s in lower)
+    if img_hits >= 2 or (img_hits == 1 and any(s in lower for s in ["промпт", "prompt", "генерац"])):
+        return "image"
+    if skill_hits > 0:
+        return "skill"
+    return "text"
 
 
 def classify_task(user_input: str) -> dict:

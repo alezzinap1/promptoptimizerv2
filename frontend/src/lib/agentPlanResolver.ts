@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import {
   AGENT_PRODUCT_HELP_TEXT,
   classifyAgentFollowUp,
+  looksLikeApplyTipDirective,
   looksLikeStrongEdit,
   parseTagsFromText,
   parseTitleHint,
@@ -66,6 +67,9 @@ function planFromSemanticIntent(
 
 export async function resolveAgentFollowUpPlan(userText: string): Promise<FollowUpPlan> {
   const rules = classifyAgentFollowUp(userText)
+  if (looksLikeApplyTipDirective(userText)) {
+    return { type: 'iterate', debug: 'apply_tip_directive' }
+  }
   if (looksLikeStrongEdit(userText)) {
     return { type: 'iterate', debug: 'override_strong_edit' }
   }
@@ -78,7 +82,15 @@ export async function resolveAgentFollowUpPlan(userText: string): Promise<Follow
         margin: r.margin,
         backend: r.backend,
       })
-      if (p) return p
+      if (p) {
+        if (p.type === 'chat' && looksLikeApplyTipDirective(userText)) {
+          return {
+            type: 'iterate',
+            debug: `semantic_chat_overridden_apply_tip conf=${r.confidence} margin=${r.margin}`,
+          }
+        }
+        return p
+      }
     }
   } catch {
     /* сеть / 404 / роутер отключён */

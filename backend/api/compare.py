@@ -40,6 +40,7 @@ class CompareRequest(BaseModel):
     techs_a_manual: list[str] = []
     techs_b_mode: str = "auto"
     techs_b_manual: list[str] = []
+    prompt_type: str = "text"
 
 
 @router.post("/compare")
@@ -82,7 +83,14 @@ def compare_prompts(
     def resolve_techs(mode: str, manual: list[str], exclude_ids: set[str] | None = None) -> list:
         if mode == "manual" and manual:
             return [t for t in (registry.get(tid) for tid in manual) if t]
-        candidates = registry.select_techniques(task_types, complexity, 6, req.target_model)
+        candidates = registry.select_techniques(
+            task_types,
+            complexity,
+            6,
+            req.target_model,
+            user_input=req.task_input,
+            prompt_type=req.prompt_type or "text",
+        )
         if classify_model(req.target_model) == ModelType.REASONING:
             candidates = [t for t in candidates if t["id"] not in SUPPRESS_FOR_REASONING]
         if exclude_ids:

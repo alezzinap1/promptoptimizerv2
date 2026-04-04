@@ -26,10 +26,12 @@ function loadSkillCount(): number {
   }
 }
 
-function pickWorkspaceName(items: Workspace[], id: number): string | null {
+function pickWorkspaceName(items: Workspace[], id: number, listReady: boolean): string | null {
   if (!id) return null
-  const w = items.find((x) => x.id === id)
-  return w?.name ?? `Пространство #${id}`
+  const w = items.find((x) => Number(x.id ?? 0) === id)
+  if (w?.name?.trim()) return w.name.trim()
+  if (!listReady) return 'Загрузка…'
+  return `Пространство #${id}`
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -38,18 +40,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isLanding = location.pathname === '/'
 
   const [collapsed, setCollapsed] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem(COLLAPSED_KEY) === '1')
-  const [counts, setCounts] = useState({ prompts: 0, techniques: 0, skills: loadSkillCount() })
+  const [counts, setCounts] = useState<{ prompts: number | null; techniques: number | null; skills: number }>({
+    prompts: null,
+    techniques: null,
+    skills: loadSkillCount(),
+  })
   const [recent, setRecent] = useState<RecentSession[]>(() => (typeof window !== 'undefined' ? getRecentSessions() : []))
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspacesListReady, setWorkspacesListReady] = useState(false)
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(0)
 
   const showSidebar = !!user && !isLanding
 
   const refreshNavCounts = useCallback(() => {
     if (!user) return
-    api.getLibraryStats().then((s) => setCounts((c) => ({ ...c, prompts: s.total }))).catch(() => {})
-    api.getTechniques().then((r) => setCounts((c) => ({ ...c, techniques: r.techniques.length }))).catch(() => {})
-    setCounts((c) => ({ ...c, skills: loadSkillCount() }))
+    Promise.all([
+      api.getLibraryStats().then((s) => s.total),
+      api.getTechniques().then((r) => r.techniques.length),
+    ])
+      .then(([prompts, techniques]) => {
+        setCounts({ prompts, techniques, skills: loadSkillCount() })
+      })
+      .catch(() => {
+        setCounts((c) => ({
+          prompts: c.prompts ?? 0,
+          techniques: c.techniques ?? 0,
+          skills: loadSkillCount(),
+        }))
+      })
   }, [user])
 
   useEffect(() => {
@@ -70,6 +88,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return
+    setWorkspacesListReady(false)
     api
       .getWorkspaces()
       .then((r) => {
@@ -78,7 +97,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         setActiveWorkspaceId(wid)
       })
       .catch(() => setWorkspaces([]))
+      .finally(() => setWorkspacesListReady(true))
   }, [user])
+
+  useEffect(() => {
+    if (!user || !workspacesListReady || activeWorkspaceId <= 0) return
+    const has = workspaces.some((w) => Number(w.id ?? 0) === activeWorkspaceId)
+    if (has) return
+    let cancelled = false
+    api
+      .getWorkspace(activeWorkspaceId)
+      .then((r) => {
+        if (cancelled) return
+        setWorkspaces((prev) => {
+          if (prev.some((w) => Number(w.id ?? 0) === activeWorkspaceId)) return prev
+          return [...prev, r.item]
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user, workspacesListReady, activeWorkspaceId, workspaces])
 
   useEffect(() => {
     const onWs = (ev: Event) => {
@@ -97,7 +137,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const workspaceLabel = showSidebar ? pickWorkspaceName(workspaces, activeWorkspaceId) : null
+  const workspaceLabel = showSidebar ? pickWorkspaceName(workspaces, activeWorkspaceId, workspacesListReady) : null
+  const isDemoUser = user?.username === 'demo_user'
 
   const logoWordmark = (
     <span className={styles.logoText}>
@@ -135,6 +176,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       ) : null}
       <div className={styles.shell}>
+        {isDemoUser ? (
+          <div className={styles.demoBanner} role="status">
+            Демо без входа: запросы к серверу недоступны.{' '}
+            <NavLink to="/login" className={styles.demoBannerLink}>
+              Войти
+            </NavLink>
+            , чтобы работать с данными.
+          </div>
+        ) : null}
         <div className={styles.headerWrap}>
           <header className={styles.header}>
             <div className={styles.headerLeft}>

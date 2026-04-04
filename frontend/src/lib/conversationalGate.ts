@@ -3,6 +3,8 @@
  * Не используем \b в RegExp для кириллицы: в JS граница «слова» только для [A-Za-z0-9_].
  */
 
+import { looksLikeApplyTipDirective } from './agentFollowUp'
+
 /** Подстроки, по которым считаем, что пользователь описывает задачу / промпт */
 const TASK_INTENT_MARKERS = [
   'промпт',
@@ -47,6 +49,20 @@ const TASK_INTENT_MARKERS = [
   'длиннее',
   'формальн',
   'сделай проще',
+  'примени совет',
+  'применить совет',
+  'apply tip',
+  'фото',
+  'картинк',
+  'изображен',
+  'midjourney',
+  'dall-e',
+  'stable diffusion',
+  'нарисуй',
+  'рисунок',
+  'скилл',
+  'навык',
+  'skill',
 ]
 
 const MINIMAL_RE = /^(ок|окей|okay|да|нет|спасибо|thanks|thx|понял|понятно|ладно|хорошо|ага|угу)\.?$/i
@@ -99,6 +115,7 @@ export function pickAfterPromptChatReply(): string {
 export function isConversationalOnlyMessage(text: string): boolean {
   const t = text.replace(/\s+/g, ' ').trim()
   if (!t) return true
+  if (looksLikeApplyTipDirective(t)) return false
   if (hasLikelyPromptTask(t)) return false
   if (t.length > 240) return false
 

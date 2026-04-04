@@ -117,7 +117,12 @@ export default function Compare() {
       })
       setResult(res)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка')
+      let msg = e instanceof Error ? e.message : 'Ошибка'
+      if (/identical technique sets/i.test(msg)) {
+        msg =
+          'Варианты A и B совпали по набору техник. Смените режим (авто/вручную) или набор техник для одного из вариантов.'
+      }
+      setError(msg)
     } finally {
       setLoading(false)
     }

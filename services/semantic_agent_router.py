@@ -33,6 +33,8 @@ INTENT_EXAMPLES: dict[str, list[str]] = {
         "убери второй пункт",
         "перепиши формальнее",
         "дополни ограничениями",
+        "примени совет: добавь ограничения что модель не должна выдумывать факты",
+        "apply tip: add constraints",
         "rewrite shorter",
         "add a bullet list",
         "remove the emoji",

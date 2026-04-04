@@ -50,6 +50,8 @@ class GenerateRequest(BaseModel):
     prompt_spec_overrides: dict | None = None
     evidence_decisions: dict | None = None
     question_answers: list[dict] = []
+    skill_body: str | None = None
+    prompt_type: str = "text"
 
 
 def _check_session_budget(db: DBManager, user_id: int, auth_session_id: str | None) -> None:
@@ -186,6 +188,7 @@ def generate_prompt(
         technique_mode=req.technique_mode,
         manual_techs=req.manual_techs,
         classification_override=classification,
+        prompt_type=req.prompt_type or "text",
     )
     prompt_spec = preview["prompt_spec"]
     evidence = preview["evidence"]
@@ -209,6 +212,8 @@ def generate_prompt(
         technique_mode=req.technique_mode,
         manual_techs=req.manual_techs,
         max_techniques=4,
+        user_input=req.task_input,
+        prompt_type=req.prompt_type or "text",
     )
     technique_ids = [t["id"] for t in techniques]
 
@@ -233,6 +238,39 @@ def generate_prompt(
         domain=req.domain or "auto",
         questions_mode=req.questions_mode,
     )
+    if req.prompt_type == "image":
+        system_prompt += (
+            "\n\n--- IMAGE PROMPT MODE ---\n"
+            "The user wants a prompt for AI image generation (Midjourney, DALL-E, Stable Diffusion, etc.).\n"
+            "Focus on visual description quality. Structure the output as:\n"
+            "1. **Subject**: Main subject with specific visual details\n"
+            "2. **Style**: Art style, medium, lighting, color palette\n"
+            "3. **Composition**: Camera angle, framing, depth of field\n"
+            "4. **Details**: Textures, materials, atmosphere, mood\n"
+            "5. **Negative**: What to avoid (artifacts, distortions, etc.)\n"
+            "Use descriptive, vivid language. Include technical parameters when relevant "
+            "(aspect ratio, quality tags, etc.).\n"
+            "--- END IMAGE PROMPT MODE ---"
+        )
+    elif req.prompt_type == "skill":
+        system_prompt += (
+            "\n\n--- SKILL PROMPT MODE ---\n"
+            "The user wants a reusable skill/instruction block for AI assistants (injectable system-style skill), "
+            "not a one-off chat reply.\n"
+            "In [PROMPT], produce a complete skill definition: role, scope, rules, procedure, output format, "
+            "edge cases. Use clear headings and bullet lists where helpful. "
+            "If the user asked for a specific framework (e.g. Cursor, Claude), adapt section titles accordingly.\n"
+            "The skill should be copy-paste ready and self-contained.\n"
+            "--- END SKILL PROMPT MODE ---"
+        )
+    if req.skill_body and req.skill_body.strip():
+        system_prompt += (
+            "\n\n--- ACTIVE SKILL ---\n"
+            "The user has an active skill that provides additional context and instructions. "
+            "Incorporate the skill's guidance into the generated prompt:\n\n"
+            + req.skill_body.strip()
+            + "\n--- END SKILL ---"
+        )
     if clarification_answers_text:
         system_prompt = system_prompt + "\n\n" + CLARIFICATION_ANSWERS_PROVIDED
     user_content = builder.build_user_content(
