@@ -207,6 +207,46 @@
   font-size: 0.9rem;
 }
 
+.emptyPromo {
+  grid-column: 1 / -1;
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.06);
+  margin-bottom: 4px;
+}
+
+.emptyPromoText {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text);
+  max-width: 56ch;
+}
+
+.emptyPromoBtn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.emptyPromoBtn:hover {
+  filter: brightness(1.05);
+}
+
+.ghostCard {
+  min-height: 180px;
+  opacity: 0.35;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  border-style: dashed;
+}
+
 .promptPreview {
   font-family: var(--font-mono);
   font-size: 0.72rem;

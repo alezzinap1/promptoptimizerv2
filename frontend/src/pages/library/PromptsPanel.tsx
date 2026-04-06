@@ -4,7 +4,7 @@ import { api, type LibraryItem } from '../../api/client'
 import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
 import LibraryTagChips from '../../components/LibraryTagChips'
 import SelectDropdown from '../../components/SelectDropdown'
-import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
+import { CopyIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
 import styles from '../Library.module.css'
@@ -184,6 +184,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
         <PublishToCommunityModal
           open
           onClose={() => setPublishItem(null)}
+          onPublished={() => api.getLibraryStats().then(setStats)}
           initial={{
             title: publishItem.title,
             prompt: publishItem.prompt,
@@ -202,7 +203,16 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
         <div key={tagPaintTick} className={`${styles.grid} ${gridClass}`}>
           {sorted.map((item) => (
             <div key={item.id} className={styles.card}>
-              <h3 className={styles.cardTitle}>{item.title}</h3>
+              <button
+                type="button"
+                className={styles.cardTitleBtn}
+                title="Открыть на Студии с этим промптом"
+                onClick={() =>
+                  navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${item.prompt}`, clearResult: true } })
+                }
+              >
+                {item.title}
+              </button>
               {item.created_at ? (
                 <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
               ) : null}
@@ -237,12 +247,17 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
               <div className={styles.cardActions}>
                 <button
                   type="button"
-                  className={`${styles.openBtn} btn-primary`}
-                  title="Открыть на главной и улучшить этот промпт"
+                  className={`${styles.openBtn} ${styles.openBtnAccent} btn-primary`}
+                  title="Открыть на Студии с этим промптом"
                   onClick={() =>
                     navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${item.prompt}`, clearResult: true } })
                   }
                 >
+                  <svg className={styles.openBtnIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
                   Открыть
                 </button>
                 <TryInGeminiButton
@@ -254,45 +269,39 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   }
                 />
                 <CopyIconButton text={item.prompt} title="Копировать текст промпта в буфер обмена" />
-                <button
-                  type="button"
-                  className={styles.openBtn}
-                  title="Опубликовать в сообществе"
-                  onClick={() => setPublishItem(item)}
-                >
-                  Сообщество
-                </button>
-                <DownloadIconButton
-                  title="Скачать этот промпт одним .txt файлом на диск"
-                  onClick={() => {
-                    const blob = new Blob([item.prompt], { type: 'text/plain;charset=utf-8' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `prompt_${item.id}.txt`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }}
-                />
-                <PencilIconButton title="Редактировать название, теги, заметки и оценку" onClick={() => startEdit(item)} />
-                <button
-                  type="button"
-                  className={`${styles.evalBtn} ${evalId === item.id ? styles.evalBtnActive : ''}`}
-                  title="Оценить качество промпта"
-                  onClick={() => handleEval(item)}
-                >
-                  %
-                </button>
-                <TrashIconButton
-                  title="Удалить запись из библиотеки без восстановления"
-                  onClick={async () => {
-                    await api.deleteLibrary(item.id)
-                    setItems((prev) => prev.filter((x) => x.id !== item.id))
-                    api.getLibraryStats().then(setStats)
-                    onPromptCountChanged?.()
-                    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
-                  }}
-                />
+                <details className={styles.cardMore}>
+                  <summary className={styles.cardMoreSummary} title="Другие действия">
+                    Ещё
+                  </summary>
+                  <div className={styles.cardMoreMenu}>
+                    <button type="button" className={styles.cardMoreItem} onClick={() => setPublishItem(item)}>
+                      Опубликовать в сообщество
+                    </button>
+                    <button type="button" className={styles.cardMoreItem} onClick={() => startEdit(item)}>
+                      Редактировать карточку
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.cardMoreItem} ${evalId === item.id ? styles.cardMoreItemActive : ''}`}
+                      onClick={() => handleEval(item)}
+                    >
+                      Оценить качество (полнота)
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.cardMoreItem} ${styles.cardMoreDanger}`}
+                      onClick={async () => {
+                        await api.deleteLibrary(item.id)
+                        setItems((prev) => prev.filter((x) => x.id !== item.id))
+                        api.getLibraryStats().then(setStats)
+                        onPromptCountChanged?.()
+                        window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+                      }}
+                    >
+                      Удалить из библиотеки
+                    </button>
+                  </div>
+                </details>
               </div>
               {evalId === item.id && (
                 <div className={styles.evalInline}>

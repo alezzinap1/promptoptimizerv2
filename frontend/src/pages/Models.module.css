@@ -41,6 +41,12 @@
   min-height: 0;
 }
 
+.curatedCardUnavailable {
+  opacity: 0.78;
+  filter: grayscale(0.2);
+  border-style: dashed;
+}
+
 .curatedCardTop {
   display: flex;
   flex-direction: column;
@@ -85,15 +91,24 @@
   opacity: 0.9;
 }
 
-.curatedMissing {
+.curatedMuted {
   margin: 0;
   font-size: 0.75rem;
-  color: #f59e0b;
+  color: var(--muted);
   line-height: 1.35;
 }
 
-[data-theme='light'] .curatedMissing {
-  color: #b45309;
+.curatedBtnDisabled {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: not-allowed;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
 }
 
 .curatedBtnIn,

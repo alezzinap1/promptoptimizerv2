@@ -81,13 +81,10 @@ export default function SimpleImprove() {
     <div className={styles.root}>
       <header className={styles.header}>
         <div>
-          <h1 className="pageTitleGradient">Простой режим</h1>
+          <h1 className="pageTitleGradient">Улучшить</h1>
           <p className={styles.lead}>
-            Быстрое улучшение готового текста промпта (пресеты, без базы YAML-техник и без Prompt IDE). Полный
-            контур MetaPrompt — на <Link to="/home">Студии</Link>.{' '}
-            <Link to="/help">Справка</Link>
-            {' · '}
-            <Link to="/settings">Настройки пресета и мета-промпта</Link>
+            Быстрое улучшение текста промпта по пресету. Полный цикл — на <Link to="/home">Студии</Link>.{' '}
+            <Link to="/help">Справка</Link> · <Link to="/settings">Настройки</Link>
           </p>
         </div>
       </header>

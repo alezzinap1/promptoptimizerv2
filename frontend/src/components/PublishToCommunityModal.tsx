@@ -136,8 +136,11 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
         </label>
         {promptType === 'image' && (
           <label className={styles.field}>
-            Превью результата (jpg/png/webp/gif, до 5 МБ) — по желанию
+            Картинка-результат (по желанию)
             <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <span className={styles.fieldHint}>
+              Загрузите файл с диска: например, картинку из Midjourney/DALL·E после сохранения. До 5 МБ, jpg/png/webp/gif.
+            </span>
           </label>
         )}
         <label className={styles.field}>

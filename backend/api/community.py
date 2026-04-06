@@ -1,19 +1,25 @@
 """Community prompt library — public shared prompts with voting and image uploads."""
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
+from config.abuse import check_input_size
 from db.manager import DBManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-UPLOAD_DIR = Path("data/uploads")
+# Тот же каталог, что и StaticFiles в main.py (cwd не влияет)
+_ROOT = Path(__file__).resolve().parent.parent.parent
+UPLOAD_DIR = _ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
@@ -70,16 +76,24 @@ def create_community_prompt(
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
 ):
-    id_ = db.create_community_prompt(
-        author_user_id=int(user["id"]),
-        title=req.title,
-        prompt=req.prompt,
-        description=req.description,
-        prompt_type=req.prompt_type,
-        category=req.category,
-        tags=req.tags,
-        image_path=req.image_path,
-    )
+    combined = f"{req.title}\n{req.description}\n{req.prompt}"
+    ok, err = check_input_size(combined)
+    if not ok:
+        raise HTTPException(400, err)
+    try:
+        id_ = db.create_community_prompt(
+            author_user_id=int(user["id"]),
+            title=req.title.strip(),
+            prompt=req.prompt,
+            description=(req.description or "").strip(),
+            prompt_type=req.prompt_type,
+            category=req.category,
+            tags=req.tags,
+            image_path=req.image_path,
+        )
+    except Exception as e:
+        logger.exception("create_community_prompt failed")
+        raise HTTPException(500, "Не удалось сохранить публикацию. Повторите попытку.") from e
     return {"id": id_}
 
 
@@ -136,14 +150,18 @@ async def upload_image(
     _user: dict = Depends(get_current_user),
 ):
     if not file.filename:
-        return {"error": "no_filename"}, 400
+        raise HTTPException(400, "Файл без имени")
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        return {"error": "invalid_format", "allowed": list(ALLOWED_EXTENSIONS)}
+        raise HTTPException(400, f"Формат не поддерживается. Допустимо: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
     data = await file.read()
     if len(data) > MAX_IMAGE_SIZE:
-        return {"error": "file_too_large", "max_bytes": MAX_IMAGE_SIZE}
+        raise HTTPException(400, f"Файл больше {MAX_IMAGE_SIZE // (1024 * 1024)} МБ")
     fname = f"{uuid.uuid4().hex}{ext}"
     dest = UPLOAD_DIR / fname
-    dest.write_bytes(data)
+    try:
+        dest.write_bytes(data)
+    except OSError as e:
+        logger.exception("community upload write failed")
+        raise HTTPException(500, "Не удалось сохранить файл на сервере.") from e
     return {"path": f"/api/uploads/{fname}"}

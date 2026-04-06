@@ -197,6 +197,28 @@
   line-height: 1.25;
 }
 
+.cardTitleBtn {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0;
+  text-align: left;
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.cardTitleBtn:hover {
+  color: var(--primary);
+}
+
 .cardDates {
   margin: 0 0 10px;
   font-size: 0.78rem;
@@ -297,11 +319,105 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.cardMore {
+  position: relative;
+  margin-left: auto;
+}
+
+.cardMoreSummary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  user-select: none;
+}
+
+.cardMoreSummary::-webkit-details-marker {
+  display: none;
+}
+
+.cardMoreSummary:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.cardMore[open] .cardMoreSummary {
+  color: var(--text);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.cardMoreMenu {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 6px;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--modal-surface, var(--panel-strong));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardMoreItem {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cardMoreItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cardMoreItemActive {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.cardMoreDanger {
+  color: rgb(248, 113, 113);
+}
+
+.cardMoreDanger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+
 .openBtn {
   padding: 8px 14px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
+}
+
+.openBtnAccent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.openBtnIcon {
+  flex-shrink: 0;
+  opacity: 0.95;
 }
 
 .exportBtn {

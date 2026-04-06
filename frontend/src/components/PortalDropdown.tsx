@@ -17,6 +17,8 @@ type Props = {
   /** Минимальная ширина меню (и подсказка для первого кадра позиционирования) */
   minWidth?: number
   align?: 'left' | 'right'
+  /** Дополнительный класс к панели (размер, фон) */
+  panelClassName?: string
 }
 
 /**
@@ -29,6 +31,7 @@ export default function PortalDropdown({
   children,
   minWidth = 200,
   align = 'left',
+  panelClassName,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [style, setStyle] = useState<CSSProperties>({})
@@ -92,7 +95,12 @@ export default function PortalDropdown({
   if (!open) return null
 
   return createPortal(
-    <div ref={panelRef} className={styles.dropdownPanel} style={style} role="listbox">
+    <div
+      ref={panelRef}
+      className={[styles.dropdownPanel, panelClassName].filter(Boolean).join(' ')}
+      style={style}
+      role="listbox"
+    >
       {children}
     </div>,
     document.body,

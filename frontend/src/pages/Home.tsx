@@ -27,6 +27,7 @@ import {
   type PromptStudioMode,
 } from '../lib/agentStudioModes'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
+import ImageStylePickerPopover from '../components/ImageStylePickerPopover'
 import PublishToCommunityModal, { type PublishToCommunityInitial } from '../components/PublishToCommunityModal'
 import {
   isConversationalOnlyMessage,
@@ -40,6 +41,9 @@ import {
   TECHNIQUES_COUNT_TITLE,
   TOKEN_ESTIMATE_TITLE,
 } from '../lib/scoreTooltips'
+import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
+import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
+import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
@@ -105,28 +109,6 @@ const AGENT_THINKING_PHASES = [
   'Собираю формулировку промпта…',
   'Проверяю согласованность и полноту…',
 ]
-
-/** Быстрые метки для режима «Фото» — уходят в запрос как image_prompt_tags */
-const IMAGE_STYLE_BADGES: { id: string; label: string }[] = [
-  { id: 'realism', label: 'Реализм' },
-  { id: 'minimal', label: 'Минимализм' },
-  { id: 'cartoon', label: 'Мультфильм' },
-  { id: 'cinematic', label: 'Кино' },
-  { id: 'illustration', label: 'Иллюстрация' },
-  { id: '3d_render', label: '3D' },
-  { id: 'dark_mood', label: 'Тёмная атмосфера' },
-  { id: 'bright_palette', label: 'Светлая палитра' },
-]
-
-/** Если /meta/image-options ещё без engines — те же id, что в backend `image_meta.IMAGE_ENGINES_UI` */
-const FALLBACK_IMAGE_ENGINE_OPTIONS = [
-  { value: 'auto', label: 'Авто / универсально' },
-  { value: 'midjourney', label: 'Midjourney' },
-  { value: 'dalle', label: 'DALL·E' },
-  { value: 'sd', label: 'Stable Diffusion / SDXL' },
-  { value: 'flux', label: 'Flux' },
-  { value: 'leonardo', label: 'Leonardo AI' },
-] as const
 
 const DEFAULT_AGENT_SPLIT = 0.38
 function loadAgentSplit(): number {
@@ -218,6 +200,10 @@ export default function Home() {
   const [imagePresetId, setImagePresetId] = useState('')
   const [imageEngine, setImageEngine] = useState('auto')
   const [imageDeepMode, setImageDeepMode] = useState(false)
+  const [imageStylePickerOpen, setImageStylePickerOpen] = useState(false)
+  const [imageStyleFavorites, setImageStyleFavorites] = useState<Set<string>>(() =>
+    typeof window !== 'undefined' ? loadImageStyleFavoriteIds() : new Set(),
+  )
   const [skillPresetId, setSkillPresetId] = useState('')
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
@@ -314,6 +300,7 @@ export default function Home() {
   const splitRootRef = useRef<HTMLDivElement>(null)
   const agentSplitRootRef = useRef<HTMLDivElement>(null)
   const agentChatScrollRef = useRef<HTMLDivElement>(null)
+  const imageStyleMoreBtnRef = useRef<HTMLButtonElement>(null)
   const [issueBannerDismissed, setIssueBannerDismissed] = useState(false)
   const lastQuestionAnswersRef = useRef<{ question: string; answers: string[] }[] | undefined>(undefined)
   const lastClarificationsMsgIdRef = useRef<string | null>(null)
@@ -401,6 +388,19 @@ export default function Home() {
     setImagePromptTags((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }, [])
 
+  const toggleImageStyleFavorite = useCallback((id: string) => {
+    setImageStyleFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    saveImageStyleFavoriteIds(imageStyleFavorites)
+  }, [imageStyleFavorites])
+
   const imagePresetSelectOptions = useMemo(() => {
     const presets = imageMeta?.presets ?? []
     return [
@@ -413,14 +413,6 @@ export default function Home() {
       })),
     ]
   }, [imageMeta, userPresetsImage])
-
-  const imageEngineSelectOptions = useMemo(() => {
-    const eng = imageMeta?.engines
-    if (eng && eng.length > 0) {
-      return eng.map((e) => ({ value: e.id, label: e.label, title: e.label }))
-    }
-    return FALLBACK_IMAGE_ENGINE_OPTIONS.map((e) => ({ ...e, title: e.label }))
-  }, [imageMeta?.engines])
 
   const skillPresetSelectOptions = useMemo(
     () => [
@@ -775,11 +767,13 @@ export default function Home() {
         question_answers: questionAnswers || [],
         image_prompt_tags: promptType === 'image' ? imagePromptTags : undefined,
         image_preset_id: promptType === 'image' && imagePresetId ? imagePresetId : undefined,
-        image_engine: promptType === 'image' ? imageEngine : undefined,
+        image_engine: promptType === 'image' ? 'auto' : undefined,
         image_deep_mode: promptType === 'image' ? imageDeepMode : undefined,
         skill_preset_id: promptType === 'skill' && skillPresetId ? skillPresetId : undefined,
+        recent_technique_ids: loadRecentTechniqueIds(),
       }
       const res = normalizeClientGenerateResult(await api.generate(req))
+      appendRecentTechniqueIds(res.technique_ids || [])
       setResult(res)
       setSessionId(res.session_id)
       pushRecentSession(res.session_id, effectiveTask)
@@ -799,6 +793,13 @@ export default function Home() {
             const thinkingParts: string[] = []
             if (res.techniques?.length) {
               thinkingParts.push(`**Техники:** ${res.techniques.map((t) => t.name).join(', ')}`)
+            }
+            if (res.technique_reasons?.length) {
+              thinkingParts.push(
+                res.technique_reasons
+                  .map((tr) => `• **${tr.id}:** ${tr.reason.length > 200 ? `${tr.reason.slice(0, 200)}…` : tr.reason}`)
+                  .join('\n'),
+              )
             }
             if (res.reasoning) {
               const short = res.reasoning.length > 400 ? res.reasoning.slice(0, 400) + '…' : res.reasoning
@@ -1235,6 +1236,16 @@ export default function Home() {
     [],
   )
 
+  const agentChatPlaceholder = useMemo(() => {
+    if (promptType === 'image') {
+      return 'Сначала опишите сцену или идею. Стили и уточнения — строкой выше, когда понадобятся.'
+    }
+    if (promptType === 'skill') {
+      return 'Опишите, какой навык или инструкцию оформить для ИИ-ассистента (роль, шаги, формат ответа)…'
+    }
+    return 'Опишите задачу или попросите изменить промпт…'
+  }, [promptType])
+
   const renderTaskColumn = () => (
     <div className={styles.columnStack}>
       <section className={`${styles.panel} ${styles.taskPanel}`}>
@@ -1307,16 +1318,18 @@ export default function Home() {
                   onSelect={setWorkspaceId}
                   workspacesReady={workspacesReady}
                 />
-                <SelectDropdown
-                  value={targetModel}
-                  options={targetModelSelectOptions}
-                  onChange={setTargetModel}
-                  aria-label="Модель, для которой пишется промпт"
-                  variant="composer"
-                  footerLink={{ to: '/models', label: 'Каталог моделей' }}
-                  triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
-                  triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
-                />
+                {promptType !== 'image' ? (
+                  <SelectDropdown
+                    value={targetModel}
+                    options={targetModelSelectOptions}
+                    onChange={setTargetModel}
+                    aria-label="Модель, для которой пишется промпт"
+                    variant="composer"
+                    footerLink={{ to: '/models', label: 'Каталог моделей' }}
+                    triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
+                    triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
+                  />
+                ) : null}
                 <button
                   type="button"
                   className={styles.techModeMicro}
@@ -1917,7 +1930,27 @@ export default function Home() {
               )}
               {result.metrics && Array.isArray(result.metrics.improvement_tips) && result.metrics.improvement_tips.length > 0 && (
                 <div className={styles.tipsBox}>
-                  <strong>Что можно улучшить:</strong>
+                  <div className={styles.tipsBoxHead}>
+                    <strong>Что можно улучшить:</strong>
+                    <button
+                      type="button"
+                      className={styles.tipsApplyAllBtn}
+                      disabled={loading}
+                      title="Вставить все советы в запрос на доработку одним действием"
+                      onClick={() => {
+                        const tips = result.metrics?.improvement_tips as string[]
+                        const body = tips.map((t, i) => `${i + 1}. ${t}`).join('\n')
+                        if (creationMode === 'agent') {
+                          setChatInput(`Учти и примени советы по очереди:\n${body}`)
+                        } else {
+                          setFeedback(body)
+                          setIterationMode(true)
+                        }
+                      }}
+                    >
+                      Применить всё
+                    </button>
+                  </div>
                   <ul>
                     {(result.metrics.improvement_tips as string[]).map((tip, idx) => (
                       <li key={idx} className={styles.tipItem}>
@@ -2114,7 +2147,7 @@ export default function Home() {
                         className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
                         onClick={() => handlePromptTypeChange(pt)}
                       >
-                        {pt === 'text' ? 'Текст' : pt === 'image' ? 'Фото' : 'Скилл'}
+                        {pt === 'text' ? '📝 Текст' : pt === 'image' ? '📷 Фото' : '⚡ Скилл'}
                       </button>
                     ))}
                   </div>
@@ -2133,41 +2166,72 @@ export default function Home() {
                 </button>
               </div>
               {promptType === 'image' && (
-                <div className={styles.imageBadgeRow} aria-label="Метки стиля для изображения">
-                  <span className={styles.imageBadgeLabel}>Стиль</span>
-                  <div className={styles.imageBadgeWrap}>
-                    {IMAGE_STYLE_BADGES.map((b) => (
+                <div className={styles.imageStyleToolbar}>
+                  <div className={styles.imageStylesOneRow} aria-label="Выбранные стили изображения">
+                    <div className={styles.imageSelectedWrap}>
+                      {imagePromptTags.map((id) => {
+                        const def = IMAGE_STYLES_BY_ID[id]
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            className={styles.imageSelectedChip}
+                            onClick={() => toggleImageTag(id)}
+                            title={def?.description ?? id}
+                          >
+                            {def?.label ?? id}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      ref={imageStyleMoreBtnRef}
+                      type="button"
+                      className={styles.imageStyleMenuBtn}
+                      title="Открыть каталог стилей"
+                      aria-label="Каталог стилей изображения"
+                      aria-expanded={imageStylePickerOpen}
+                      aria-haspopup="listbox"
+                      onClick={() => setImageStylePickerOpen((o) => !o)}
+                    >
+                      Стили
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className={`${styles.imageDeepToggle} ${imageDeepMode ? styles.imageDeepToggleOn : ''}`}
+                    aria-pressed={imageDeepMode}
+                    title="Анализирует сцену и добавляет детали освещения, перспективы и атмосферы перед генерацией промпта. Дороже по токенам, обычно точнее."
+                    onClick={() => setImageDeepMode((v) => !v)}
+                  >
+                    <span className={styles.imageDeepIcon} aria-hidden>
+                      🔬
+                    </span>
+                    <span className={styles.imageDeepToggleText}>Анализ сцены</span>
+                  </button>
+                </div>
+              )}
+              {promptType === 'skill' && chatMessages.length === 0 ? (
+                <div className={styles.skillQuickStart} aria-label="Быстрые шаблоны для скилла">
+                  <span className={styles.skillQuickLabel}>Примеры</span>
+                  <div className={styles.skillQuickChips}>
+                    {[
+                      ['Эксперт по финанализу', 'Скилл: ты — финансовый аналитик. Помогай с метриками и рисками. Формат: кратко, таблицы по запросу.\n\n'],
+                      ['Редактор текстов', 'Скилл: редактор стиля. Улучшай ясность и тон, сохраняй смысл. Отвечай правками и кратким обоснованием.\n\n'],
+                      ['Python-разработчик', 'Скилл: senior Python. Код с типами и тестами, объясняй шаги. Стиль: PEP8, без лишней воды.\n\n'],
+                    ].map(([label, seed]) => (
                       <button
-                        key={b.id}
+                        key={label}
                         type="button"
-                        className={`${styles.imageBadge} ${imagePromptTags.includes(b.id) ? styles.imageBadgeOn : ''}`}
-                        onClick={() => toggleImageTag(b.id)}
+                        className={styles.skillQuickChip}
+                        onClick={() => setChatInput(seed)}
                       >
-                        {b.label}
+                        {label}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-              {promptType === 'image' && (
-                <div className={styles.imageEngineRow}>
-                  <SelectDropdown
-                    value={imageEngine}
-                    options={imageEngineSelectOptions}
-                    onChange={setImageEngine}
-                    aria-label="Движок генерации изображения"
-                    variant="composer"
-                  />
-                  <label className={styles.imageDeepLabel}>
-                    <input
-                      type="checkbox"
-                      checked={imageDeepMode}
-                      onChange={(e) => setImageDeepMode(e.target.checked)}
-                    />
-                    Глубокий режим (анализ сцены)
-                  </label>
-                </div>
-              )}
+              ) : null}
               <div className={styles.agentChatBody}>
                 <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
                   {chatMessages.map((m) => {
@@ -2246,7 +2310,7 @@ export default function Home() {
                   className={cb.composerTextarea}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Опишите задачу или попросите изменить промпт…"
+                  placeholder={agentChatPlaceholder}
                   minHeightPx={result?.has_questions && !result?.has_prompt ? 52 : 72}
                   maxHeightPx={280}
                   spellCheck
@@ -2417,9 +2481,20 @@ export default function Home() {
         </div>
       )}
       <PublishToCommunityModal
+        key={`pub-${result?.session_id ?? 'x'}-${(result?.prompt_block || '').length}`}
         open={publishCommunityOpen}
         onClose={() => setPublishCommunityOpen(false)}
         initial={communityPublishInitial}
+      />
+      <ImageStylePickerPopover
+        open={imageStylePickerOpen}
+        onClose={() => setImageStylePickerOpen(false)}
+        anchorRef={imageStyleMoreBtnRef}
+        items={IMAGE_STYLES_ALL}
+        selectedIds={imagePromptTags}
+        onToggle={toggleImageTag}
+        favoriteIds={imageStyleFavorites}
+        onToggleFavorite={toggleImageStyleFavorite}
       />
     </div>
   )

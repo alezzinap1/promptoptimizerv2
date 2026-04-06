@@ -94,13 +94,21 @@ export default function Community() {
 
       {loading && <div className={styles.empty}>Загрузка…</div>}
 
-      {!loading && items.length === 0 && (
-        <div className={styles.empty}>
-          Пока нет опубликованных промптов. Будьте первым!
-        </div>
-      )}
-
       <div className={styles.grid}>
+        {!loading && items.length === 0 && (
+          <>
+            <div className={styles.emptyPromo}>
+              <p className={styles.emptyPromoText}>
+                Здесь будет живая лента: делитесь промптами — другие найдут их через поиск и смогут использовать у себя.
+              </p>
+              <button type="button" className={styles.emptyPromoBtn} onClick={() => setPublishOpen(true)}>
+                Опубликовать первым
+              </button>
+            </div>
+            <div className={`${styles.card} ${styles.ghostCard}`} aria-hidden />
+            <div className={`${styles.card} ${styles.ghostCard}`} aria-hidden />
+          </>
+        )}
         {items.map((item) => (
           <div key={item.id} className={styles.card}>
             {item.image_path && (

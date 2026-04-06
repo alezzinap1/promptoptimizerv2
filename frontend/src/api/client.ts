@@ -103,6 +103,8 @@ export interface GenerateRequest {
   image_deep_mode?: boolean
   /** Пользовательский пресет для режима «Скилл» (u_{id}) */
   skill_preset_id?: string | null
+  /** Недавние id техник — для разнообразия автоподбора на сервере */
+  recent_technique_ids?: string[]
 }
 
 export interface ImagePresetOption {
@@ -154,6 +156,11 @@ export interface GenerateResult {
   questions?: StructuredQuestion[]
   techniques: { id: string; name: string }[]
   technique_ids: string[]
+  /** Краткое обоснование выбора каждой техники */
+  technique_reasons?: { id: string; reason: string }[]
+  context_gap?: number
+  questions_policy?: { mode: string; max_questions: number }
+  questions_enforced?: boolean
   task_types: string[]
   complexity: string
   task_input?: string
@@ -576,8 +583,22 @@ export const api = {
     const sessionId = localStorage.getItem('session_id')
     if (sessionId) headers['X-Session-Id'] = sessionId
     const res = await fetch(`${API_BASE}/community/upload-image`, { method: 'POST', body: formData, headers })
-    if (!res.ok) throw new ApiError(res.status, 'Upload failed')
-    return res.json()
+    const text = await res.text()
+    if (!res.ok) {
+      let msg = `Ошибка загрузки (${res.status})`
+      try {
+        const j = JSON.parse(text) as { detail?: unknown }
+        if (typeof j.detail === 'string') msg = j.detail
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(msg, res.status)
+    }
+    try {
+      return JSON.parse(text) as { path: string }
+    } catch {
+      throw new ApiError('Ответ сервера не JSON', res.status)
+    }
   },
 
   // Skills

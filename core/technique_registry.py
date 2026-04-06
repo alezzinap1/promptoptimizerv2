@@ -93,6 +93,7 @@ class TechniqueRegistry:
         target_model: str = "unknown",
         user_input: str = "",
         prompt_type: str = "text",
+        recent_technique_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Select optimal technique set using scored synergy algorithm.
 
@@ -110,6 +111,7 @@ class TechniqueRegistry:
                 max_techniques=max_techniques,
                 target_model=target_model,
                 prompt_type=prompt_type or "text",
+                recent_technique_ids=recent_technique_ids,
             )
 
         return self._select_techniques_legacy(

@@ -234,7 +234,10 @@ export default function Models() {
             const live = modelById.get(pick.id)
             const inSet = selectedGen.has(pick.id)
             return (
-              <article key={pick.id} className={styles.curatedCard}>
+              <article
+                key={pick.id}
+                className={`${styles.curatedCard} ${!live && !loading ? styles.curatedCardUnavailable : ''}`}
+              >
                 <div className={styles.curatedCardTop}>
                   <h3 className={styles.curatedTitle}>{pick.title}</h3>
                   <code className={styles.curatedId}>{pick.id}</code>
@@ -250,12 +253,18 @@ export default function Models() {
                     Контекст {formatContext(live.context_length)} · выход {formatPrice(live.pricing?.completion)}/1M
                   </p>
                 )}
-                {!live && !loading && (
-                  <p className={styles.curatedMissing}>Нет в текущем каталоге — ID мог обновиться на OpenRouter.</p>
-                )}
+                {!live && !loading ? (
+                  <p className={styles.curatedMuted}>Сейчас нет в каталоге — обновите список моделей позже.</p>
+                ) : null}
                 <button
                   type="button"
-                  className={inSet ? styles.curatedBtnOut : styles.curatedBtnIn}
+                  className={
+                    !live
+                      ? styles.curatedBtnDisabled
+                      : inSet
+                        ? styles.curatedBtnOut
+                        : styles.curatedBtnIn
+                  }
                   onClick={() => live && toggleGenModel(pick.id)}
                   disabled={saving || !live}
                 >

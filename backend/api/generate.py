@@ -25,6 +25,7 @@ from core.image_target_syntax import get_image_engine_syntax_block
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
+from core.context_gap import compute_context_gap, gap_missing_summary, get_questions_policy
 from core.task_classifier import classify_task, heuristic_classification_confidence
 from core.task_llm_classifier import classify_task_with_llm
 from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
@@ -91,6 +92,69 @@ SKILL_QUESTIONS_STRICT = (
     "верни [QUESTIONS], не [PROMPT].\n"
     "--- END SKILL STRICT ---"
 )
+
+QUESTIONS_CONTRACT_SYSTEM = """You are a requirements analyst for prompt engineering.
+Your ONLY output must be the block [QUESTIONS]...[/QUESTIONS]. Nothing else.
+
+Rules:
+- Do NOT write [PROMPT], [REASONING], or code fences for a full prompt.
+- Ask at most {max_q} questions; each answerable in 1–2 short lines.
+- Use the SAME language as the user's task (Russian if the task is Russian).
+- Number questions 1. 2. … and under each question list 2–5 short options as lines starting with "- ".
+
+Output shape:
+[QUESTIONS]
+1. ...
+- ...
+- ...
+2. ...
+...
+[/QUESTIONS]
+"""
+
+
+def _build_technique_reasons(
+    techniques: list[dict],
+    classification: dict,
+    prompt_type: str,
+) -> list[dict[str, str]]:
+    tts = ", ".join(classification.get("task_types") or ["general"])
+    cx = classification.get("complexity") or "medium"
+    out: list[dict[str, str]] = []
+    for t in techniques:
+        tid = t.get("id", "")
+        wt = t.get("when_to_use") or {}
+        hint = (wt.get("summary") or "").strip()
+        if not hint:
+            why = (t.get("why_it_works") or "").strip().replace("\n", " ")
+            hint = (why[:140] + "…") if len(why) > 140 else why if why else str(t.get("name") or tid)
+        if len(hint) > 180:
+            hint = hint[:177] + "…"
+        out.append(
+            {
+                "id": tid,
+                "reason": f"Режим «{prompt_type}», тип задачи: {tts}, сложность: {cx}. {hint}",
+            }
+        )
+    return out
+
+
+def _should_enforce_questions_contract(
+    policy: dict,
+    gap: float,
+    parsed: dict,
+    questions: list | None,
+) -> bool:
+    if policy.get("mode") == "skip":
+        return False
+    if not parsed.get("has_prompt"):
+        return False
+    if parsed.get("has_questions") and questions and len(questions) > 0:
+        return False
+    if policy.get("mode") == "required":
+        return True
+    return gap >= 0.26
+
 
 SCENE_ANALYSIS_SYSTEM = """You are a visual scene analyst for text-to-image workflows.
 Given the user's description (and any clarifications), output ONLY a single JSON object. No markdown fences, no commentary before or after.
@@ -173,6 +237,7 @@ class GenerateRequest(BaseModel):
     image_engine: str | None = None
     image_deep_mode: bool = False
     skill_preset_id: str | None = None
+    recent_technique_ids: list[str] = Field(default_factory=list)
 
 
 def _is_primary_generation_with_unanswered_questions(req: GenerateRequest) -> bool:
@@ -349,6 +414,13 @@ def generate_prompt(
         user_id=int(user["id"]),
     )
 
+    context_gap = compute_context_gap(
+        req.task_input,
+        workspace=workspace,
+        prompt_type=req.prompt_type or "text",
+    )
+    questions_policy = get_questions_policy(context_gap, classification.get("complexity") or "medium")
+
     effective_overrides = apply_evidence_decisions(req.prompt_spec_overrides, req.evidence_decisions)
     preview = build_preview_payload(
         raw_input=req.task_input,
@@ -386,14 +458,17 @@ def generate_prompt(
         max_techniques=4,
         user_input=req.task_input,
         prompt_type=req.prompt_type or "text",
+        recent_technique_ids=req.recent_technique_ids or None,
     )
     technique_ids = [t["id"] for t in techniques]
+    technique_reasons = _build_technique_reasons(techniques, classification, req.prompt_type or "text")
 
     if req.domain and req.domain != "auto" and req.technique_mode != "manual":
         domain_tech_ids = get_domain_techniques(req.domain)
         if domain_tech_ids:
             techniques = [t for t in (registry.get(tid) for tid in domain_tech_ids) if t]
             technique_ids = [t["id"] for t in techniques]
+            technique_reasons = _build_technique_reasons(techniques, classification, req.prompt_type or "text")
 
     builder = ContextBuilder(registry)
 
@@ -440,6 +515,13 @@ def generate_prompt(
         questions_mode=req.questions_mode,
         prompt_type=req.prompt_type or "text",
     )
+    if _is_primary_generation_with_unanswered_questions(req) and questions_policy.get("mode") != "skip":
+        system_prompt += (
+            f"\n\n--- CONTEXT POLICY (gap={context_gap:.2f}) ---\n"
+            f"Prefer at most {questions_policy['max_questions']} clarifying questions when context is thin; "
+            f"mode={questions_policy['mode']}. Short tasks or missing audience/format usually need questions first.\n"
+            "--- END CONTEXT POLICY ---\n"
+        )
     if req.prompt_type == "image":
         system_prompt += IMAGE_PROMPT_MODE_BLOCK
         if req.questions_mode:
@@ -503,6 +585,48 @@ def generate_prompt(
     full_text = (full_text or "").strip()
     parsed = parse_reply(full_text)
     questions = parse_questions(parsed.get("questions_raw", "")) or []
+    questions_enforced = False
+
+    if (
+        _is_primary_generation_with_unanswered_questions(req)
+        and _should_enforce_questions_contract(questions_policy, context_gap, parsed, questions)
+    ):
+        q_provider = _scene_analysis_provider(using_host_key)
+        if using_host_key:
+            cmid_q = _get_openrouter_model_id(q_provider)
+            if completion_price_per_m(cmid_q) > TRIAL_MAX_COMPLETION_PER_M:
+                q_provider = "gemini_flash"
+        max_q = int(questions_policy.get("max_questions") or 2)
+        max_q = max(1, min(5, max_q))
+        missing = gap_missing_summary(req.task_input, req.prompt_type or "text")
+        contract_sys = QUESTIONS_CONTRACT_SYSTEM.format(max_q=max_q)
+        contract_user = (
+            f"User task:\n{req.task_input.strip()}\n\n"
+            f"Identified gaps to clarify:\n{missing}\n\n"
+            f"Ask up to {max_q} targeted questions. Do not output [PROMPT]."
+        )
+        try:
+            q_pass = llm.generate(contract_sys, contract_user, q_provider, temperature=0.35)
+            q_pass = (q_pass or "").strip()
+            parsed_q = parse_reply(q_pass)
+            q_list = parse_questions(parsed_q.get("questions_raw", "")) or []
+            if parsed_q.get("has_questions") and q_list:
+                full_text = q_pass
+                parsed = {
+                    **parsed_q,
+                    "has_prompt": False,
+                    "prompt_block": "",
+                }
+                questions = q_list
+                questions_enforced = True
+                if using_host_key:
+                    c_raw = len(contract_sys) + len(contract_user) + len(q_pass) + 120
+                    model_id = _get_openrouter_model_id(q_provider)
+                    pr, cp = get_model_pricing(model_id)
+                    db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
+        except Exception:
+            pass
+
     gen_flags = diagnose_generation_response(parsed, questions)
     generation_issue: str | None = None
     if gen_flags["format_failure"]:
@@ -606,8 +730,12 @@ def generate_prompt(
         "generation_issue": generation_issue,
         "generation_flags": gen_flags,
         "questions": questions,
+        "context_gap": context_gap,
+        "questions_policy": questions_policy,
+        "questions_enforced": questions_enforced,
         "techniques": [{"id": t["id"], "name": t.get("name", t["id"])} for t in techniques],
         "technique_ids": technique_ids,
+        "technique_reasons": technique_reasons,
         "task_types": classification["task_types"],
         "complexity": classification["complexity"],
         "task_input": req.task_input,

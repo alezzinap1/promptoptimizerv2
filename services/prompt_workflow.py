@@ -85,6 +85,7 @@ def resolve_techniques(
     max_techniques: int = 4,
     user_input: str = "",
     prompt_type: str = "text",
+    recent_technique_ids: list[str] | None = None,
 ) -> list[dict]:
     task_types = classification["task_types"]
     complexity = classification["complexity"]
@@ -95,6 +96,7 @@ def resolve_techniques(
             task_types, complexity, max_techniques=max_techniques,
             target_model=target_model, user_input=user_input,
             prompt_type=prompt_type or "text",
+            recent_technique_ids=recent_technique_ids,
         )
 
     model_type = classify_model(target_model)

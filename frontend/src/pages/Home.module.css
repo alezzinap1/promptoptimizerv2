@@ -684,23 +684,26 @@ details[open].chatBubbleThinking .thinkingSummary::before {
 }
 
 .promptTypeTabs {
-  display: flex;
-  gap: 2px;
-  background: var(--panel-strong);
-  border-radius: 6px;
-  padding: 2px;
+  display: inline-flex;
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--stroke);
+  border-radius: 0;
 }
 
 .promptTypeTab {
   background: none;
   border: none;
-  padding: 3px 10px;
-  border-radius: 4px;
-  font-size: 0.72rem;
+  border-bottom: 2px solid transparent;
+  padding: 6px 10px 5px;
+  margin-bottom: -1px;
+  border-radius: 0;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--muted);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .promptTypeTab:hover {
@@ -708,76 +711,158 @@ details[open].chatBubbleThinking .thinkingSummary::before {
 }
 
 .promptTypeTabActive {
-  background: var(--primary);
-  color: #fff;
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: none;
 }
 
-.imageBadgeRow {
+.imageStylesOneRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px 10px;
-  padding: 0 2px 4px;
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
-.imageBadgeLabel {
+.imageStylesOneRow .imageSelectedWrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.imageStyleMenuBtn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, filter 0.15s;
+}
+
+.imageStyleMenuBtn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.65);
+}
+
+.imageDeepToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
   font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.imageDeepToggle:hover {
+  color: var(--text);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.imageDeepToggleOn {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: var(--text);
+  background: rgba(56, 189, 248, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+
+.imageDeepIcon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.imageDeepToggleText {
+  white-space: nowrap;
+}
+
+.skillQuickStart {
+  flex-shrink: 0;
+  padding: 6px 2px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.skillQuickLabel {
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--muted);
-  padding-top: 4px;
-  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.imageBadgeWrap {
+.skillQuickChips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.imageBadge {
+.skillQuickChip {
+  padding: 5px 10px;
+  border-radius: 999px;
   border: 1px solid var(--stroke);
-  background: var(--panel-strong);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.skillQuickChip:hover {
+  color: var(--primary);
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.imageStyleToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 0 2px 4px;
+}
+
+.imageStyleToolbar .imageDeepToggle {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.imageSelectedWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.imageSelectedChip {
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: rgba(56, 189, 248, 0.2);
+  color: #f8fafc;
   font-size: 0.72rem;
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.imageBadge:hover {
-  color: var(--text);
-  border-color: rgba(56, 189, 248, 0.4);
-}
-
-.imageBadgeOn {
-  border-color: var(--primary);
-  color: #fff;
-  background: rgba(56, 189, 248, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
-}
-
-.imageEngineRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 12px;
-  padding: 0 2px 8px;
-}
-
-.imageDeepLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
-}
-
-.imageDeepLabel input {
-  accent-color: var(--primary);
+.imageSelectedChip:hover {
+  background: rgba(56, 189, 248, 0.32);
+  border-color: rgba(56, 189, 248, 0.75);
 }
 
 .thinkingBody {
@@ -2268,15 +2353,50 @@ details[open].chatBubbleThinking .thinkingSummary::before {
   line-height: 1.5;
 }
 
-.tipsBox strong {
-  display: block;
+.tipsBoxHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
+}
+
+.tipsBoxHead strong {
   font-size: 0.82rem;
   color: rgb(250, 204, 21);
 }
 
-[data-theme='light'] .tipsBox strong {
+[data-theme='light'] .tipsBoxHead strong {
   color: rgb(161, 98, 7);
+}
+
+.tipsApplyAllBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  background: transparent;
+  color: rgb(250, 204, 21);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tipsApplyAllBtn:hover:not(:disabled) {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.55);
+}
+
+.tipsApplyAllBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+[data-theme='light'] .tipsApplyAllBtn {
+  color: rgb(161, 98, 7);
+  border-color: rgba(161, 98, 7, 0.35);
 }
 
 .tipsBox ul {

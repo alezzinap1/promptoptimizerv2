@@ -40,6 +40,13 @@
   font-size: 0.85rem;
 }
 
+.fieldHint {
+  font-size: 0.78rem;
+  opacity: 0.8;
+  line-height: 1.4;
+  margin: 0;
+}
+
 .field input,
 .field select,
 .promptArea {

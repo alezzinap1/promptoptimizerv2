@@ -6,8 +6,11 @@ Replaces the simple boolean-match approach in technique_registry.select_techniqu
 """
 from __future__ import annotations
 
+import random
 import re
-from typing import Any
+from typing import Any, Callable
+
+import zlib
 
 # ---------------------------------------------------------------------------
 # Technique families — max 1 per family (unless complexity=high allows 2 from reasoning)
@@ -306,6 +309,71 @@ def _prompt_type_score_multiplier(technique_id: str, prompt_type: str) -> float:
     return 1.0
 
 
+# Слои для квот (research: pool → layer quotas → weighted sample)
+_PRIMARY_LAYER: dict[str, str] = {
+    "role_prompting": "role",
+    "meta_prompting": "role",
+    "chain_of_thought": "structure",
+    "tree_of_thoughts": "structure",
+    "self_consistency": "structure",
+    "step_back": "structure",
+    "least_to_most": "structure",
+    "structured_output": "constraint",
+    "constraints_prompting": "constraint",
+    "negative_prompting": "constraint",
+    "few_shot": "enrichment",
+    "generated_knowledge": "enrichment",
+    "react_prompting": "enrichment",
+}
+
+_POOL_K = 14
+_MIN_POOL_SCORE = 0.075
+_SESSION_PENALTY_PER_HIT = 0.15
+
+
+def _primary_layer(tid: str) -> str | None:
+    return _PRIMARY_LAYER.get(tid)
+
+
+def _session_penalty(tid: str, recent: list[str] | None) -> float:
+    if not recent:
+        return 0.0
+    hits = sum(1 for x in recent[-16:] if x == tid)
+    return _SESSION_PENALTY_PER_HIT * min(hits, 3)
+
+
+def _weighted_sample_without_replacement(
+    items: list[str],
+    weight_fn: Callable[[str], float],
+    k: int,
+    rng: random.Random,
+) -> list[str]:
+    pool = list(items)
+    out: list[str] = []
+    for _ in range(min(k, len(pool))):
+        wts = [max(0.02, weight_fn(x)) for x in pool]
+        pick = rng.choices(pool, weights=wts, k=1)[0]
+        out.append(pick)
+        pool.remove(pick)
+    return out
+
+
+def _can_add_technique(
+    tid: str,
+    selected: list[str],
+    family_counts: dict[str, int],
+    complexity: str,
+) -> bool:
+    if tid in selected:
+        return False
+    if not _family_slot_available(tid, family_counts, complexity):
+        return False
+    anti = _anti_synergy_penalty(tid, selected)
+    if anti >= 0.55:
+        return False
+    return True
+
+
 def select_techniques_scored(
     task_types: list[str],
     complexity: str,
@@ -315,47 +383,106 @@ def select_techniques_scored(
     max_techniques: int = 4,
     target_model: str = "unknown",
     prompt_type: str = "text",
+    recent_technique_ids: list[str] | None = None,
+    diversity_seed: int | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Score-based technique selection with family quotas, synergy, and input features.
-    Returns a list of technique dicts (from the registry) sorted by score.
+    Pool → слои → взвешенная выборка + штраф за недавние техники (research).
     """
     from core.technique_registry import AVOID_ON_SMALL_MODELS
 
     eff_types = _effective_task_types_for_prompt_mode(task_types, prompt_type)
     features = extract_input_features(user_input)
     is_small = target_model == "small_model"
+    recent = recent_technique_ids or []
+    seed = diversity_seed
+    if seed is None:
+        seed = zlib.adler32((user_input + "|" + prompt_type + "|" + "|".join(recent[-8:])).encode("utf-8", errors="ignore")) & 0xFFFFFFFF
+    rng = random.Random(seed)
 
-    candidates: list[tuple[float, str]] = []
-    for tid, tech in techniques_data.items():
+    raw_scores: dict[str, float] = {}
+    for tid, _tech in techniques_data.items():
         if is_small and tid in AVOID_ON_SMALL_MODELS:
             continue
         base = _base_relevance(tid, eff_types)
         cx = _complexity_factor(tid, complexity)
         fb = _feature_boost(tid, features)
         pm = _prompt_type_score_multiplier(tid, prompt_type)
-        score = (base * cx + fb) * pm
-        candidates.append((score, tid))
+        raw_scores[tid] = (base * cx + fb) * pm
 
-    candidates.sort(key=lambda x: -x[0])
+    ranked = sorted(raw_scores.items(), key=lambda x: -x[1])
+    pool_ids = [tid for tid, sc in ranked[:_POOL_K] if sc >= _MIN_POOL_SCORE]
+    if not pool_ids:
+        pool_ids = [tid for tid, sc in ranked[:8]]
+
+    def adjusted_score(tid: str) -> float:
+        sc = raw_scores.get(tid, 0.0)
+        pen = _session_penalty(tid, recent)
+        syn = _synergy_bonus(tid, [], techniques_data)
+        return sc - pen + syn
+
+    structure_slots = 2 if complexity == "high" else 1
+    layer_plan: list[tuple[str, int]] = [
+        ("role", 1),
+        ("structure", structure_slots),
+        ("constraint", 1),
+        ("enrichment", 1),
+    ]
 
     selected: list[str] = []
     family_counts: dict[str, int] = {}
 
-    for score, tid in candidates:
+    for layer, slots in layer_plan:
         if len(selected) >= max_techniques:
             break
-        if not _family_slot_available(tid, family_counts, complexity):
+        layer_cands = [
+            tid
+            for tid in pool_ids
+            if _primary_layer(tid) == layer and _can_add_technique(tid, selected, family_counts, complexity)
+        ]
+        if not layer_cands:
             continue
+        need = min(slots, max_techniques - len(selected))
+        picks = _weighted_sample_without_replacement(
+            layer_cands,
+            lambda t: max(0.05, adjusted_score(t) + _synergy_bonus(t, selected, techniques_data) - _anti_synergy_penalty(t, selected)),
+            need,
+            rng,
+        )
+        for tid in picks:
+            if not _can_add_technique(tid, selected, family_counts, complexity):
+                continue
+            syn = _synergy_bonus(tid, selected, techniques_data)
+            anti = _anti_synergy_penalty(tid, selected)
+            if adjusted_score(tid) + syn - anti < 0.08:
+                continue
+            selected.append(tid)
+            fam = _TECHNIQUE_TO_FAMILY.get(tid)
+            if fam:
+                family_counts[fam] = family_counts.get(fam, 0) + 1
 
+    remainder = [tid for tid in pool_ids if tid not in selected]
+    while len(selected) < max_techniques and remainder:
+        cand = [
+            tid
+            for tid in remainder
+            if _can_add_technique(tid, selected, family_counts, complexity)
+        ]
+        if not cand:
+            break
+        tid = _weighted_sample_without_replacement(
+            cand,
+            lambda t: max(0.05, adjusted_score(t) + _synergy_bonus(t, selected, techniques_data) - _anti_synergy_penalty(t, selected)),
+            1,
+            rng,
+        )[0]
         syn = _synergy_bonus(tid, selected, techniques_data)
         anti = _anti_synergy_penalty(tid, selected)
-        final_score = score + syn - anti
-
-        if final_score < 0.15:
+        if adjusted_score(tid) + syn - anti < 0.06:
+            remainder.remove(tid)
             continue
-
         selected.append(tid)
+        remainder.remove(tid)
         fam = _TECHNIQUE_TO_FAMILY.get(tid)
         if fam:
             family_counts[fam] = family_counts.get(fam, 0) + 1
