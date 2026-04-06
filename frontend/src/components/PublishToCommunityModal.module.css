@@ -10,48 +10,55 @@
 }
 
 .modal {
-  width: min(520px, 100%);
-  max-height: min(90vh, 720px);
+  width: min(480px, 100%);
+  max-height: min(88vh, 680px);
   overflow: auto;
   background: var(--panel-bg, #1a1a1e);
   border: 1px solid var(--border-subtle, #333);
-  border-radius: 12px;
-  padding: 1.25rem 1.35rem;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
 .title {
-  margin: 0 0 0.5rem;
-  font-size: 1.15rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .lead {
-  margin: 0 0 1rem;
-  font-size: 0.88rem;
-  opacity: 0.85;
-  line-height: 1.45;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
-  font-size: 0.85rem;
-}
-
-.fieldHint {
-  font-size: 0.78rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
   opacity: 0.8;
   line-height: 1.4;
-  margin: 0;
 }
 
-.field input,
-.field select,
+.rowTight {
+  display: grid;
+  grid-template-columns: 1fr minmax(120px, 0.4fr);
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.fieldCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.82rem;
+}
+
+.optional {
+  font-weight: 400;
+  opacity: 0.65;
+  font-size: 0.78rem;
+}
+
+.fieldCompact input,
+.fieldCompact select,
 .promptArea {
   font: inherit;
-  padding: 0.45rem 0.55rem;
+  padding: 0.4rem 0.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-subtle, #444);
   background: var(--input-bg, #121214);
@@ -60,30 +67,63 @@
 
 .promptArea {
   resize: vertical;
-  min-height: 140px;
+  min-height: 120px;
 }
 
-.row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+.imageBlock {
+  margin-bottom: 0.65rem;
 }
 
-@media (max-width: 480px) {
-  .row {
-    grid-template-columns: 1fr;
-  }
+.imageLabel {
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+
+.imageDrop {
+  position: relative;
+  border: 1px dashed var(--border-subtle, #555);
+  border-radius: 8px;
+  padding: 0.6rem;
+  min-height: 72px;
+}
+
+.fileInput {
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.imagePreview {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: 6px;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.imageHint {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  line-height: 1.35;
 }
 
 .error {
   color: var(--danger, #f87171);
-  font-size: 0.85rem;
-  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  margin: 0 0 0.5rem;
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+@media (max-width: 480px) {
+  .rowTight {
+    grid-template-columns: 1fr;
+  }
 }

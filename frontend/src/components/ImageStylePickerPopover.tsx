@@ -60,7 +60,6 @@ export default function ImageStylePickerPopover({
             Избранные
           </button>
         </div>
-        <p className={styles.sub}>Карточка — выбрать стиль. Звезда — только избранное (не выбирает стиль).</p>
       </div>
       <div className={styles.scroll}>
         {filter === 'favorites' && shownItems.length === 0 ? (

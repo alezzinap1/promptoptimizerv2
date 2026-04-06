@@ -27,7 +27,7 @@ PROVIDER_MODELS: dict[str, str] = {
     "deepseek_r1":    "deepseek/deepseek-r1",
     "gpt4o":          "openai/gpt-4o",
     "gpt4o_mini":     "openai/gpt-4o-mini",
-    "gemini_flash":   "google/gemini-flash-1.5",
+    "gemini_flash":   "google/gemini-2.0-flash-001",
     "gemini_pro":     "google/gemini-pro-1.5",
     "claude_haiku":   "anthropic/claude-3-haiku",
     "claude_sonnet":  "anthropic/claude-3.5-sonnet",

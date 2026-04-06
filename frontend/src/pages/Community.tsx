@@ -94,9 +94,9 @@ export default function Community() {
 
       {loading && <div className={styles.empty}>Загрузка…</div>}
 
-      <div className={styles.grid}>
+      <div className={styles.masonry}>
         {!loading && items.length === 0 && (
-          <>
+          <div className={styles.emptyStateWrap}>
             <div className={styles.emptyPromo}>
               <p className={styles.emptyPromoText}>
                 Здесь будет живая лента: делитесь промптами — другие найдут их через поиск и смогут использовать у себя.
@@ -105,44 +105,85 @@ export default function Community() {
                 Опубликовать первым
               </button>
             </div>
-            <div className={`${styles.card} ${styles.ghostCard}`} aria-hidden />
-            <div className={`${styles.card} ${styles.ghostCard}`} aria-hidden />
-          </>
-        )}
-        {items.map((item) => (
-          <div key={item.id} className={styles.card}>
-            {item.image_path && (
-              <img src={item.image_path} alt="" className={styles.cardImage} loading="lazy" />
-            )}
-            <h3 className={styles.cardTitle}>{item.title}</h3>
-            {item.description && <p className={styles.cardDesc}>{item.description}</p>}
-            <div className={styles.promptPreview}>{item.prompt.slice(0, 200)}</div>
-            <div className={styles.cardMeta}>
-              <span className={styles.typeBadge}>{item.prompt_type}</span>
-              {item.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className={styles.tag}>{tag}</span>
-              ))}
-            </div>
-            <div className={styles.cardFooter}>
-              <span className={styles.author}>@{item.author_name || 'anon'}</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
-                  onClick={() => handleVote(item.id)}
-                  title="Голос"
-                >
-                  ▲ {item.upvotes}
-                </button>
-                <button
-                  className={styles.useBtn}
-                  onClick={() => handleUse(item.prompt)}
-                >
-                  Использовать
-                </button>
-              </div>
+            <div className={styles.ghostRow}>
+              <div className={styles.ghostCard} aria-hidden />
+              <div className={styles.ghostCard} aria-hidden />
             </div>
           </div>
-        ))}
+        )}
+        {items.map((item) =>
+          item.image_path ? (
+            <div key={item.id} className={`${styles.card} ${styles.cardWithImage}`}>
+              <div className={styles.cardHero}>
+                <img className={styles.cardHeroImg} src={item.image_path} alt="" loading="lazy" />
+                <div className={styles.cardHeroGradient} aria-hidden />
+                <div className={styles.cardHeroOverlay}>
+                  <h3 className={styles.cardTitleOverlay}>{item.title}</h3>
+                  {item.description ? (
+                    <p className={styles.cardDescOverlay}>{item.description}</p>
+                  ) : null}
+                </div>
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.promptPreview}>{item.prompt.slice(0, 200)}</div>
+                <div className={styles.cardMeta}>
+                  <span className={styles.typeBadge}>{item.prompt_type}</span>
+                  {item.tags.slice(0, 3).map((tag) => (
+                    <span key={tag} className={styles.tag}>{tag}</span>
+                  ))}
+                </div>
+                <div className={styles.cardFooter}>
+                  <span className={styles.author}>@{item.author_name || 'anon'}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
+                      onClick={() => handleVote(item.id)}
+                      title="Голос"
+                      type="button"
+                    >
+                      ▲ {item.upvotes}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.useBtn}
+                      onClick={() => handleUse(item.prompt)}
+                    >
+                      Использовать
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div key={item.id} className={styles.card}>
+              <h3 className={styles.cardTitle}>{item.title}</h3>
+              {item.description && <p className={styles.cardDesc}>{item.description}</p>}
+              <div className={styles.promptPreview}>{item.prompt.slice(0, 200)}</div>
+              <div className={styles.cardMeta}>
+                <span className={styles.typeBadge}>{item.prompt_type}</span>
+                {item.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className={styles.tag}>{tag}</span>
+                ))}
+              </div>
+              <div className={styles.cardFooter}>
+                <span className={styles.author}>@{item.author_name || 'anon'}</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
+                    onClick={() => handleVote(item.id)}
+                    title="Голос"
+                  >
+                    ▲ {item.upvotes}
+                  </button>
+                  <button type="button" className={styles.useBtn} onClick={() => handleUse(item.prompt)}>
+                    Использовать
+                  </button>
+                </div>
+              </div>
+            </div>
+          ),
+        )}
       </div>
 
       <PublishToCommunityModal

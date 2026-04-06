@@ -262,7 +262,7 @@ const RAW: RawRow[] = [
 ]
 
 /** Увеличь после перегенерации `scripts/generate_style_thumbnails.py`, чтобы браузер подтянул новые PNG */
-export const IMAGE_STYLE_THUMB_CACHE_VER = '3'
+export const IMAGE_STYLE_THUMB_CACHE_VER = '5'
 
 export const IMAGE_STYLES_ALL: ImageStyleDef[] = RAW.map(([id, label, preview, description]) => ({
   id,

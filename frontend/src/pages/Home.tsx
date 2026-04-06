@@ -2310,6 +2310,12 @@ export default function Home() {
                   className={cb.composerTextarea}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (!loading && chatInput.trim()) handleAgentSend()
+                    }
+                  }}
                   placeholder={agentChatPlaceholder}
                   minHeightPx={result?.has_questions && !result?.has_prompt ? 52 : 72}
                   maxHeightPx={280}

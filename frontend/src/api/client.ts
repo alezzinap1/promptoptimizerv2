@@ -580,7 +580,7 @@ export const api = {
     const formData = new FormData()
     formData.append('file', file)
     const headers: Record<string, string> = {}
-    const sessionId = localStorage.getItem('session_id')
+    const sessionId = getAuthSessionId()
     if (sessionId) headers['X-Session-Id'] = sessionId
     const res = await fetch(`${API_BASE}/community/upload-image`, { method: 'POST', body: formData, headers })
     const text = await res.text()

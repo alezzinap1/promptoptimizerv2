@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent } from 'react'
 import { api } from '../api/client'
 import styles from './PublishToCommunityModal.module.css'
 
@@ -20,36 +20,73 @@ type Props = {
   onPublished?: () => void
 }
 
-const CATEGORIES = [
-  { value: 'general', label: 'Общее' },
-  { value: 'writing', label: 'Тексты' },
-  { value: 'code', label: 'Код' },
-  { value: 'image', label: 'Изображения' },
-  { value: 'skill', label: 'Скиллы' },
-]
-
 export default function PublishToCommunityModal({ open, onClose, initial, onPublished }: Props) {
   const [title, setTitle] = useState(initial.title)
-  const [description, setDescription] = useState(initial.description || '')
   const [prompt, setPrompt] = useState(initial.prompt)
   const [promptType, setPromptType] = useState<PublishPromptType>(initial.prompt_type)
-  const [category, setCategory] = useState(initial.category || 'general')
   const [tags, setTags] = useState((initial.tags || []).join(', '))
   const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  const clearPreview = useCallback(() => {
+    setPreviewUrl((u) => {
+      if (u) URL.revokeObjectURL(u)
+      return null
+    })
+  }, [])
 
   useEffect(() => {
     if (!open) return
     setTitle(initial.title)
-    setDescription(initial.description || '')
     setPrompt(initial.prompt)
     setPromptType(initial.prompt_type)
-    setCategory(initial.category || 'general')
     setTags((initial.tags || []).join(', '))
     setFile(null)
+    clearPreview()
     setError(null)
-  }, [open, initial])
+  }, [open, initial, clearPreview])
+
+  useEffect(() => {
+    if (open) modalRef.current?.focus()
+  }, [open])
+
+  useEffect(() => {
+    if (!file) {
+      clearPreview()
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return url
+    })
+    return () => URL.revokeObjectURL(url)
+  }, [file, clearPreview])
+
+  const setImageFile = (f: File | null) => {
+    setFile(f)
+  }
+
+  const onPasteImage = useCallback((e: ClipboardEvent) => {
+    if (promptType !== 'image') return
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      if (it.kind === 'file' && it.type.startsWith('image/')) {
+        const f = it.getAsFile()
+        if (f) {
+          e.preventDefault()
+          const name = f.name || 'paste.png'
+          setImageFile(new File([f], name, { type: f.type || 'image/png' }))
+          return
+        }
+      }
+    }
+  }, [promptType])
 
   if (!open) return null
 
@@ -68,12 +105,11 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
         const up = await api.uploadCommunityImage(file)
         imagePath = up.path
       }
-      const cat =
-        promptType === 'image' ? 'image' : promptType === 'skill' ? 'skill' : category
+      const cat = promptType === 'image' ? 'image' : promptType === 'skill' ? 'skill' : initial.category || 'general'
       await api.createCommunityPrompt({
         title: t,
         prompt: p,
-        description: description.trim(),
+        description: '',
         prompt_type: promptType,
         category: cat,
         tags: tags
@@ -93,67 +129,69 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
 
   return (
     <div className={styles.overlay} onClick={onClose} role="presentation">
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="pub-community-title">
+      <div
+        ref={modalRef}
+        className={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        onPaste={onPasteImage}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pub-community-title"
+        tabIndex={0}
+      >
         <h3 id="pub-community-title" className={styles.title}>
-          Публикация в сообщество
+          В сообщество
         </h3>
-        <p className={styles.lead}>
-          Материал станет виден другим пользователям. Не публикуйте секреты и персональные данные.
-        </p>
-        <label className={styles.field}>
-          Заголовок
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Краткое название" />
-        </label>
-        <label className={styles.field}>
-          Описание (необязательно)
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот промпт" />
-        </label>
-        <div className={styles.row}>
-          <label className={styles.field}>
+        <p className={styles.lead}>Видно всем. Без секретов и персональных данных.</p>
+
+        <div className={styles.rowTight}>
+          <label className={styles.fieldCompact}>
+            Заголовок
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Название" />
+          </label>
+          <label className={styles.fieldCompact}>
             Тип
             <select value={promptType} onChange={(e) => setPromptType(e.target.value as PublishPromptType)}>
-              <option value="text">Текст / чат</option>
-              <option value="image">Изображение</option>
+              <option value="text">Текст</option>
+              <option value="image">Картинка</option>
               <option value="skill">Скилл</option>
             </select>
           </label>
-          {promptType === 'text' && (
-            <label className={styles.field}>
-              Категория
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
         </div>
-        <label className={styles.field}>
-          Теги через запятую
-          <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="seo, blog, midjourney…" />
+
+        <label className={styles.fieldCompact}>
+          Теги <span className={styles.optional}>(необязательно)</span>
+          <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="через запятую" />
         </label>
+
         {promptType === 'image' && (
-          <label className={styles.field}>
-            Картинка-результат (по желанию)
-            <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            <span className={styles.fieldHint}>
-              Загрузите файл с диска: например, картинку из Midjourney/DALL·E после сохранения. До 5 МБ, jpg/png/webp/gif.
-            </span>
-          </label>
+          <div className={styles.imageBlock}>
+            <span className={styles.imageLabel}>Иллюстрация</span>
+            <div className={styles.imageDrop}>
+              {previewUrl && <img src={previewUrl} alt="" className={styles.imagePreview} />}
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,.jfif,.pjpeg"
+                className={styles.fileInput}
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              />
+              <p className={styles.imageHint}>Файл или Ctrl+V со скриншотом. На сервере — 256×256, webp.</p>
+            </div>
+          </div>
         )}
-        <label className={styles.field}>
-          Текст промпта / скилла
-          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={10} className={styles.promptArea} />
+
+        <label className={styles.fieldCompact}>
+          Промпт
+          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={8} className={styles.promptArea} />
         </label>
+
         {error && <p className={styles.error}>{error}</p>}
         <div className={styles.actions}>
           <button type="button" className="btn-ghost" onClick={onClose} disabled={submitting}>
             Отмена
           </button>
           <button type="button" className="btn-primary" onClick={submit} disabled={submitting}>
-            {submitting ? 'Публикация…' : 'Опубликовать'}
+            {submitting ? '…' : 'Опубликовать'}
           </button>
         </div>
       </div>

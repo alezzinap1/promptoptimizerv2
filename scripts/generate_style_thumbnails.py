@@ -36,6 +36,10 @@ import httpx
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from backend.image_utils import resize_to_square_png
+
 SEED_PATH = ROOT / "scripts" / "image_styles_thumbnail_seed.json"
 OUT_DIR = ROOT / "frontend" / "public" / "image-styles"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -284,7 +288,8 @@ def extract_image_bytes(data: dict) -> tuple[bytes, str]:
     if ext == "jpeg":
         ext = "jpg"
     raw = base64.b64decode(m.group(2))
-    return raw, ext
+    raw = resize_to_square_png(raw)
+    return raw, "png"
 
 
 def run_one(client: httpx.Client, api_key: str, prompt: str, sid: str) -> dict:
@@ -335,11 +340,8 @@ def process_one(
     print(f"[{idx}/{total}] generating {sid} …", flush=True)
     try:
         data = run_one(client, api_key, build_prompt(row), sid)
-        raw, ext = extract_image_bytes(data)
-        if ext != "png":
-            out_path = OUT_DIR / f"{sid}.{ext}"
-        else:
-            out_path = OUT_DIR / f"{sid}.png"
+        raw, _ext = extract_image_bytes(data)
+        out_path = OUT_DIR / f"{sid}.png"
         out_path.write_bytes(raw)
         print(f"  -> {out_path.relative_to(ROOT)} ({len(raw)} bytes)", flush=True)
         return (

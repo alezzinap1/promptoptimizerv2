@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
+from backend.image_utils import resize_upload_for_community
 from config.abuse import check_input_size
 from db.manager import DBManager
 
@@ -21,8 +22,20 @@ router = APIRouter()
 _ROOT = Path(__file__).resolve().parent.parent.parent
 UPLOAD_DIR = _ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_IMAGE_SIZE = 12 * 1024 * 1024  # до PIL; после ресайза файл маленький
+# Вход: распространённые форматы; выход всегда .webp 256×256
+ALLOWED_EXTENSIONS = {
+    ".jpg",
+    ".jpeg",
+    ".jfif",
+    ".pjpeg",
+    ".png",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+}
 
 
 @router.get("/community")
@@ -153,14 +166,22 @@ async def upload_image(
         raise HTTPException(400, "Файл без имени")
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"Формат не поддерживается. Допустимо: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+        raise HTTPException(
+            400,
+            f"Формат не поддерживается. Допустимо: jpg, jpeg, png, webp, gif, bmp, tiff…",
+        )
     data = await file.read()
     if len(data) > MAX_IMAGE_SIZE:
-        raise HTTPException(400, f"Файл больше {MAX_IMAGE_SIZE // (1024 * 1024)} МБ")
-    fname = f"{uuid.uuid4().hex}{ext}"
+        raise HTTPException(400, "Файл слишком большой (макс. 12 МБ до обработки)")
+    try:
+        out, out_ext = resize_upload_for_community(data)
+    except Exception as e:
+        logger.warning("image decode/resize failed: %s", e)
+        raise HTTPException(400, "Не удалось прочитать изображение. Попробуйте другой файл.") from e
+    fname = f"{uuid.uuid4().hex}{out_ext}"
     dest = UPLOAD_DIR / fname
     try:
-        dest.write_bytes(data)
+        dest.write_bytes(out)
     except OSError as e:
         logger.exception("community upload write failed")
         raise HTTPException(500, "Не удалось сохранить файл на сервере.") from e

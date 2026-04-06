@@ -1,6 +1,7 @@
 """Prompt generation."""
 from __future__ import annotations
 
+import logging
 import json
 import re
 import time
@@ -36,6 +37,7 @@ from services.prompt_workflow import (
     resolve_techniques,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 IMAGE_PROMPT_MODE_BLOCK = (
@@ -488,23 +490,36 @@ def generate_prompt(
         image_preset_dict = _resolve_image_preset_dict(req.image_preset_id, user_id, db)
 
     if req.prompt_type == "image" and req.image_deep_mode:
+        scene_user = _scene_analysis_user_text(req.task_input, clarification_answers_text, req.feedback)
         spa = _scene_analysis_provider(using_host_key)
         if using_host_key:
             cmid = _get_openrouter_model_id(spa)
             if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
                 spa = "gemini_flash"
-        scene_user = _scene_analysis_user_text(req.task_input, clarification_answers_text, req.feedback)
-        raw_scene = llm.generate(SCENE_ANALYSIS_SYSTEM, scene_user, spa, temperature=0.35)
-        scene_obj = _extract_json_object(raw_scene)
+        # Несколько провайдеров: старая модель на OpenRouter может отвалиться → не роняем весь /generate
+        scene_providers = [spa, "gemini_flash", "gpt4o_mini", "deepseek"]
+        ordered = list(dict.fromkeys(scene_providers))
+        raw_scene = ""
+        scene_obj = None
+        used_sp = spa
+        for sp_try in ordered:
+            try:
+                used_sp = sp_try
+                raw_scene = llm.generate(SCENE_ANALYSIS_SYSTEM, scene_user, sp_try, temperature=0.35)
+                scene_obj = _extract_json_object(raw_scene)
+                break
+            except Exception:
+                logger.warning("scene analysis failed with provider %s, trying next", sp_try, exc_info=True)
+                continue
         if scene_obj:
             combined_input += (
                 "\n\n--- STRUCTURED SCENE BRIEF (analyser output; treat as facts, expand into a rich image prompt) ---\n"
                 + json.dumps(scene_obj, ensure_ascii=False, indent=2)
                 + "\n--- END SCENE BRIEF ---"
             )
-        if using_host_key:
+        if using_host_key and raw_scene:
             c_raw = len(SCENE_ANALYSIS_SYSTEM) + len(scene_user) + len(raw_scene) + 200
-            model_id = _get_openrouter_model_id(spa)
+            model_id = _get_openrouter_model_id(used_sp)
             pr, cp = get_model_pricing(model_id)
             db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
 
