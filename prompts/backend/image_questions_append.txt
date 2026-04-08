@@ -1,0 +1,6 @@
+
+[Image questions] When you output [QUESTIONS], ask about: aspect ratio (1:1, 16:9, 9:16…),
+visual style (realism / cartoon / minimal / illustration / cinematic), lighting and mood, color palette,
+detail level, single subject vs full scene. Each question must include short badge-like options (2–5 words)
+and at least 2 meaningful alternatives per question. Use the same language as the user's task.
+

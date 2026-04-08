@@ -12,9 +12,11 @@ QUESTIONS_OPEN = "[QUESTIONS]"
 QUESTIONS_CLOSE = "[/QUESTIONS]"
 REASONING_OPEN = "[REASONING]"
 REASONING_CLOSE = "[/REASONING]"
+TITLE_OPEN = "[TITLE]"
+TITLE_CLOSE = "[/TITLE]"
 
 # Порядок: сначала более длинные имена не нужны — теги не пересекаются
-_PROTOCOL_TAG_NAMES = ("reasoning", "questions", "prompt")
+_PROTOCOL_TAG_NAMES = ("reasoning", "title", "questions", "prompt")
 
 
 def _normalize_protocol_markers(text: str) -> str:
@@ -69,12 +71,13 @@ def _trim_before_line_start_marker(content: str, marker: str) -> str:
 
 
 def parse_reply(reply: str) -> dict:
-    """Parse LLM response into components: reasoning, prompt, questions, text."""
+    """Parse LLM response into components: reasoning, optional title, prompt, questions, text."""
     raw = _normalize_protocol_markers(reply or "")
 
-    reasoning, text_without_reasoning = _extract_block(raw, REASONING_OPEN, REASONING_CLOSE)
-    prompt_block, _text_without_prompt = _extract_block(text_without_reasoning, PROMPT_OPEN, PROMPT_CLOSE)
-    questions_block, _ = _extract_block(raw, QUESTIONS_OPEN, QUESTIONS_CLOSE)
+    reasoning, after_reasoning = _extract_block(raw, REASONING_OPEN, REASONING_CLOSE)
+    title_block, after_title = _extract_block(after_reasoning, TITLE_OPEN, TITLE_CLOSE)
+    prompt_block, _text_without_prompt = _extract_block(after_title, PROMPT_OPEN, PROMPT_CLOSE)
+    questions_block, _ = _extract_block(after_title, QUESTIONS_OPEN, QUESTIONS_CLOSE)
 
     # Запасной путь: после вырезания [REASONING] пара [PROMPT] могла не извлечься
     # (например теги только в полном raw или сбой границы блоков).
@@ -92,11 +95,16 @@ def parse_reply(reply: str) -> dict:
     if prompt_block and prompt_block.strip():
         prompt_block = _trim_before_line_start_marker(prompt_block, QUESTIONS_OPEN)
 
+    title_clean = (title_block or "").strip().replace("\n", " ")
+    if len(title_clean) > 200:
+        title_clean = title_clean[:197] + "…"
+
     return {
         "reasoning": reasoning,
+        "prompt_title": title_clean,
         "prompt_block": prompt_block,
         "questions_raw": questions_block,
-        "text": text_without_reasoning,
+        "text": after_reasoning,
         "has_prompt": bool(prompt_block and prompt_block.strip()),
         "has_questions": bool(questions_block and questions_block.strip()),
     }

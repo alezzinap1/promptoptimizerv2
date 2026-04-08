@@ -25,6 +25,7 @@ from core.image_style_tags import expand_image_tags_to_directives
 from core.image_target_syntax import get_image_engine_syntax_block
 from core.workspace_profile import normalize_workspace
 from db.manager import DBManager
+from prompts import load_prompt
 from services.api_key_resolver import resolve_openrouter_api_key
 from core.context_gap import compute_context_gap, gap_missing_summary, get_questions_policy
 from core.task_classifier import classify_task, heuristic_classification_confidence
@@ -40,79 +41,13 @@ from services.prompt_workflow import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-IMAGE_PROMPT_MODE_BLOCK = (
-    "\n\n--- IMAGE PROMPT MODE ---\n"
-    "The user wants a prompt for AI image generation (Midjourney, DALL-E, Stable Diffusion, Flux, etc.).\n"
-    "\n"
-    "LANGUAGE (critical): The entire text inside [PROMPT] must be in the SAME language as the user's task "
-    "in the user message below (Russian task → Russian prompt; English → English). Do not default to English "
-    "only because many image prompts online are in English, unless the user explicitly asked for English tags.\n"
-    "\n"
-    "Structure the image prompt with clear sections, for example:\n"
-    "1. **Subject / Субъект** — who or what, action\n"
-    "2. **Style / Стиль** — medium, references (claymation, oil, 3D…)\n"
-    "3. **Composition / Композиция** — framing, camera, depth of field\n"
-    "4. **Lighting & palette / Свет и палитра**\n"
-    "5. **Negative / Негатив** — what to avoid\n"
-    "6. **Technical / Техника** — aspect ratio, quality, if relevant\n"
-    "\n"
-    "Use concrete visual language. Include technical parameters when useful.\n"
-    "--- END IMAGE PROMPT MODE ---"
-)
-
-IMAGE_QUESTIONS_APPEND = (
-    "\n\n[Image questions] When you output [QUESTIONS], ask about: aspect ratio (1:1, 16:9, 9:16…), "
-    "visual style (realism / cartoon / minimal / illustration / cinematic), lighting and mood, color palette, "
-    "detail level, single subject vs full scene. Each question must include short badge-like options (2–5 words) "
-    "and at least 2 meaningful alternatives per question. Use the same language as the user's task.\n"
-)
-
-# Режим вопросов: пока пользователь не ответил на уточнения и это не итерация промпта — жёстче требовать [QUESTIONS].
-IMAGE_QUESTIONS_STRICT = (
-    "\n\n--- IMAGE — ОБЯЗАТЕЛЬНЫЕ УТОЧНЕНИЯ (режим вопросов) ---\n"
-    "В этом запросе нет ответов на уточняющие вопросы и нет «улучшения существующего промпта» (первичная генерация).\n"
-    "Верни [QUESTIONS]...[/QUESTIONS], а не [PROMPT], если в формулировке пользователя не раскрыты явно: "
-    "соотношение сторон; визуальный стиль; тёплая/холодная/нейтральная палитра; ключевой свет и настроение; "
-    "уровень детализации; один объект или целая сцена.\n"
-    "Если пользователь уже дал исчерпывающее ТЗ по всем пунктам — можно [PROMPT]. "
-    "Язык вопросов — как у задачи пользователя; варианты строками «- ».\n"
-    "--- END IMAGE STRICT ---"
-)
-
-TEXT_QUESTIONS_STRICT = (
-    "\n\n--- TEXT — РЕЖИМ ВОПРОСОВ (строже) ---\n"
-    "Ответов на уточнения в сообщении нет; это первичная генерация (не итерация по готовому промпту).\n"
-    "Если цель, аудитория, формат ответа целевой модели или жёсткие ограничения не ясны — верни [QUESTIONS], не [PROMPT]. "
-    "Длинный текст без явной цели не считается достаточным основанием для [PROMPT].\n"
-    "--- END TEXT STRICT ---"
-)
-
-SKILL_QUESTIONS_STRICT = (
-    "\n\n--- SKILL — РЕЖИМ ВОПРОСОВ (строже) ---\n"
-    "Ответов на уточнения нет; первичная генерация скилла.\n"
-    "Если не ясны: среда (Cursor/Claude/общий), язык, глубина, формат вывода (YAML/Markdown), границы скилла — "
-    "верни [QUESTIONS], не [PROMPT].\n"
-    "--- END SKILL STRICT ---"
-)
-
-QUESTIONS_CONTRACT_SYSTEM = """You are a requirements analyst for prompt engineering.
-Your ONLY output must be the block [QUESTIONS]...[/QUESTIONS]. Nothing else.
-
-Rules:
-- Do NOT write [PROMPT], [REASONING], or code fences for a full prompt.
-- Ask at most {max_q} questions; each answerable in 1–2 short lines.
-- Use the SAME language as the user's task (Russian if the task is Russian).
-- Number questions 1. 2. … and under each question list 2–5 short options as lines starting with "- ".
-
-Output shape:
-[QUESTIONS]
-1. ...
-- ...
-- ...
-2. ...
-...
-[/QUESTIONS]
-"""
+IMAGE_PROMPT_MODE_BLOCK = load_prompt("backend/image_prompt_mode.txt")
+IMAGE_QUESTIONS_APPEND = load_prompt("backend/image_questions_append.txt")
+IMAGE_QUESTIONS_STRICT = load_prompt("backend/image_questions_strict.txt")
+TEXT_QUESTIONS_STRICT = load_prompt("backend/text_questions_strict.txt")
+SKILL_QUESTIONS_STRICT = load_prompt("backend/skill_questions_strict.txt")
+QUESTIONS_CONTRACT_TEMPLATE = load_prompt("backend/questions_contract_system.txt")
+ITERATION_GUARD_BLOCK = load_prompt("backend/iteration_guard.txt")
 
 
 def _build_technique_reasons(
@@ -158,17 +93,7 @@ def _should_enforce_questions_contract(
     return gap >= 0.26
 
 
-SCENE_ANALYSIS_SYSTEM = """You are a visual scene analyst for text-to-image workflows.
-Given the user's description (and any clarifications), output ONLY a single JSON object. No markdown fences, no commentary before or after.
-Keys (use the same language as the user for string values):
-- "subject": main subject and action
-- "setting": environment / location
-- "mood": emotional tone
-- "lighting": light quality and direction
-- "camera": framing, lens feel, shot scale if inferable
-- "style_notes": artistic direction
-- "negative": what to avoid visually (string, may be empty)
-Use empty string "" for unknown values rather than omitting keys."""
+SCENE_ANALYSIS_SYSTEM = load_prompt("backend/scene_analysis_system.txt")
 
 
 def _extract_json_object(raw: str) -> dict | None:
@@ -327,6 +252,201 @@ def _get_openrouter_model_id(provider: str) -> str:
     if "/" in provider:
         return provider
     return provider
+
+
+def _estimate_generation_input(
+    req: GenerateRequest,
+    user_id: int,
+    db: DBManager,
+    registry,
+) -> dict:
+    """
+    Те же system+user, что у основной генерации, без вызовов LLM (классификатор, сцена).
+    Токены анализа сцены при image_deep_mode добавляются отдельной оценкой.
+    """
+    workspace = None
+    if req.workspace_id:
+        workspace = db.get_workspace(req.workspace_id, user_id=user_id)
+        if not workspace:
+            raise HTTPException(404, f"Workspace {req.workspace_id} not found")
+
+    hc = classify_task(req.task_input)
+    classification = {
+        **hc,
+        "classification_source": "heuristic",
+        "classifier_confidence": heuristic_classification_confidence(hc, req.task_input),
+    }
+    context_gap = compute_context_gap(
+        req.task_input,
+        workspace=workspace,
+        prompt_type=req.prompt_type or "text",
+    )
+    questions_policy = get_questions_policy(context_gap, classification.get("complexity") or "medium")
+
+    effective_overrides = apply_evidence_decisions(req.prompt_spec_overrides, req.evidence_decisions)
+    preview = build_preview_payload(
+        raw_input=req.task_input,
+        target_model=req.target_model,
+        workspace=workspace,
+        previous_prompt=req.previous_prompt,
+        overrides=effective_overrides,
+        registry=registry,
+        technique_mode=req.technique_mode,
+        manual_techs=req.manual_techs,
+        classification_override=classification,
+        prompt_type=req.prompt_type or "text",
+    )
+    prompt_spec = preview["prompt_spec"]
+
+    techniques = resolve_techniques(
+        registry=registry,
+        classification=classification,
+        target_model=req.target_model,
+        technique_mode=req.technique_mode,
+        manual_techs=req.manual_techs,
+        max_techniques=4,
+        user_input=req.task_input,
+        prompt_type=req.prompt_type or "text",
+        recent_technique_ids=req.recent_technique_ids or None,
+    )
+    technique_ids = [t["id"] for t in techniques]
+
+    if req.domain and req.domain != "auto" and req.technique_mode != "manual":
+        domain_tech_ids = get_domain_techniques(req.domain)
+        if domain_tech_ids:
+            techniques = [t for t in (registry.get(tid) for tid in domain_tech_ids) if t]
+            technique_ids = [t["id"] for t in techniques]
+
+    builder = ContextBuilder(registry)
+
+    combined_input = build_generation_brief(prompt_spec)
+    clarification_answers_text = _build_answers_text(req.question_answers) if req.question_answers else ""
+    if clarification_answers_text:
+        combined_input += f"\n\nОтветы на уточняющие вопросы:\n{clarification_answers_text}"
+    if req.feedback.strip():
+        combined_input += f"\n\nКомментарий к улучшению: {req.feedback}"
+    if req.prompt_type == "image" and req.image_prompt_tags:
+        tag_block = expand_image_tags_to_directives(req.image_prompt_tags)
+        if tag_block:
+            combined_input += "\n\n" + tag_block
+
+    image_preset_dict = None
+    if req.prompt_type == "image":
+        image_preset_dict = _resolve_image_preset_dict(req.image_preset_id, user_id, db)
+
+    scene_extra_tokens = 0
+    if req.prompt_type == "image" and req.image_deep_mode:
+        scene_user = _scene_analysis_user_text(req.task_input, clarification_answers_text, req.feedback)
+        scene_extra_tokens = (len(SCENE_ANALYSIS_SYSTEM) + len(scene_user) + 380) // 4
+
+    system_prompt = builder.build_system_prompt(
+        technique_ids=technique_ids,
+        target_model=req.target_model,
+        domain=req.domain or "auto",
+        questions_mode=req.questions_mode,
+        prompt_type=req.prompt_type or "text",
+    )
+    if _is_primary_generation_with_unanswered_questions(req) and questions_policy.get("mode") != "skip":
+        system_prompt += (
+            f"\n\n--- CONTEXT POLICY (gap={context_gap:.2f}) ---\n"
+            f"Prefer at most {questions_policy['max_questions']} clarifying questions when context is thin; "
+            f"mode={questions_policy['mode']}. Short tasks or missing audience/format usually need questions first.\n"
+            "--- END CONTEXT POLICY ---\n"
+        )
+    if req.prompt_type == "image":
+        system_prompt += IMAGE_PROMPT_MODE_BLOCK
+        if req.questions_mode:
+            system_prompt += IMAGE_QUESTIONS_APPEND
+        system_prompt += get_image_engine_syntax_block(req.image_engine)
+        if image_preset_dict:
+            system_prompt += format_active_style_preset_system_block(image_preset_dict)
+        if _is_primary_generation_with_unanswered_questions(req):
+            system_prompt += IMAGE_QUESTIONS_STRICT
+    elif req.prompt_type == "skill":
+        system_prompt += (
+            "\n\n--- SKILL PROMPT MODE ---\n"
+            "The user wants a reusable skill/instruction block for AI assistants (injectable system-style skill), "
+            "not a one-off chat reply.\n"
+            "In [PROMPT], produce a complete skill definition: role, scope, rules, procedure, output format, "
+            "edge cases. Use clear headings and bullet lists where helpful. "
+            "If the user asked for a specific framework (e.g. Cursor, Claude), adapt section titles accordingly.\n"
+            "The skill should be copy-paste ready and self-contained.\n"
+            "--- END SKILL PROMPT MODE ---"
+        )
+        sp_hint = _resolve_skill_preset_hint(req.skill_preset_id, user_id, db)
+        if sp_hint:
+            system_prompt += (
+                "\n\n--- USER SKILL PRESET ---\n"
+                "Дополнительные правила для этой генерации скилла (язык и структура — по запросу пользователя):\n"
+                + sp_hint
+                + "\n--- END USER SKILL PRESET ---"
+            )
+        if _is_primary_generation_with_unanswered_questions(req):
+            system_prompt += SKILL_QUESTIONS_STRICT
+    if req.prompt_type == "text" and _is_primary_generation_with_unanswered_questions(req):
+        system_prompt += TEXT_QUESTIONS_STRICT
+    if req.skill_body and req.skill_body.strip():
+        system_prompt += (
+            "\n\n--- ACTIVE SKILL ---\n"
+            "The user has an active skill that provides additional context and instructions. "
+            "Incorporate the skill's guidance into the generated prompt:\n\n"
+            + req.skill_body.strip()
+            + "\n--- END SKILL ---"
+        )
+    if clarification_answers_text:
+        system_prompt = system_prompt + "\n\n" + CLARIFICATION_ANSWERS_PROVIDED
+    if req.previous_prompt and str(req.previous_prompt).strip():
+        system_prompt = system_prompt + "\n\n" + ITERATION_GUARD_BLOCK
+    user_content = builder.build_user_content(
+        combined_input,
+        previous_agent_prompt=req.previous_prompt,
+        task_classification=classification,
+    )
+
+    gen_model_id = _get_openrouter_model_id(req.gen_model)
+    main_tokens = count_tokens(system_prompt + "\n\n" + user_content, gen_model_id)["tokens"]
+    input_token_estimate = main_tokens + scene_extra_tokens
+
+    task_preview = analyze_prompt(
+        req.task_input.strip(),
+        req.target_model,
+        prompt_type=req.prompt_type or "text",
+        task_input=req.task_input,
+    )
+
+    return {
+        "input_token_estimate": input_token_estimate,
+        "main_request_tokens": main_tokens,
+        "scene_analysis_tokens_estimate": scene_extra_tokens,
+        "task_preview": {
+            "completeness_score": task_preview.get("completeness_score"),
+            "completeness_label": task_preview.get("completeness_label"),
+            "token_method": task_preview.get("token_method"),
+        },
+        "context_gap": context_gap,
+    }
+
+
+@router.post("/generate/estimate")
+def estimate_generate_input(
+    req: GenerateRequest,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+    registry = Depends(get_registry_for_user),
+    auth_session_id: str | None = Depends(get_session_id),
+):
+    """Оценка входных токенов и полноты формулировки задачи без вызова генерации."""
+    ok, err = check_input_size(req.task_input)
+    if not ok:
+        raise HTTPException(400, err)
+    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    if not ok:
+        raise HTTPException(429, err)
+    user_id = int(user["id"])
+    try:
+        return _estimate_generation_input(req, user_id, db, registry)
+    except HTTPException:
+        raise
 
 
 @router.post("/generate")
@@ -579,11 +699,16 @@ def generate_prompt(
         )
     if clarification_answers_text:
         system_prompt = system_prompt + "\n\n" + CLARIFICATION_ANSWERS_PROVIDED
+    if req.previous_prompt and str(req.previous_prompt).strip():
+        system_prompt = system_prompt + "\n\n" + ITERATION_GUARD_BLOCK
     user_content = builder.build_user_content(
         combined_input,
         previous_agent_prompt=req.previous_prompt,
         task_classification=classification,
     )
+
+    gen_model_id = _get_openrouter_model_id(req.gen_model)
+    input_token_estimate = count_tokens(system_prompt + "\n\n" + user_content, gen_model_id)["tokens"]
 
     started_at = time.perf_counter()
     full_text = ""
@@ -614,7 +739,7 @@ def generate_prompt(
         max_q = int(questions_policy.get("max_questions") or 2)
         max_q = max(1, min(5, max_q))
         missing = gap_missing_summary(req.task_input, req.prompt_type or "text")
-        contract_sys = QUESTIONS_CONTRACT_SYSTEM.format(max_q=max_q)
+        contract_sys = QUESTIONS_CONTRACT_TEMPLATE.format(max_q=max_q)
         contract_user = (
             f"User task:\n{req.task_input.strip()}\n\n"
             f"Identified gaps to clarify:\n{missing}\n\n"
@@ -660,6 +785,10 @@ def generate_prompt(
         if parsed.get("has_prompt")
         else {}
     )
+    if parsed.get("has_prompt") and metrics:
+        pt = (parsed.get("prompt_title") or "").strip()
+        if pt:
+            metrics["prompt_title"] = pt
     latency_ms = round((time.perf_counter() - started_at) * 1000, 1)
     outcome = "prompt" if parsed.get("has_prompt") else "questions" if parsed.get("has_questions") else "raw_text"
 
@@ -758,6 +887,7 @@ def generate_prompt(
         "target_model": req.target_model,
         "target_model_type": target_model_type.value,
         "metrics": metrics,
+        "input_token_estimate": input_token_estimate,
         "prompt_spec": prompt_spec,
         "evidence": evidence,
         "debug_issues": debug_issues,

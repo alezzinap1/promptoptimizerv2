@@ -155,29 +155,29 @@ def get_quality_label(score: float) -> str:
 
 
 def get_improvement_tips(metrics: dict) -> list[str]:
-    """Return actionable improvement suggestions based on metrics."""
+    """Return actionable improvement suggestions based on metrics (инфинитив, без повелительного наклонения)."""
     tips = []
 
     if not metrics["has_role"]:
-        tips.append("Добавь роль: 'Ты — [эксперт]. ...' — повышает качество на 15–25%")
+        tips.append("Добавить роль («Ты — [эксперт]. …») — обычно повышает качество на 15–25%")
 
     if not metrics["has_output_format"]:
-        tips.append("Укажи формат вывода: JSON, таблица, список с полями, etc.")
+        tips.append("Указать формат вывода: JSON, таблица, список с полями и т.п.")
 
     if metrics["instruction_count"] < 2:
-        tips.append("Добавь конкретные инструкции (пронумерованный список шагов)")
+        tips.append("Добавить конкретные инструкции (пронумерованный список шагов)")
 
     if metrics["constraint_count"] == 0:
-        tips.append("Добавь ограничения: что модель НЕ должна делать")
+        tips.append("Добавить ограничения: что модель не должна делать")
 
     if not metrics["has_examples"]:
-        tips.append("Few-Shot: добавь 1–2 примера ввода/вывода для сложных задач")
+        tips.append("При сложной задаче — few-shot: 1–2 примера ввода/вывода")
 
     if not metrics["has_context"]:
-        tips.append("Добавь контекст: для кого/чего создаётся результат")
+        tips.append("Уточнить контекст: для кого и для чего создаётся результат (если релевантно)")
 
     if not metrics["has_cot_trigger"] and metrics["token_estimate"] > 100:
-        tips.append("Для сложных задач: добавь 'Думай шаг за шагом перед ответом'")
+        tips.append("При сложной задаче — фраза в духе «сначала рассуждать по шагам, затем ответ»")
 
     return tips
 

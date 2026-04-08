@@ -140,10 +140,13 @@ def build_prompt_spec(
 
 
 def build_generation_brief(spec: dict) -> str:
-    """Compile the structured prompt spec into a compact generation brief."""
+    """Compile the structured prompt spec into a compact generation brief.
+
+    Не дублируем «цель» (первая строка) отдельным пунктом: полный текст задачи
+    всегда идёт в «ИСХОДНЫЙ ЗАПРОС ПОЛЬЗОВАТЕЛЯ» — отдельная строка «Цель» давала
+    тот же смысл и раздувала user-токены без новой информации.
+    """
     parts = ["СТРУКТУРИРОВАННАЯ СПЕЦИФИКАЦИЯ ЗАДАЧИ:"]
-    if spec.get("goal"):
-        parts.append(f"- Цель: {spec['goal']}")
     if spec.get("task_types"):
         parts.append(f"- Типы задач: {', '.join(spec['task_types'])}")
     if spec.get("complexity"):

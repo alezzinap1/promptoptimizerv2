@@ -169,12 +169,28 @@ export interface GenerateResult {
   /** "reasoning" | "standard" | "small" */
   target_model_type?: string
   metrics: Record<string, unknown>
+  /** Оценка входных токенов основного запроса (system + user) до стрима */
+  input_token_estimate?: number
+  /** Короткое название для библиотеки из блока [TITLE] */
+  prompt_title?: string
   session_id: string
   prompt_spec?: PromptSpec
   evidence?: Record<string, PromptIdeEvidence>
   debug_issues?: PromptIdeIssue[]
   intent_graph?: PromptIdeNode[]
   workspace?: Workspace
+}
+
+export interface GenerateEstimateResponse {
+  input_token_estimate: number
+  main_request_tokens: number
+  scene_analysis_tokens_estimate: number
+  task_preview: {
+    completeness_score?: number
+    completeness_label?: string
+    token_method?: string
+  }
+  context_gap: number
 }
 
 export interface PromptIdePreviewResponse {
@@ -435,6 +451,8 @@ export const api = {
 
   generate: (req: GenerateRequest) =>
     fetchApi<GenerateResult>('/generate', { method: 'POST', body: JSON.stringify(req) }),
+  estimateGenerate: (req: GenerateRequest) =>
+    fetchApi<GenerateEstimateResponse>('/generate/estimate', { method: 'POST', body: JSON.stringify(req) }),
   getImageOptions: () => fetchApi<ImageMetaResponse>('/meta/image-options'),
   listPresets: (kind?: 'image' | 'skill') =>
     fetchApi<{ items: UserPresetRecord[] }>(kind ? `/presets?kind=${kind}` : '/presets'),

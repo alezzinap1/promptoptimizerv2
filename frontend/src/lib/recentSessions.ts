@@ -15,7 +15,7 @@ function normalizeLabel(task: string): string {
   return words.slice(0, 5).join(' ') + '…'
 }
 
-export function pushRecentSession(sessionId: string, taskPreview: string): void {
+export function pushRecentSession(sessionId: string, taskPreview: string, titleOverride?: string): void {
   if (!sessionId) return
   let list: RecentSession[] = []
   try {
@@ -25,7 +25,8 @@ export function pushRecentSession(sessionId: string, taskPreview: string): void 
   } catch {
     list = []
   }
-  const label = normalizeLabel(taskPreview)
+  const t = (titleOverride || '').trim()
+  const label = t ? normalizeLabel(t) : normalizeLabel(taskPreview)
   list = list.filter((x) => x.sessionId !== sessionId)
   list.unshift({ sessionId, label, at: Date.now() })
   list = list.slice(0, MAX)

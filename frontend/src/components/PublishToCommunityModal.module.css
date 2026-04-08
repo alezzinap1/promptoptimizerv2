@@ -13,11 +13,12 @@
   width: min(480px, 100%);
   max-height: min(88vh, 680px);
   overflow: auto;
-  background: var(--panel-bg, #1a1a1e);
-  border: 1px solid var(--border-subtle, #333);
+  background: var(--modal-surface, var(--panel-strong));
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 1rem 1.1rem;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  color: var(--text);
 }
 
 .title {
@@ -60,9 +61,9 @@
   font: inherit;
   padding: 0.4rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid var(--border-subtle, #444);
-  background: var(--input-bg, #121214);
-  color: inherit;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2, var(--panel));
+  color: var(--text);
 }
 
 .promptArea {
