@@ -20,7 +20,7 @@
 - **Метрики и модели** — учёт событий, справочник моделей OpenRouter, лимиты trial при общем ключе хоста.
 - **Целевая модель** — карточки подсказок по семейству (OpenRouter id → шаблон); **классификация задачи** — эвристика или LLM (настройки); **Compare** — опционально LLM-судья (`/compare/judge`).
 - **Простой режим** — одна кнопка: улучшить вставленный промпт (пресеты и мета-промпт в настройках).
-- **Справка** — обзор, онбординг, главный поток Home, разделы приложения, простой режим, глоссарий (`/help` и `docs/user/`).
+- **Справка** — обзор, онбординг, главный поток Home, разделы приложения, простой режим, глоссарий (`/help`; исходники в [`frontend/src/docs/user/`](frontend/src/docs/user/)).
 
 Поток в общих чертах: **описать задачу → (опционально) уточнить в IDE → сгенерировать → при необходимости итерировать → сохранить в библиотеку**.
 
@@ -109,7 +109,7 @@ prompt-engineer-agent/
 ├── services/          # LLM, auth, шифрование ключей, workflow
 ├── techniques/        # YAML-база техник
 ├── scripts/           # backup / миграции
-├── docs/              # Скриншоты для README (корневые *.md — локально, см. .gitignore)
+├── docs/              # current/ — актуальные планы и гайды; archive/ — история; analytics/; screenshots/
 └── app/               # Streamlit (архив)
 ```
 
@@ -145,7 +145,7 @@ cd frontend && npm install && npm run dev
 
 Откройте [http://localhost:5173](http://localhost:5173). Запросы к `/api` проксируются на [http://localhost:8000](http://localhost:8000) (см. `frontend/vite.config.ts`).
 
-В приложении: **Справка** (`/help`) — встроенная пользовательская документация; те же материалы лежат в каталоге [`docs/user/`](docs/user/).
+В приложении: **Справка** (`/help`) — встроенная пользовательская документация; исходные markdown лежат в [`frontend/src/docs/user/`](frontend/src/docs/user/) (импорт в `Help.tsx`).
 
 Зарегистрируйте пользователя через UI или вызовите `/api/auth/register`.
 
@@ -255,7 +255,16 @@ why_it_works: "Объяснение..."
 
 ## Документация в `docs/`
 
-Файлы `docs/*.md` (планы, чеклисты, архивные заметки) **не коммитятся** — они в [`.gitignore`](.gitignore), остаются у вас локально. В репозитории по смыслу держим только то, что нужно всем клонам (например, [`docs/screenshots/README.md`](docs/screenshots/README.md) для скриншотов).
+- **Актуально:** [`docs/current/README.md`](docs/current/README.md) — индекс планов, продуктового видения, production checklist, demo script и т.д.
+- **Архив (история, не источник истины о продукте):** [`docs/archive/README.md`](docs/archive/README.md) — Streamlit-аудиты, старый план миграции, сжатый брейнсторм идей.
+- **Аналитика:** [`docs/analytics/`](docs/analytics/).
+- **Скриншоты для README:** [`docs/screenshots/README.md`](docs/screenshots/README.md).
+
+Файлы **`docs/*.md` в корне `docs/`** (не в подпапках) по-прежнему в [`.gitignore`](.gitignore) — локальные черновики. Подпапки `docs/current/`, `docs/archive/`, `docs/analytics/` **не** попадают под это правило и могут коммититься.
+
+Рекомендуется добавить в **корень** репозитория `.cursorignore` со строкой `docs/archive/`, чтобы Cursor не индексировал архив (если создание файла не блокируется средой).
+
+**Длинный developer-обзор** (маршруты, API, пайплайны): [`docs/user/PROJECT_FULL_REPORT.md`](docs/user/PROJECT_FULL_REPORT.md).
 
 ---
 
@@ -265,7 +274,7 @@ why_it_works: "Объяснение..."
 streamlit run app/main.py
 ```
 
-Подробности — в локальном `docs/STREAMLIT_ARCHIVE.md`, если вы ведёте копию у себя.
+Подробности — в [`docs/archive/STREAMLIT_ARCHIVE.md`](docs/archive/STREAMLIT_ARCHIVE.md).
 
 Опциональный health-сервер Streamlit: `uvicorn app.health_server:app --host 0.0.0.0 --port 8502`.
 
@@ -273,4 +282,4 @@ streamlit run app/main.py
 
 ## Что игнорируется Git
 
-В [`.gitignore`](.gitignore) в том числе: `.env`, `venv`, `node_modules`, `data/`, **`docs/*.md`** (внутренние заметки в корне `docs/`), офисные форматы (`*.pdf`, `*.docx`, …), папка `documents/`, вложения такого типа под `docs/**`, служебные `.cursor/`, `*.log`. Скриншоты для README — **`docs/screenshots/*.png`** и **`docs/screenshots/README.md`** (не подпадают под `docs/*.md`); закоммитьте PNG, когда будут готовы.
+В [`.gitignore`](.gitignore) в том числе: `.env`, `venv`, `node_modules`, `data/`, **`docs/*.md`** (только файлы **непосредственно** в `docs/`, без подпапок), офисные форматы (`*.pdf`, `*.docx`, …), папка `documents/`, вложения такого типа под `docs/**`, служебные `.cursor/`, `*.log`. Пути вроде **`docs/current/*.md`**, **`docs/archive/*.md`**, **`docs/user/*.md`**, **`docs/analytics/*.md`** правило `docs/*.md` **не** скрывает. Скриншоты для README — **`docs/screenshots/*.png`** и **`docs/screenshots/README.md`**; закоммитьте PNG, когда будут готовы.

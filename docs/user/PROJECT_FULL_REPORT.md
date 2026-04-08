@@ -1,6 +1,6 @@
-# MetaPrompt / Prompt Engineer — полный обзор проекта
+# MetaPrompt / Prompt Engineer — обзор проекта (developer)
 
-Документ описывает **текущую реализацию** в репозитории: идею, архитектуру, техники, автоматизацию по этапам, экраны и API. Актуальный продукт — **FastAPI + React (SPA)**. Каталог `app/` (Streamlit) помечен как архивный сценарий.
+Документ описывает **текущую реализацию** в репозитории: идею, архитектуру, техники, автоматизацию по этапам, экраны и API. Актуальный продукт — **FastAPI + React (SPA)**. Каталог `app/` (Streamlit) помечен как архивный сценарий. Индекс актуальной документации: [`docs/current/README.md`](../current/README.md).
 
 ---
 
@@ -35,15 +35,19 @@
 ```
 prompt-engineer-agent/
 ├── backend/           # FastAPI: main.py, api/* — роутеры
-├── frontend/          # React SPA
+├── frontend/          # React SPA; встроенная справка: src/docs/user/*.md
 ├── config/            # Лимиты, rate limit, настройки окружения
 ├── core/              # Классификация задач, prompt spec, context builder, парсинг ответа LLM, реестр техник, метрики
 ├── db/                # SQLite-менеджер, схемы таблиц
 ├── services/          # LLM-клиент, auth, workflow промпта, семантический роутер, каталог техник пользователя
 ├── techniques/        # YAML-база техник (дефолтный набор)
-├── bot/               # Telegram-бот (отдельная поверхность, общие идеи с core)
-├── app/               # Streamlit — архив
-└── docs/user/         # Пользовательская справка (в т.ч. этот файл)
+├── scripts/           # backup, миграции
+├── docs/
+│   ├── current/       # актуальная документация (people + agents)
+│   ├── archive/       # история; не использовать как источник истины
+│   ├── analytics/
+│   └── screenshots/
+└── app/               # Streamlit — архив
 ```
 
 ---
@@ -65,7 +69,7 @@ prompt-engineer-agent/
 | `/models` | Auth | Каталог OpenRouter, избранные модели из настроек |
 | `/settings` | Auth | Тема, шрифты, ключ OpenRouter, классификатор задачи, простой режим |
 | `/user-info` | Auth | Пользователь, trial, продуктовые метрики |
-| `/help` | Auth | Встроенная справка (markdown из `docs/user/*.md`) |
+| `/help` | Auth | Встроенная справка (`frontend/src/docs/user/*.md`, импорт в `Help.tsx`) |
 | `/metrics` | — | Редирект на `/user-info#product-metrics` |
 | `*` | — | Редирект на `/` |
 

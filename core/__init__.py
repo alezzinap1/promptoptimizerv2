@@ -1,1 +1,1 @@
-# Core business logic — model-agnostic, reusable across Telegram bot and web app
+# Core business logic — model-agnostic (FastAPI backend, React SPA; Streamlit app/ is archival)

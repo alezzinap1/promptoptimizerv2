@@ -1,6 +1,6 @@
 """
 Parsing utilities for LLM response blocks.
-Shared between Telegram bot and Streamlit web app.
+Shared by the FastAPI backend (primary) and archived Streamlit UI (`app/`).
 """
 from __future__ import annotations
 
