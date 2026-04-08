@@ -118,8 +118,126 @@
 
 .agentWizardInComposer .questionBox {
   margin-top: 0;
-  padding: 8px 10px 6px;
+  padding: 5px 7px 4px;
+  gap: 4px;
+}
+
+.agentWizardSummary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
+  min-height: 0;
+  padding: 3px 8px 3px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  user-select: none;
+}
+
+.agentWizardSummary::-webkit-details-marker {
+  display: none;
+}
+
+.agentWizardSummary::before {
+  content: '▸';
+  font-size: 8px;
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+  margin-right: 1px;
+}
+
+.agentWizardDetails[open] > .agentWizardSummary {
+  border-bottom: 1px solid var(--stroke);
+}
+
+.agentWizardDetails[open] > .agentWizardSummary::before {
+  transform: rotate(90deg);
+}
+
+.agentWizardSummaryMeta {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.agentWizardDetailsBody {
+  padding: 0;
+}
+
+/* Плотнее содержимое мастера в колонке «Задача» */
+.agentWizardDetailsBody .questionBoxCompact {
+  padding: 5px 7px 4px;
+  gap: 4px;
+}
+
+.agentWizardDetailsBody .questionItemCompact {
+  padding: 3px 5px;
+  font-size: 0.78rem;
+}
+
+.agentWizardDetailsBody .questionItemCompact input[placeholder] {
+  font-size: 0.74rem;
+  padding: 4px 6px;
+}
+
+.agentWizardDetailsBody .wizardQuestionBlockAgent .questionItemCompact strong {
+  font-size: 0.78rem;
+  margin-bottom: 3px;
+  line-height: 1.28;
+}
+
+.agentWizardDetailsBody .wizardProgressWrapTight {
+  margin-bottom: 2px;
+}
+
+.agentWizardDetailsBody .wizardProgressWrap {
+  gap: 5px;
+}
+
+.agentWizardDetailsBody .wizardProgressBar {
+  height: 2px;
+}
+
+.agentWizardDetailsBody .wizardProgressWrapTight .questionCarouselMeta {
+  font-size: 0.62rem;
+}
+
+.agentWizardDetailsBody .wizardToolbar {
+  min-height: 26px;
+  gap: 4px;
+}
+
+.agentWizardDetailsBody .wizIconBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+
+.agentWizardDetailsBody .wizToolbarLeadSpacer {
+  width: 26px;
+  height: 26px;
+}
+
+.agentWizardDetailsBody .wizTextBtn {
+  padding: 3px 7px;
+  font-size: 0.65rem;
+}
+
+.agentWizardDetailsBody .wizCreateBtn {
+  padding: 4px 9px;
+  font-size: 0.68rem;
+  border-radius: 6px;
+}
+
+.agentWizardDetailsBody .wizardFooterCompact {
+  margin-top: 2px;
+  padding-top: 3px;
 }
 
 .wizardAgentMerged {
@@ -916,6 +1034,308 @@ details[open].chatBubbleThinking .thinkingSummary::before {
 
 [data-theme='light'] .thinkingBody :global(strong) {
   color: rgb(109, 40, 217);
+}
+
+.promptDoneWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promptDoneStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.promptDoneCheck {
+  color: #4ade80;
+  margin-right: 2px;
+}
+
+.promptDoneVersion {
+  color: var(--text);
+}
+
+.promptDoneVersionBtn {
+  border: none;
+  background: rgba(74, 222, 128, 0.12);
+  color: #86efac;
+  font: inherit;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.promptDoneVersionBtn:hover {
+  background: rgba(74, 222, 128, 0.22);
+}
+
+.promptDoneSep {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.promptDoneTech {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.promptDoneSuggestionsWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 100%;
+}
+
+.promptDoneActions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 2px 0 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.promptDoneChipCompact {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 4.5rem;
+  max-width: 4.5rem;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.08);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.promptDoneChipCompact:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.promptDoneChipCompact:hover:not(:disabled):not(.promptDoneChipCompactActive) {
+  background: rgba(139, 92, 246, 0.11);
+  border-color: rgba(139, 92, 246, 0.42);
+}
+
+.promptDoneChipCompactActive {
+  background: rgba(139, 92, 246, 0.14);
+  border-color: rgba(139, 92, 246, 0.55);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2);
+}
+
+.promptDoneTipPreview {
+  margin-top: 6px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--muted);
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.06);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+[data-theme='light'] .promptDoneTipPreview {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+[data-theme='light'] .promptDoneChipCompact {
+  background: rgba(139, 92, 246, 0.06);
+  border-color: rgba(109, 40, 217, 0.25);
+}
+
+[data-theme='light'] .promptDoneChipCompactActive {
+  background: rgba(139, 92, 246, 0.11);
+}
+
+.promptDoneDiff {
+  margin-top: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .promptDoneDiff {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.promptDoneDiffTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.promptDoneDiffList {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.promptDoneDiffAdd {
+  color: color-mix(in srgb, var(--text) 72%, rgb(45, 120, 90) 28%);
+}
+
+.promptDoneDiffRm {
+  color: color-mix(in srgb, var(--text) 72%, rgb(140, 75, 75) 28%);
+}
+
+.promptDoneDiffChg {
+  color: var(--text);
+}
+
+[data-theme='light'] .promptDoneDiffAdd {
+  color: color-mix(in srgb, var(--text) 65%, rgb(30, 110, 75) 35%);
+}
+
+[data-theme='light'] .promptDoneDiffRm {
+  color: color-mix(in srgb, var(--text) 65%, rgb(130, 65, 65) 35%);
+}
+
+.chatBubbleTipApplied {
+  align-self: flex-start;
+  max-width: 95%;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.07) 0%, rgba(56, 189, 248, 0.05) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  overflow: clip;
+}
+
+.tipAppliedSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.tipAppliedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.tipAppliedSummary::before {
+  content: '▸';
+  font-size: 10px;
+  color: rgba(52, 211, 153, 0.5);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+details[open].chatBubbleTipApplied .tipAppliedSummary::before {
+  transform: rotate(90deg);
+}
+
+.tipAppliedLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(52, 211, 153, 0.58);
+  flex-shrink: 0;
+}
+
+.tipAppliedSummaryText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tipAppliedBody {
+  padding: 0 12px 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(52, 211, 153, 0.12);
+}
+
+.tipAppliedBody :global(p) {
+  margin: 0 0 0.4em;
+}
+
+.tipAppliedBody :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+[data-theme='light'] .chatBubbleTipApplied {
+  border-color: rgba(16, 185, 129, 0.22);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(56, 189, 248, 0.04) 100%);
+}
+
+.versionRestoreBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.versionRestoreBox {
+  max-width: 400px;
+  width: 100%;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  box-shadow: var(--glow);
+}
+
+.versionRestoreTitle {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.versionRestoreText {
+  margin: 0 0 18px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.versionRestoreActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .agentRightStack {

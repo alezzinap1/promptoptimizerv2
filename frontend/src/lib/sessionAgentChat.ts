@@ -3,10 +3,79 @@
  * can restore the left column when reopening a session.
  */
 import type { DraftChatMessage } from './agentDraft'
+import type { PromptDoneCard, PromptDoneDiffRow } from './studioPromptDoneCard'
+import type { StudioAppliedTip } from './agentStudioModes'
 
 const PREFIX = 'prompt-engineer-session-chat:'
 
 export type SessionChatMessage = DraftChatMessage
+
+function parseDiffRows(raw: unknown): PromptDoneDiffRow[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const rows: PromptDoneDiffRow[] = []
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue
+    const o = r as Record<string, unknown>
+    const kind = o.kind
+    const text = typeof o.text === 'string' ? o.text : ''
+    if (kind !== 'add' && kind !== 'rm' && kind !== 'chg') continue
+    if (!text.trim()) continue
+    rows.push({ kind, text })
+  }
+  return rows.length ? rows : undefined
+}
+
+function parsePromptDoneCard(raw: unknown): PromptDoneCard | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const o = raw as Record<string, unknown>
+  const version = Number(o.version)
+  if (!Number.isFinite(version) || version < 1) return undefined
+  const completeness = Math.round(Number(o.completeness) || 0)
+  const techniquesLabel = typeof o.techniquesLabel === 'string' ? o.techniquesLabel : '—'
+  const tokenEstimate = Math.round(Number(o.tokenEstimate) || 0)
+  const promptSnapshot = typeof o.promptSnapshot === 'string' ? o.promptSnapshot : ''
+  const suggestions: PromptDoneCard['suggestions'] = []
+  if (Array.isArray(o.suggestions)) {
+    for (const x of o.suggestions) {
+      if (typeof x === 'string' && x.trim()) {
+        suggestions.push({ fullText: x.trim() })
+      } else if (x && typeof x === 'object') {
+        const ft = (x as Record<string, unknown>).fullText
+        if (typeof ft === 'string' && ft.trim()) suggestions.push({ fullText: ft.trim() })
+      }
+      if (suggestions.length >= 5) break
+    }
+  }
+  let diff: PromptDoneCard['diff']
+  const d = o.diff
+  if (d && typeof d === 'object') {
+    const dr = d as Record<string, unknown>
+    const fromVersion = Number(dr.fromVersion)
+    const toVersion = Number(dr.toVersion)
+    const rows = parseDiffRows(dr.rows)
+    if (Number.isFinite(fromVersion) && Number.isFinite(toVersion) && rows?.length) {
+      diff = { fromVersion, toVersion, rows }
+    }
+  }
+  return {
+    version,
+    completeness,
+    techniquesLabel,
+    tokenEstimate,
+    promptSnapshot,
+    suggestions,
+    diff,
+  }
+}
+
+function parseAppliedTip(raw: unknown): StudioAppliedTip | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const t = raw as Record<string, unknown>
+  const index = Number(t.index)
+  const fullText = typeof t.fullText === 'string' ? t.fullText : ''
+  if (!Number.isFinite(index) || index < 1 || !fullText.trim()) return undefined
+  return { index, fullText }
+}
 
 export function saveSessionAgentChat(sessionId: string, messages: SessionChatMessage[]): void {
   if (!sessionId?.trim()) return
@@ -36,6 +105,8 @@ export function loadSessionAgentChat(sessionId: string): SessionChatMessage[] | 
         role: o.role,
         content: o.content,
         clarificationQA: Array.isArray(o.clarificationQA) ? (o.clarificationQA as SessionChatMessage['clarificationQA']) : undefined,
+        promptDoneCard: parsePromptDoneCard(o.promptDoneCard),
+        appliedTip: parseAppliedTip(o.appliedTip),
       })
     }
     return out.length ? out : null

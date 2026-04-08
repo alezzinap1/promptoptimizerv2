@@ -3,6 +3,9 @@
  * отдельные чаты, сессии и пресеты без пересечения при переключении.
  */
 import type { GenerateResult } from '../api/client'
+import type { PromptDoneCard } from './studioPromptDoneCard'
+
+export type StudioAppliedTip = { index: number; fullText: string }
 
 export type PromptStudioMode = 'text' | 'image' | 'skill'
 
@@ -11,6 +14,8 @@ export type StudioChatMessage = {
   role: 'user' | 'assistant'
   content: string
   clarificationQA?: { question: string; answers: string[] }[]
+  promptDoneCard?: PromptDoneCard
+  appliedTip?: StudioAppliedTip
 }
 
 export type AgentStudioSnapshot = {

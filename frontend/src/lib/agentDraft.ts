@@ -1,6 +1,8 @@
 import type { GenerateResult } from '../api/client'
 import type { AgentStudioSnapshot, PromptStudioMode } from './agentStudioModes'
 import { createEmptyStudioSnapshot } from './agentStudioModes'
+import type { PromptDoneCard } from './studioPromptDoneCard'
+import type { StudioAppliedTip } from './agentStudioModes'
 
 const KEY = 'prompt-engineer-agent-draft-v1'
 const KEY_V2 = 'prompt-engineer-agent-draft-v2'
@@ -10,6 +12,8 @@ export type DraftChatMessage = {
   role: 'user' | 'assistant'
   content: string
   clarificationQA?: { question: string; answers: string[] }[]
+  promptDoneCard?: PromptDoneCard
+  appliedTip?: StudioAppliedTip
 }
 
 /** @deprecated используйте AgentDraftV2 */

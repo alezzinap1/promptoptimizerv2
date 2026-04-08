@@ -24,6 +24,7 @@ import {
   defaultWelcomeForMode,
   type AgentStudioSnapshot,
   type PromptStudioMode,
+  type StudioAppliedTip,
 } from '../lib/agentStudioModes'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
 import ImageStylePickerPopover from '../components/ImageStylePickerPopover'
@@ -44,6 +45,8 @@ import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
 import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
 import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
+import { buildPromptDoneCard } from '../lib/studioPromptDoneCard'
+import type { PromptDoneCard } from '../lib/studioPromptDoneCard'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
 import styles from './Home.module.css'
@@ -70,6 +73,42 @@ type GenChatMsg = {
   role: 'user' | 'assistant'
   content: string
   clarificationQA?: { question: string; answers: string[] }[]
+  promptDoneCard?: PromptDoneCard
+  appliedTip?: StudioAppliedTip
+}
+
+type DoneGenerationContext = {
+  nextVersion: number
+  isIteration: boolean
+  previousPromptBlock?: string
+  fromVersion?: number
+  prevScore: number
+  prevTokens: number
+}
+
+function buildDoneGenerationContext(
+  prevMsgs: GenChatMsg[],
+  versions: Record<string, unknown>[],
+  isIteration: boolean,
+  previousPrompt: string | undefined,
+  prevResult: GenerateResult | null,
+): DoneGenerationContext {
+  const maxVer =
+    versions.length > 0
+      ? Math.max(...versions.map((v) => Number((v as Record<string, unknown>).version) || 0))
+      : 0
+  const maxFromChat = prevMsgs.reduce((acc, m) => Math.max(acc, m.promptDoneCard?.version ?? 0), 0)
+  const base = Math.max(maxVer, maxFromChat)
+  const nextVersion = base + 1
+  const hasPrev = Boolean(isIteration && previousPrompt && previousPrompt.trim())
+  return {
+    nextVersion,
+    isIteration: hasPrev,
+    previousPromptBlock: hasPrev ? String(previousPrompt) : undefined,
+    fromVersion: hasPrev ? base : undefined,
+    prevScore: prevResult ? Number(prevResult.metrics?.completeness_score ?? prevResult.metrics?.quality_score ?? 0) : 0,
+    prevTokens: prevResult ? Math.round(Number(prevResult.metrics?.token_estimate ?? 0)) : 0,
+  }
 }
 
 function findPendingClarificationId(messages: GenChatMsg[]): string | null {
@@ -87,6 +126,7 @@ function computeChatAfterGeneration(
   prev: GenChatMsg[],
   res: GenerateResult,
   questionAnswers: { question: string; answers: string[] }[] | undefined,
+  doneCtx: DoneGenerationContext,
 ): { next: GenChatMsg[]; lastClarificationsMsgId: string | null } {
   let next: GenChatMsg[] = [...prev]
   let lastClarificationsMsgId: string | null = null
@@ -110,17 +150,6 @@ function computeChatAfterGeneration(
       const short = res.reasoning.length > 400 ? res.reasoning.slice(0, 400) + '…' : res.reasoning
       thinkingParts.push(short)
     }
-    if (res.metrics) {
-      const score = Number(res.metrics.completeness_score ?? res.metrics.quality_score ?? 0)
-      const tokens = Number(res.metrics.token_estimate ?? 0)
-      const parts: string[] = []
-      if (score > 0) parts.push(`полнота ${score}%`)
-      if (tokens > 0) parts.push(`≈${tokens.toLocaleString()} токенов`)
-      if (parts.length) thinkingParts.push(`**Оценка:** ${parts.join(' · ')}`)
-    }
-    if (res.metrics && Array.isArray(res.metrics.improvement_tips) && (res.metrics.improvement_tips as string[]).length > 0) {
-      thinkingParts.push(`**Можно улучшить:** ${(res.metrics.improvement_tips as string[]).join('; ')}`)
-    }
     if (thinkingParts.length > 0) {
       next.push({
         id: crypto.randomUUID(),
@@ -131,7 +160,15 @@ function computeChatAfterGeneration(
     next.push({
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: 'Готово — промпт справа. Напишите в чат, что изменить.',
+      content: '',
+      promptDoneCard: buildPromptDoneCard(res, {
+        nextVersion: doneCtx.nextVersion,
+        isIteration: doneCtx.isIteration,
+        previousPromptBlock: doneCtx.previousPromptBlock,
+        fromVersion: doneCtx.fromVersion,
+        prevScore: doneCtx.prevScore,
+        prevTokens: doneCtx.prevTokens,
+      }),
     })
   } else if (res.has_questions && (res.questions?.length || 0) > 0) {
     const cid = crypto.randomUUID()
@@ -179,6 +216,8 @@ type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   clarificationQA?: { question: string; answers: string[] }[]
+  promptDoneCard?: PromptDoneCard
+  appliedTip?: StudioAppliedTip
 }
 
 type Technique = { id: string; name: string }
@@ -246,6 +285,14 @@ export default function Home() {
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
   const [quickSaved, setQuickSaved] = useState(false)
+  const [versionRestoreConfirm, setVersionRestoreConfirm] = useState<{ version: number; prompt: string } | null>(null)
+  /** Панель уточняющих вопросов: сворачиваем при старте генерации, можно развернуть по клику. */
+  const [questionFollowupOpen, setQuestionFollowupOpen] = useState(true)
+  /** Hover по чипу «Совет N» в карточке результата — текст показывается строкой под чипами. */
+  const [hoveredPromptSuggestion, setHoveredPromptSuggestion] = useState<{
+    msgId: string
+    index: number
+  } | null>(null)
   /** Снимки студии по вкладкам «Текст / Фото / Скилл» — при переключении не смешиваем чаты и сессии. */
   const studioModesRef = useRef<Record<PromptStudioMode, AgentStudioSnapshot>>({
     text: createEmptyStudioSnapshot('text'),
@@ -688,6 +735,8 @@ export default function Home() {
     forceIteration?: boolean
     previousPromptOverride?: string
     skipAgentChatReplies?: boolean
+    /** Сообщения, добавляемые в чат до блоков «размышления» / карточки результата (например «применён совет»). */
+    chatAppendBeforeResult?: GenChatMsg[]
   }
 
   const handleGenerate = async (
@@ -752,8 +801,19 @@ export default function Home() {
             quickSaved: false,
           }
         } else {
-          const prevMsgs = (snap.chatMessages || []) as GenChatMsg[]
-          const { next: nextMsgs } = computeChatAfterGeneration(prevMsgs, res, questionAnswers)
+          let prevMsgs = (snap.chatMessages || []) as GenChatMsg[]
+          if (opts?.chatAppendBeforeResult?.length) {
+            prevMsgs = [...prevMsgs, ...opts.chatAppendBeforeResult]
+          }
+          const snapTarget = studioModesRef.current[requestPromptType]
+          const doneCtx = buildDoneGenerationContext(
+            prevMsgs,
+            versions,
+            isIteration,
+            previousPrompt,
+            snapTarget.result,
+          )
+          const { next: nextMsgs } = computeChatAfterGeneration(prevMsgs, res, questionAnswers, doneCtx)
           studioModesRef.current[requestPromptType] = {
             ...snap,
             chatMessages: nextMsgs as ChatMessage[],
@@ -780,10 +840,22 @@ export default function Home() {
       setQuickSaved(false)
       if (!opts?.skipAgentChatReplies) {
         setChatMessages((prev) => {
+          let base = prev as GenChatMsg[]
+          if (opts?.chatAppendBeforeResult?.length) {
+            base = [...base, ...opts.chatAppendBeforeResult]
+          }
+          const doneCtx = buildDoneGenerationContext(
+            base,
+            versions,
+            isIteration,
+            previousPrompt,
+            result,
+          )
           const { next, lastClarificationsMsgId } = computeChatAfterGeneration(
-            prev as GenChatMsg[],
+            base,
             res,
             questionAnswers,
+            doneCtx,
           )
           lastClarificationsMsgIdRef.current = lastClarificationsMsgId
           queueMicrotask(() => {
@@ -1121,6 +1193,27 @@ export default function Home() {
       })),
     [preferredTargetModels, modelLabels],
   )
+  const latestVersionInChat = useMemo(() => {
+    let m = 0
+    for (const msg of chatMessages) {
+      const v = msg.promptDoneCard?.version
+      if (typeof v === 'number' && v > m) m = v
+    }
+    return m
+  }, [chatMessages])
+
+  useEffect(() => {
+    if (loading && result?.has_questions && !result?.has_prompt) {
+      setQuestionFollowupOpen(false)
+    }
+  }, [loading, result?.has_questions, result?.has_prompt])
+
+  useEffect(() => {
+    if (!result?.has_questions || result?.has_prompt) {
+      setQuestionFollowupOpen(true)
+    }
+  }, [result?.has_questions, result?.has_prompt])
+
   const agentChatPlaceholder = useMemo(() => {
     if (promptType === 'image') {
       return 'Сначала опишите сцену или идею. Стили и уточнения — строкой выше, когда понадобятся.'
@@ -1711,6 +1804,150 @@ export default function Home() {
               <div className={styles.agentChatBody}>
                 <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
                   {chatMessages.map((m) => {
+                    if (m.appliedTip) {
+                      return (
+                        <details key={m.id} className={styles.chatBubbleTipApplied}>
+                          <summary className={styles.tipAppliedSummary}>
+                            <span className={styles.tipAppliedLabel}>Совет</span>
+                            <span className={styles.tipAppliedSummaryText}>
+                              Применён совет {m.appliedTip.index}
+                            </span>
+                          </summary>
+                          <div className={styles.tipAppliedBody}>
+                            <MarkdownOutput>{m.appliedTip.fullText}</MarkdownOutput>
+                          </div>
+                        </details>
+                      )
+                    }
+                    if (m.promptDoneCard) {
+                      const card = m.promptDoneCard
+                      const isOldVersion =
+                        latestVersionInChat > 0 && card.version < latestVersionInChat
+                      return (
+                        <div
+                          key={m.id}
+                          className={`${styles.chatBubbleAssistant} ${styles.promptDoneWrap}`}
+                        >
+                          <div className={styles.promptDoneStatus} role="status">
+                            <span className={styles.promptDoneCheck} aria-hidden>
+                              ✓
+                            </span>
+                            {isOldVersion ? (
+                              <button
+                                type="button"
+                                className={styles.promptDoneVersionBtn}
+                                title="Вернуться к этой версии промпта"
+                                onClick={() =>
+                                  setVersionRestoreConfirm({
+                                    version: card.version,
+                                    prompt: card.promptSnapshot,
+                                  })
+                                }
+                              >
+                                v{card.version}
+                              </button>
+                            ) : (
+                              <span className={styles.promptDoneVersion}>v{card.version}</span>
+                            )}
+                            <span className={styles.promptDoneSep}>·</span>
+                            <span>{card.completeness}%</span>
+                            {card.tokenEstimate > 0 ? (
+                              <>
+                                <span className={styles.promptDoneSep}>·</span>
+                                <span>≈{card.tokenEstimate.toLocaleString('ru-RU')} tok</span>
+                              </>
+                            ) : null}
+                            <span className={styles.promptDoneSep}>·</span>
+                            <span className={styles.promptDoneTech}>{card.techniquesLabel}</span>
+                          </div>
+                          {card.suggestions.length > 0 ? (
+                            <div
+                              className={styles.promptDoneSuggestionsWrap}
+                              onMouseLeave={() => {
+                                setHoveredPromptSuggestion((prev) =>
+                                  prev?.msgId === m.id ? null : prev,
+                                )
+                              }}
+                            >
+                              <div className={styles.promptDoneActions}>
+                                {card.suggestions.map((s, i) => {
+                                  const tipActive =
+                                    hoveredPromptSuggestion?.msgId === m.id &&
+                                    hoveredPromptSuggestion.index === i
+                                  return (
+                                    <button
+                                      key={`${m.id}-s-${i}`}
+                                      type="button"
+                                      className={`${styles.promptDoneChipCompact} ${
+                                        tipActive ? styles.promptDoneChipCompactActive : ''
+                                      }`}
+                                      disabled={loading || !result?.prompt_block?.trim()}
+                                      aria-describedby={
+                                        tipActive ? `${m.id}-tip-preview` : undefined
+                                      }
+                                      onMouseEnter={() =>
+                                        setHoveredPromptSuggestion({ msgId: m.id, index: i })
+                                      }
+                                      onClick={() => {
+                                        const text = s.fullText.trim()
+                                        if (!text || loading || !result?.prompt_block?.trim()) return
+                                        setHoveredPromptSuggestion(null)
+                                        const tipMsg: GenChatMsg = {
+                                          id: crypto.randomUUID(),
+                                          role: 'assistant',
+                                          content: '',
+                                          appliedTip: { index: i + 1, fullText: text },
+                                        }
+                                        void handleGenerate(undefined, {
+                                          forceIteration: true,
+                                          feedbackOverride: text,
+                                          chatAppendBeforeResult: [tipMsg],
+                                        })
+                                      }}
+                                    >
+                                      Совет {i + 1}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {hoveredPromptSuggestion?.msgId === m.id &&
+                              card.suggestions[hoveredPromptSuggestion.index] ? (
+                                <div
+                                  id={`${m.id}-tip-preview`}
+                                  className={styles.promptDoneTipPreview}
+                                  role="note"
+                                >
+                                  {card.suggestions[hoveredPromptSuggestion.index].fullText}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          {card.diff?.rows.length ? (
+                            <div className={styles.promptDoneDiff}>
+                              <div className={styles.promptDoneDiffTitle}>
+                                Что изменилось (v{card.diff.fromVersion} → v{card.diff.toVersion})
+                              </div>
+                              <ul className={styles.promptDoneDiffList}>
+                                {card.diff.rows.map((row, i) => (
+                                  <li
+                                    key={i}
+                                    className={
+                                      row.kind === 'add'
+                                        ? styles.promptDoneDiffAdd
+                                        : row.kind === 'rm'
+                                          ? styles.promptDoneDiffRm
+                                          : styles.promptDoneDiffChg
+                                    }
+                                  >
+                                    {row.text}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    }
                     const isThinking = m.role === 'assistant' && m.content.startsWith('__thinking__\n')
                     const displayContent = isThinking ? m.content.slice('__thinking__\n'.length) : m.content
                     if (isThinking) {
@@ -1773,9 +2010,19 @@ export default function Home() {
                 }`}
               >
                 {result?.has_questions && !result?.has_prompt && (
-                  <div className={styles.agentWizardInComposer} aria-label="Уточняющие вопросы">
-                    {renderQuestionsPanel()}
-                  </div>
+                  <details
+                    className={`${styles.agentWizardInComposer} ${styles.agentWizardDetails}`}
+                    open={questionFollowupOpen}
+                    onToggle={(e) => setQuestionFollowupOpen(e.currentTarget.open)}
+                  >
+                    <summary className={styles.agentWizardSummary}>
+                      <span>Уточняющие вопросы</span>
+                      {loading ? (
+                        <span className={styles.agentWizardSummaryMeta}>Генерация…</span>
+                      ) : null}
+                    </summary>
+                    <div className={styles.agentWizardDetailsBody}>{renderQuestionsPanel()}</div>
+                  </details>
                 )}
               <div
                 className={`${cb.composer} ${
@@ -1977,6 +2224,39 @@ export default function Home() {
         favoriteIds={imageStyleFavorites}
         onToggleFavorite={toggleImageStyleFavorite}
       />
+      {versionRestoreConfirm ? (
+        <div
+          className={styles.versionRestoreBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="version-restore-title"
+        >
+          <div className={styles.versionRestoreBox}>
+            <h3 id="version-restore-title" className={styles.versionRestoreTitle}>
+              Перейти к версии v{versionRestoreConfirm.version}?
+            </h3>
+            <p className={styles.versionRestoreText}>
+              Текст промпта справа заменится на сохранённую версию из чата. Продолжить?
+            </p>
+            <div className={styles.versionRestoreActions}>
+              <button
+                type="button"
+                className={`${styles.primaryAction} btn-primary`}
+                onClick={() => {
+                  const snap = versionRestoreConfirm.prompt
+                  setResult((prev) => (prev ? { ...prev, prompt_block: snap } : prev))
+                  setVersionRestoreConfirm(null)
+                }}
+              >
+                Да, перейти
+              </button>
+              <button type="button" className="btn-ghost" onClick={() => setVersionRestoreConfirm(null)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
