@@ -92,6 +92,397 @@
   min-height: 0;
 }
 
+.suggestedActionsBar {
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--panel) 94%, var(--primary) 6%);
+}
+
+.suggestedActionsBarInner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.suggestedActionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.suggestedActionChip:hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--stroke));
+  background: color-mix(in srgb, var(--panel) 88%, var(--primary) 12%);
+}
+
+.suggestedActionEmoji {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.suggestedActionsMore {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.suggestedActionsMore:hover {
+  color: var(--text);
+}
+
+.editPreviewWrap {
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--stroke));
+  background: color-mix(in srgb, var(--panel) 92%, var(--primary) 8%);
+  max-width: 100%;
+}
+
+.editPreviewHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.editPreviewTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.editPreviewInstr {
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.editPreviewDiff {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.editPreviewDiff li {
+  margin: 0;
+  padding: 2px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editPreviewIns {
+  background: rgba(34, 197, 94, 0.12);
+  border-left: 3px solid rgba(34, 197, 94, 0.65);
+}
+
+.editPreviewDel {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid rgba(239, 68, 68, 0.55);
+  text-decoration: line-through;
+  opacity: 0.9;
+}
+
+.editPreviewEq {
+  opacity: 0.55;
+}
+
+.editPreviewMono {
+  margin: 0 0 10px;
+  padding: 8px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editPreviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editPreviewApply {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--primary) 88%, transparent);
+  color: var(--text);
+}
+
+.editPreviewApply:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.editPreviewApply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editPreviewCancel {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.editPreviewCancel:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.skillDoneBar {
+  margin-top: 8px;
+}
+
+.skillSandboxOpenBtn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--panel) 90%, var(--primary) 10%);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.skillSandboxOpenBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--stroke));
+}
+
+.skillSandboxOpenBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.skillTestAccordion {
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0 8px 8px;
+}
+
+.skillTestSummary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 4px;
+  list-style: none;
+}
+
+.skillTestRunning {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.skillTestBody {
+  padding: 0 4px 4px;
+}
+
+.skillTestList {
+  margin: 0 0 8px;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+}
+
+.skillTestUser {
+  margin-bottom: 2px;
+}
+
+.skillTestExpect {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.skillTestExpect code {
+  font-size: 0.72rem;
+}
+
+.skillTestPass {
+  color: #4ade80;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.skillTestFail {
+  color: #f87171;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.skillTestRunAll {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.skillTestRunAll:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.skillSandboxBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.skillSandboxModal {
+  width: min(520px, 100%);
+  max-height: min(86vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.skillSandboxHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.skillSandboxTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.skillSandboxClose {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.skillSandboxClose:disabled {
+  opacity: 0.4;
+}
+
+.skillSandboxHint {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.skillSandboxLog {
+  flex: 1;
+  min-height: 160px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skillSandboxEmpty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.skillSandboxRowUser,
+.skillSandboxRowAsst {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.skillSandboxRowUser {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  max-width: 95%;
+}
+
+.skillSandboxRowAsst {
+  align-self: flex-start;
+  background: rgba(0, 0, 0, 0.2);
+  max-width: 95%;
+}
+
+.skillSandboxComposer {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--stroke);
+  align-items: flex-end;
+}
+
+.skillSandboxTextarea {
+  flex: 1;
+  min-height: 44px;
+}
+
+.skillSandboxSend {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--primary) 85%, transparent);
+  color: var(--text);
+}
+
+.skillSandboxSend:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Опрос уточнений — слеплен с композером: без отдельной «колоды» и без лишней прокрутки */
 .agentComposerWithWizard {
   display: flex;
@@ -287,10 +678,57 @@
 
 .agentChatHeaderTop {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+}
+
+.agentHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.expertLevelRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.expertLevelLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.expertLevelTab {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.expertLevelTab:hover {
+  color: var(--text);
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.expertLevelTabActive {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(139, 92, 246, 0.12);
 }
 
 .agentChatHeader h2 {

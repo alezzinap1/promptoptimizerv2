@@ -2,12 +2,16 @@
  * Изолированные снимки студии агента для вкладок «Текст / Фото / Скилл» —
  * отдельные чаты, сессии и пресеты без пересечения при переключении.
  */
-import type { GenerateResult } from '../api/client'
+import type { GenerateResult, SuggestedStudioAction } from '../api/client'
+import type { ExpertLevel } from './expertLevelPresets'
 import type { PromptDoneCard } from './studioPromptDoneCard'
+import type { LineDiffOp } from './lineDiffLcs'
 
 export type StudioAppliedTip = { index: number; fullText: string }
 
 export type PromptStudioMode = 'text' | 'image' | 'skill'
+
+export type { ExpertLevel }
 
 export type StudioChatMessage = {
   id: string
@@ -16,6 +20,12 @@ export type StudioChatMessage = {
   clarificationQA?: { question: string; answers: string[] }[]
   promptDoneCard?: PromptDoneCard
   appliedTip?: StudioAppliedTip
+  editPreviewCard?: {
+    instruction: string
+    oldPrompt: string
+    newPrompt: string
+    diffOps: LineDiffOp[]
+  }
 }
 
 export type AgentStudioSnapshot = {
@@ -36,6 +46,10 @@ export type AgentStudioSnapshot = {
   skillPresetId: string
   /** Текст активного скилла — уходит в API как skill_body (контекст для генерации промпта). */
   skillBody: string
+  /** Профиль «режим эксперта» — влияет на вопросы, техники, температуру. */
+  expertLevel: ExpertLevel
+  /** Эвристические подсказки после готового промпта (сервер: /generate, /agent/process). */
+  suggestedActions: SuggestedStudioAction[]
 }
 
 const WELCOME_TEXT =
@@ -71,5 +85,7 @@ export function createEmptyStudioSnapshot(mode: PromptStudioMode): AgentStudioSn
     imageDeepMode: false,
     skillPresetId: '',
     skillBody: '',
+    expertLevel: 'mid',
+    suggestedActions: [],
   }
 }

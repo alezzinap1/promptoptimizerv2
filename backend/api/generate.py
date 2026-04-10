@@ -8,6 +8,7 @@ import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from config.abuse import check_input_size, check_rate_limit
@@ -24,6 +25,7 @@ from core.image_presets import format_active_style_preset_system_block, get_imag
 from core.image_style_tags import expand_image_tags_to_directives
 from core.image_target_syntax import get_image_engine_syntax_block
 from core.workspace_profile import normalize_workspace
+from core.suggested_actions import build_suggested_actions
 from db.manager import DBManager
 from prompts import load_prompt
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -201,6 +203,22 @@ class GenerateRequest(BaseModel):
     image_deep_mode: bool = False
     skill_preset_id: str | None = None
     recent_technique_ids: list[str] = Field(default_factory=list)
+    expert_level: str | None = None
+
+
+def _apply_expert_level_questions_policy(policy: dict, expert_level: str | None) -> dict:
+    """Лёгкая подстройка лимита вопросов под профиль (фронт уже шлёт questions_mode)."""
+    if not expert_level:
+        return policy
+    p = dict(policy)
+    mq = int(p.get("max_questions") or 2)
+    if expert_level == "junior":
+        p["max_questions"] = min(5, max(mq, 3))
+    elif expert_level == "senior":
+        p["max_questions"] = max(1, min(mq, 2))
+    elif expert_level == "creative":
+        p["max_questions"] = min(5, mq + 1)
+    return p
 
 
 def _is_primary_generation_with_unanswered_questions(req: GenerateRequest) -> bool:
@@ -318,6 +336,7 @@ def _estimate_generation_input(
         prompt_type=req.prompt_type or "text",
     )
     questions_policy = get_questions_policy(context_gap, classification.get("complexity") or "medium")
+    questions_policy = _apply_expert_level_questions_policy(questions_policy, req.expert_level)
 
     effective_overrides = apply_evidence_decisions(req.prompt_spec_overrides, req.evidence_decisions)
     preview = build_preview_payload(
@@ -584,6 +603,7 @@ def generate_prompt(
         prompt_type=req.prompt_type or "text",
     )
     questions_policy = get_questions_policy(context_gap, classification.get("complexity") or "medium")
+    questions_policy = _apply_expert_level_questions_policy(questions_policy, req.expert_level)
 
     effective_overrides = apply_evidence_decisions(req.prompt_spec_overrides, req.evidence_decisions)
     preview = build_preview_payload(
@@ -914,6 +934,15 @@ def generate_prompt(
         questions = []
         parsed = {**parsed, "has_questions": False, "questions_raw": ""}
 
+    suggested_actions = build_suggested_actions(
+        has_prompt=bool(parsed.get("has_prompt")),
+        prompt_type=req.prompt_type or "text",
+        current_prompt=(parsed.get("prompt_block") or "").strip() or None
+        if parsed.get("has_prompt")
+        else None,
+        metrics=metrics,
+    )
+
     return {
         **parsed,
         "llm_raw": full_text,
@@ -929,6 +958,7 @@ def generate_prompt(
         "task_types": classification["task_types"],
         "complexity": classification["complexity"],
         "task_input": req.task_input,
+        "prompt_type": req.prompt_type or "text",
         "gen_model": req.gen_model,
         "target_model": req.target_model,
         "target_model_type": target_model_type.value,
@@ -942,4 +972,26 @@ def generate_prompt(
         "session_id": session_id,
         "scene_analysis_applied": scene_analysis_applied,
         "questions_contract_used": bool(questions_enforced),
+        "suggested_actions": suggested_actions,
+        "test_cases": parsed.get("test_cases") or [],
     }
+
+
+@router.post("/generate/stream")
+def generate_prompt_stream(
+    req: GenerateRequest,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+    registry = Depends(get_registry_for_user),
+    auth_session_id: str | None = Depends(get_session_id),
+):
+    """
+    SSE-обёртка над полной генерацией: одно событие `done` с тем же телом, что у POST /generate.
+    Клиент может парсить поток; поэтапные `chunk` добавятся при выносе стрима LLM в общий генератор.
+    """
+    result = generate_prompt(req, user, db, registry, auth_session_id)
+
+    def events():
+        yield f"data: {json.dumps({'type': 'done', 'result': result}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")

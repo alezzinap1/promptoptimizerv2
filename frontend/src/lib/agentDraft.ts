@@ -3,6 +3,7 @@ import type { AgentStudioSnapshot, PromptStudioMode } from './agentStudioModes'
 import { createEmptyStudioSnapshot } from './agentStudioModes'
 import type { PromptDoneCard } from './studioPromptDoneCard'
 import type { StudioAppliedTip } from './agentStudioModes'
+import type { LineDiffOp } from './lineDiffLcs'
 
 const KEY = 'prompt-engineer-agent-draft-v1'
 const KEY_V2 = 'prompt-engineer-agent-draft-v2'
@@ -14,6 +15,12 @@ export type DraftChatMessage = {
   clarificationQA?: { question: string; answers: string[] }[]
   promptDoneCard?: PromptDoneCard
   appliedTip?: StudioAppliedTip
+  editPreviewCard?: {
+    instruction: string
+    oldPrompt: string
+    newPrompt: string
+    diffOps: LineDiffOp[]
+  }
 }
 
 /** @deprecated используйте AgentDraftV2 */
@@ -61,6 +68,8 @@ function v1ToSnapshot(d: AgentDraftV1): AgentStudioSnapshot {
     imageDeepMode: d.imageDeepMode ?? false,
     skillPresetId: d.skillPresetId ?? '',
     skillBody: '',
+    expertLevel: 'mid',
+    suggestedActions: [],
   }
 }
 
@@ -74,6 +83,12 @@ export function loadAgentDraftV2(): AgentDraftV2 | null {
           const snap = o.modes[m]
           if (snap && typeof snap.skillBody !== 'string') {
             snap.skillBody = ''
+          }
+          if (snap && !snap.expertLevel) {
+            snap.expertLevel = 'mid'
+          }
+          if (snap && !Array.isArray(snap.suggestedActions)) {
+            snap.suggestedActions = []
           }
         }
         return o

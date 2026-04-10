@@ -33,6 +33,7 @@ from backend.api import (
     compare,
     config,
     generate,
+    preview_edit,
     image_meta,
     library,
     metrics,
@@ -67,6 +68,7 @@ api_app.include_router(sessions.router, tags=["sessions"])
 api_app.include_router(prompt_ide.router, tags=["prompt-ide"])
 api_app.include_router(agent_route.router, tags=["agent"])
 api_app.include_router(generate.router, tags=["generate"])
+api_app.include_router(preview_edit.router, tags=["generate"])
 api_app.include_router(simple_improve.router, tags=["simple-improve"])
 api_app.include_router(compare.router, tags=["compare"])
 api_app.include_router(library.router, tags=["library"])

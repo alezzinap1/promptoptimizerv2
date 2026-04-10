@@ -35,6 +35,27 @@ class ParsingTests(unittest.TestCase):
         self.assertIn("structured output", parsed["reasoning"].lower())
         self.assertIn("Верни JSON", parsed["prompt_block"])
 
+    def test_parse_reply_extracts_test_cases_json(self) -> None:
+        reply = """
+[REASONING]
+ok
+[/REASONING]
+
+[PROMPT]
+Skill body
+[/PROMPT]
+
+[TEST_CASES]
+[{"user": "hi", "expect_substring": "hello"}]
+[/TEST_CASES]
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertTrue(parsed["has_prompt"])
+        tc = parsed.get("test_cases") or []
+        self.assertEqual(len(tc), 1)
+        self.assertEqual(tc[0]["user"], "hi")
+        self.assertEqual(tc[0]["expect_substring"], "hello")
+
     def test_parse_reply_normalizes_lowercase_markers(self) -> None:
         reply = """
 [reasoning]

@@ -5,6 +5,7 @@
 import type { DraftChatMessage } from './agentDraft'
 import type { PromptDoneCard, PromptDoneDiffRow } from './studioPromptDoneCard'
 import type { StudioAppliedTip } from './agentStudioModes'
+import type { LineDiffOp } from './lineDiffLcs'
 
 const PREFIX = 'prompt-engineer-session-chat:'
 
@@ -57,6 +58,24 @@ function parsePromptDoneCard(raw: unknown): PromptDoneCard | undefined {
       diff = { fromVersion, toVersion, rows }
     }
   }
+  let skillTestCases: PromptDoneCard['skillTestCases']
+  const stc = o.skillTestCases
+  if (Array.isArray(stc)) {
+    const rows: NonNullable<PromptDoneCard['skillTestCases']> = []
+    for (const x of stc) {
+      if (!x || typeof x !== 'object') continue
+      const t = x as Record<string, unknown>
+      const u = typeof t.user === 'string' ? t.user.trim() : ''
+      const exp =
+        typeof t.expect_substring === 'string'
+          ? t.expect_substring.trim()
+          : typeof t.must_contain === 'string'
+            ? t.must_contain.trim()
+            : ''
+      if (u && exp) rows.push({ user: u, expect_substring: exp })
+    }
+    if (rows.length) skillTestCases = rows
+  }
   return {
     version,
     completeness,
@@ -65,7 +84,36 @@ function parsePromptDoneCard(raw: unknown): PromptDoneCard | undefined {
     promptSnapshot,
     suggestions,
     diff,
+    skillTestCases,
   }
+}
+
+function parseEditPreviewCard(raw: unknown):
+  | {
+      instruction: string
+      oldPrompt: string
+      newPrompt: string
+      diffOps: LineDiffOp[]
+    }
+  | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const o = raw as Record<string, unknown>
+  const instruction = typeof o.instruction === 'string' ? o.instruction : ''
+  const oldPrompt = typeof o.oldPrompt === 'string' ? o.oldPrompt : ''
+  const newPrompt = typeof o.newPrompt === 'string' ? o.newPrompt : ''
+  if (!instruction.trim() || !oldPrompt || !newPrompt) return undefined
+  const diffOps: LineDiffOp[] = []
+  if (Array.isArray(o.diffOps)) {
+    for (const row of o.diffOps) {
+      if (!row || typeof row !== 'object') continue
+      const r = row as Record<string, unknown>
+      const kind = r.kind
+      const text = typeof r.text === 'string' ? r.text : ''
+      if (kind !== 'eq' && kind !== 'del' && kind !== 'ins') continue
+      diffOps.push({ kind, text })
+    }
+  }
+  return { instruction, oldPrompt, newPrompt, diffOps }
 }
 
 function parseAppliedTip(raw: unknown): StudioAppliedTip | undefined {
@@ -107,6 +155,7 @@ export function loadSessionAgentChat(sessionId: string): SessionChatMessage[] | 
         clarificationQA: Array.isArray(o.clarificationQA) ? (o.clarificationQA as SessionChatMessage['clarificationQA']) : undefined,
         promptDoneCard: parsePromptDoneCard(o.promptDoneCard),
         appliedTip: parseAppliedTip(o.appliedTip),
+        editPreviewCard: parseEditPreviewCard(o.editPreviewCard),
       })
     }
     return out.length ? out : null

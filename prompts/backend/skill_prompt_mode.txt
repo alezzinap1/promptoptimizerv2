@@ -10,4 +10,15 @@ In [PROMPT], produce a **complete, copy-paste ready** skill. Prefer clear Markdo
 **EDGE CASES** (fallbacks). Adapt or rename sections if the user named a framework (Cursor rules, Claude skill, etc.).
 
 Use bullet lists where helpful. The skill should be self-contained and not reference this chat.
+
+After [/PROMPT], add a separate block (not inside the skill text) with 2–4 short regression checks:
+
+[TEST_CASES]
+[
+  {"user": "короткое тестовое сообщение пользователя", "expect_substring": "фрагмент, который должен появиться в ответе"},
+  {"user": "…", "expect_substring": "…"}
+]
+[/TEST_CASES]
+
+Use the same language as the skill. Keep user lines under one sentence; expect_substring should be a distinctive substring (not the whole reply).
 --- END SKILL PROMPT MODE ---

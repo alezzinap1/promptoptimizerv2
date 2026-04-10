@@ -2,12 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   api,
+  normalizeSuggestedStudioActions,
   type GenerateRequest,
   type GenerateResult,
   type GenerationIssue,
   type ImageMetaResponse,
-  type UserPresetRecord,
   type OpenRouterModel,
+  type SuggestedStudioAction,
+  type UserPresetRecord,
   type Workspace,
 } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
@@ -23,9 +25,15 @@ import {
   createEmptyStudioSnapshot,
   defaultWelcomeForMode,
   type AgentStudioSnapshot,
+  type ExpertLevel,
   type PromptStudioMode,
   type StudioAppliedTip,
 } from '../lib/agentStudioModes'
+import {
+  EXPERT_LEVEL_HINTS,
+  EXPERT_LEVEL_LABELS,
+  getExpertLevelPreset,
+} from '../lib/expertLevelPresets'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
 import ImageStylePickerPopover from '../components/ImageStylePickerPopover'
 import PublishToCommunityModal, { type PublishToCommunityInitial } from '../components/PublishToCommunityModal'
@@ -34,7 +42,9 @@ import {
   pickAfterPromptChatReply,
   pickConversationalReply,
 } from '../lib/conversationalGate'
-import { resolveAgentFollowUpPlan } from '../lib/agentPlanResolver'
+import { looksLikeStrongEdit } from '../lib/agentFollowUp'
+import { computeLineDiffOps } from '../lib/lineDiffLcs'
+import { resolveStudioFollowUpPlan } from '../lib/agentStudioProcessPlan'
 import {
   COMPLETENESS_SCORE_TITLE,
   PROMPT_COST_TITLE,
@@ -76,6 +86,12 @@ type GenChatMsg = {
   clarificationQA?: { question: string; answers: string[] }[]
   promptDoneCard?: PromptDoneCard
   appliedTip?: StudioAppliedTip
+  editPreviewCard?: {
+    instruction: string
+    oldPrompt: string
+    newPrompt: string
+    diffOps: ReturnType<typeof computeLineDiffOps>
+  }
 }
 
 type DoneGenerationContext = {
@@ -219,6 +235,7 @@ type ChatMessage = {
   clarificationQA?: { question: string; answers: string[] }[]
   promptDoneCard?: PromptDoneCard
   appliedTip?: StudioAppliedTip
+  editPreviewCard?: GenChatMsg['editPreviewCard']
 }
 
 type Technique = { id: string; name: string }
@@ -284,9 +301,12 @@ export default function Home() {
   )
   const [skillPresetId, setSkillPresetId] = useState('')
   const [skillBody, setSkillBody] = useState('')
+  const [expertLevel, setExpertLevel] = useState<ExpertLevel>('mid')
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
   const [quickSaved, setQuickSaved] = useState(false)
+  const [suggestedActions, setSuggestedActions] = useState<SuggestedStudioAction[]>([])
+  const [suggestionsBarExpanded, setSuggestionsBarExpanded] = useState(false)
   const [versionRestoreConfirm, setVersionRestoreConfirm] = useState<{ version: number; prompt: string } | null>(null)
   /** Панель уточняющих вопросов: сворачиваем при старте генерации, можно развернуть по клику. */
   const [questionFollowupOpen, setQuestionFollowupOpen] = useState(true)
@@ -302,7 +322,18 @@ export default function Home() {
     skill: createEmptyStudioSnapshot('skill'),
   })
 
-  const hydrateFromSnapshot = useCallback((s: AgentStudioSnapshot) => {
+  const applyExpertPreset = useCallback((level: ExpertLevel, mode: PromptStudioMode) => {
+    const p = getExpertLevelPreset(level, mode)
+    setQuestionsMode(p.questionsMode)
+    setTechniqueMode(p.techniqueMode)
+    setManualTechs(p.manualTechs)
+    setTemperature(p.temperature)
+    setTopP(p.topP)
+    if (p.imageDeepMode !== undefined) setImageDeepMode(p.imageDeepMode)
+  }, [])
+
+  const hydrateFromSnapshot = useCallback(
+    (s: AgentStudioSnapshot, targetMode?: PromptStudioMode) => {
     setChatMessages(s.chatMessages as ChatMessage[])
     setTaskInput(s.taskInput)
     setBaseTaskRef(s.baseTaskRef)
@@ -313,6 +344,10 @@ export default function Home() {
     setQuestionState(s.questionState)
     setQuestionCarouselIdx(s.questionCarouselIdx)
     setQuickSaved(s.quickSaved)
+    const lvl = s.expertLevel ?? 'mid'
+    setExpertLevel(lvl)
+    const modeForPreset = targetMode ?? promptTypeRef.current
+    applyExpertPreset(lvl, modeForPreset)
     setImagePromptTags(s.imagePromptTags)
     setImagePresetId(s.imagePresetId)
     setImageEngine(s.imageEngine)
@@ -328,7 +363,10 @@ export default function Home() {
           m.clarificationQA === undefined,
       )
     lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
-  }, [])
+    setSuggestedActions(s.suggestedActions ?? [])
+  },
+    [applyExpertPreset],
+  )
 
   const persistCurrentModeToRef = useCallback(() => {
     studioModesRef.current[promptType] = {
@@ -348,6 +386,8 @@ export default function Home() {
       imageDeepMode,
       skillPresetId,
       skillBody,
+      expertLevel,
+      suggestedActions,
     }
   }, [
     promptType,
@@ -367,6 +407,8 @@ export default function Home() {
     imageDeepMode,
     skillPresetId,
     skillBody,
+    expertLevel,
+    suggestedActions,
   ])
 
   const handlePromptTypeChange = useCallback(
@@ -374,7 +416,7 @@ export default function Home() {
       if (next === promptType) return
       persistCurrentModeToRef()
       const incoming = studioModesRef.current[next]
-      hydrateFromSnapshot(incoming)
+      hydrateFromSnapshot(incoming, next)
       setPromptType(next)
       if (incoming.sessionId?.trim()) {
         localStorage.setItem(ACTIVE_SESSION_KEY, incoming.sessionId)
@@ -387,6 +429,18 @@ export default function Home() {
     [promptType, persistCurrentModeToRef, hydrateFromSnapshot],
   )
 
+  const handleExpertLevelChange = useCallback(
+    (level: ExpertLevel) => {
+      setExpertLevel(level)
+      applyExpertPreset(level, promptType)
+      studioModesRef.current[promptType] = {
+        ...studioModesRef.current[promptType],
+        expertLevel: level,
+      }
+    },
+    [promptType, applyExpertPreset],
+  )
+
   const agentSplitRootRef = useRef<HTMLDivElement>(null)
   const agentChatScrollRef = useRef<HTMLDivElement>(null)
   const imageStyleMoreBtnRef = useRef<HTMLButtonElement>(null)
@@ -397,6 +451,12 @@ export default function Home() {
   const restoredFromSidebarRef = useRef(false)
   const [agentThinkingIdx, setAgentThinkingIdx] = useState(0)
   const [publishCommunityOpen, setPublishCommunityOpen] = useState(false)
+  const [skillSandboxOpen, setSkillSandboxOpen] = useState(false)
+  const [skillSandboxInput, setSkillSandboxInput] = useState('')
+  const [skillSandboxLog, setSkillSandboxLog] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [skillSandboxBusy, setSkillSandboxBusy] = useState(false)
+  const [skillTestRunning, setSkillTestRunning] = useState(false)
+  const [skillTestResults, setSkillTestResults] = useState<Record<number, 'pass' | 'fail'>>({})
   /** Токены только текста задачи (baseTaskRef || taskInput), без system и без истории чата */
   const [taskTextTokens, setTaskTextTokens] = useState<{ tokens: number; method: string } | null>(null)
   const [taskTextTokensLoading, setTaskTextTokensLoading] = useState(false)
@@ -570,7 +630,7 @@ export default function Home() {
     if (draft) {
       studioModesRef.current = draft.modes
       setPromptType(draft.activePromptType)
-      hydrateFromSnapshot(draft.modes[draft.activePromptType])
+      hydrateFromSnapshot(draft.modes[draft.activePromptType], draft.activePromptType)
       const sid = draft.modes[draft.activePromptType].sessionId
       if (sid?.trim()) localStorage.setItem(ACTIVE_SESSION_KEY, sid)
       else localStorage.removeItem(ACTIVE_SESSION_KEY)
@@ -600,6 +660,42 @@ export default function Home() {
       navigate(location.pathname, { replace: true, state: null })
     }
   }, [location.pathname, location.state, navigate])
+
+  useEffect(() => {
+    const state = location.state as { studioForkSkill?: { body: string; title?: string } } | null
+    if (!state?.studioForkSkill) return
+    const raw = (state.studioForkSkill.body || '').trim()
+    const title = (state.studioForkSkill.title || '').trim()
+    if (!raw) {
+      navigate(location.pathname, { replace: true, state: null })
+      return
+    }
+    const seed = title
+      ? `Оформи и улучши скилл «${title}» (текст ниже уже в контексте skill_body).`
+      : 'Доработай скилл из библиотеки (текст в контексте skill_body).'
+    const welcomeSkill: ChatMessage[] = [
+      { id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('skill') },
+      { id: crypto.randomUUID(), role: 'user', content: seed },
+    ]
+    const snap: AgentStudioSnapshot = {
+      ...createEmptyStudioSnapshot('skill'),
+      ...studioModesRef.current.skill,
+      skillBody: raw,
+      taskInput: seed,
+      baseTaskRef: seed,
+      chatMessages: welcomeSkill,
+      result: null,
+      sessionId: null,
+      suggestedActions: [],
+    }
+    studioModesRef.current.skill = snap
+    hydrateFromSnapshot(snap, 'skill')
+    setPromptType('skill')
+    setResult(null)
+    setSessionId(null)
+    localStorage.removeItem(ACTIVE_SESSION_KEY)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.pathname, location.state, navigate, hydrateFromSnapshot])
 
   useEffect(() => {
     localStorage.setItem(ACTIVE_WORKSPACE_KEY, String(workspaceId))
@@ -756,6 +852,8 @@ export default function Home() {
     if (!effectiveTask) return
     lastQuestionAnswersRef.current = questionAnswers
     setIssueBannerDismissed(false)
+    setSuggestedActions([])
+    setSuggestionsBarExpanded(false)
     setLoading(true)
     setError(null)
     const isIteration =
@@ -792,8 +890,11 @@ export default function Home() {
         skill_preset_id: promptType === 'skill' && skillPresetId ? skillPresetId : undefined,
         skill_body: skillBody.trim() || undefined,
         recent_technique_ids: loadRecentTechniqueIds(),
+        expert_level: expertLevel,
       }
       const res = normalizeClientGenerateResult(await api.generate(req))
+      const nextSuggestions = normalizeSuggestedStudioActions(res.suggested_actions)
+      setSuggestedActions(nextSuggestions)
       appendRecentTechniqueIds(res.technique_ids || [])
       pushRecentSession(res.session_id, effectiveTask, pickPromptTitle(res, effectiveTask))
 
@@ -809,6 +910,8 @@ export default function Home() {
             questionCarouselIdx: 0,
             quickSaved: false,
             skillBody,
+            expertLevel,
+            suggestedActions: nextSuggestions,
           }
         } else {
           let prevMsgs = (snap.chatMessages || []) as GenChatMsg[]
@@ -834,6 +937,8 @@ export default function Home() {
             questionCarouselIdx: 0,
             quickSaved: false,
             skillBody,
+            expertLevel,
+            suggestedActions: nextSuggestions,
           }
         }
         saveAgentDraftV2({
@@ -887,6 +992,8 @@ export default function Home() {
               imageDeepMode,
               skillPresetId,
               skillBody,
+              expertLevel,
+              suggestedActions: nextSuggestions,
             }
             saveAgentDraftV2({
               activePromptType: promptType,
@@ -903,6 +1010,159 @@ export default function Home() {
     }
   }
 
+  const handleSuggestedActionClick = async (item: SuggestedStudioAction) => {
+    if (!result?.has_prompt || !result.prompt_block?.trim() || loading) return
+    const taskRef = (baseTaskRef || taskInput).trim()
+    if (!taskRef) return
+    const snapshot = result
+    const tm = effectiveTargetModel
+
+    const pushAssistant = (body: string) => {
+      setChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: body }])
+    }
+
+    if (item.action === 'iterate') {
+      const fb = item.data?.feedback?.trim() || item.title
+      void handleGenerate(undefined, {
+        taskInputOverride: taskRef,
+        feedbackOverride: fb,
+        forceIteration: true,
+        previousPromptOverride: snapshot.prompt_block,
+      })
+      return
+    }
+    if (item.action === 'save_library') {
+      try {
+        const title = pickPromptTitle(snapshot, taskRef)
+        await api.saveToLibrary({
+          title,
+          prompt: snapshot.prompt_block,
+          tags: [],
+          target_model: tm,
+          task_type: snapshot.task_types?.[0] || 'general',
+          techniques: snapshot.technique_ids,
+        })
+        window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+        setQuickSaved(true)
+        pushAssistant(`Сохранено в библиотеку как «${title}».`)
+      } catch (e) {
+        pushAssistant(e instanceof Error ? e.message : 'Не удалось сохранить.')
+      }
+      return
+    }
+    if (item.action === 'eval_prompt') {
+      try {
+        const { metrics } = await api.evaluatePrompt(snapshot.prompt_block, tm, promptType)
+        const pretty = JSON.stringify(metrics, null, 2)
+        pushAssistant(`Оценка текущего промпта (эвристика на сервере):\n\n\`\`\`json\n${pretty}\n\`\`\``)
+      } catch (e) {
+        pushAssistant(e instanceof Error ? e.message : 'Оценка не выполнена.')
+      }
+      return
+    }
+    if (item.action === 'nav_compare') {
+      navigate('/compare', { state: { taskInput: taskRef } })
+      pushAssistant('Открыта страница **Сравнение** с подставленной задачей.')
+    }
+  }
+
+  const handleEditPreviewApply = async (msgId: string, newPrompt: string) => {
+    const sid = (sessionId || result?.session_id || '').trim()
+    if (!sid) {
+      setError('Нет активной сессии — сначала сгенерируйте промпт, чтобы появились версии.')
+      return
+    }
+    setError(null)
+    setLoading(true)
+    try {
+      await api.applySessionPrompt(sid, { final_prompt: newPrompt })
+      const { items } = await api.getSessionVersions(sid)
+      setVersions(items)
+      const latest = items.length ? (items[items.length - 1] as Record<string, unknown>) : null
+      if (latest) {
+        const fp = String(latest.final_prompt || '')
+        const techniqueIds = (Array.isArray(latest.techniques_used) ? latest.techniques_used : []) as string[]
+        setResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                prompt_block: fp,
+                has_prompt: true,
+                has_questions: false,
+                techniques: techniqueIds.map((id) => ({ id, name: id })),
+                technique_ids: techniqueIds,
+                reasoning: String(latest.reasoning || prev.reasoning),
+                metrics:
+                  typeof latest.metrics === 'object' && latest.metrics
+                    ? (latest.metrics as Record<string, unknown>)
+                    : prev.metrics,
+              }
+            : null,
+        )
+      }
+      setChatMessages((prev) => prev.filter((x) => x.id !== msgId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось применить правку.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditPreviewCancel = (msgId: string) => {
+    setChatMessages((prev) => prev.filter((x) => x.id !== msgId))
+  }
+
+  const runSkillTestCases = async (cases: NonNullable<PromptDoneCard['skillTestCases']>) => {
+    const skill = (result?.prompt_block || '').trim()
+    if (!skill || skillTestRunning) return
+    setSkillTestRunning(true)
+    setSkillTestResults({})
+    const acc: Record<number, 'pass' | 'fail'> = {}
+    try {
+      for (let i = 0; i < cases.length; i++) {
+        const c = cases[i]!
+        try {
+          const r = await api.skillSandboxChat({
+            skill_body: skill,
+            user_message: c.user,
+            gen_model: genModel || undefined,
+          })
+          const ok = r.reply.toLowerCase().includes(c.expect_substring.toLowerCase())
+          acc[i] = ok ? 'pass' : 'fail'
+        } catch {
+          acc[i] = 'fail'
+        }
+        setSkillTestResults({ ...acc })
+      }
+    } finally {
+      setSkillTestRunning(false)
+    }
+  }
+
+  const sendSkillSandboxMessage = async () => {
+    const skill = (result?.prompt_block || '').trim()
+    const q = skillSandboxInput.trim()
+    if (!skill || !q || skillSandboxBusy) return
+    setSkillSandboxBusy(true)
+    setSkillSandboxLog((prev) => [...prev, { role: 'user', content: q }])
+    setSkillSandboxInput('')
+    try {
+      const r = await api.skillSandboxChat({
+        skill_body: skill,
+        user_message: q,
+        gen_model: genModel || undefined,
+      })
+      setSkillSandboxLog((prev) => [...prev, { role: 'assistant', content: r.reply }])
+    } catch (e) {
+      setSkillSandboxLog((prev) => [
+        ...prev,
+        { role: 'assistant', content: e instanceof Error ? e.message : 'Ошибка запроса' },
+      ])
+    } finally {
+      setSkillSandboxBusy(false)
+    }
+  }
+
   const handleRetryGeneration = () => {
     const qa = lastQuestionAnswersRef.current
     const taskOverride = (baseTaskRef || taskInput).trim() || undefined
@@ -913,7 +1173,7 @@ export default function Home() {
     if (sessionId?.trim()) clearSessionAgentChat(sessionId)
     const fresh = createEmptyStudioSnapshot(promptType)
     studioModesRef.current[promptType] = fresh
-    hydrateFromSnapshot(fresh)
+    hydrateFromSnapshot(fresh, promptType)
     setChatInput('')
     setQuestionCarouselIdx(0)
     clearAgentDraftV2()
@@ -953,8 +1213,63 @@ export default function Home() {
       const tm = effectiveTargetModel
       const sidRef = sessionId
 
+      if (looksLikeStrongEdit(text)) {
+        void (async () => {
+          setLoading(true)
+          setError(null)
+          try {
+            const r = await api.previewPromptEdit({
+              task_input: taskRef,
+              current_prompt: snapshot.prompt_block,
+              instruction: text,
+              prompt_type: promptType,
+              gen_model: genModel || undefined,
+            })
+            const diffOps = computeLineDiffOps(snapshot.prompt_block, r.new_prompt)
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: '',
+                editPreviewCard: {
+                  instruction: text,
+                  oldPrompt: snapshot.prompt_block,
+                  newPrompt: r.new_prompt,
+                  diffOps,
+                },
+              },
+            ])
+          } catch (e) {
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content:
+                  e instanceof Error
+                    ? e.message
+                    : 'Не удалось получить превью правки. Попробуйте ещё раз или используйте полную генерацию.',
+              },
+            ])
+          } finally {
+            setLoading(false)
+          }
+        })()
+        return
+      }
+
       void (async () => {
-        const plan = await resolveAgentFollowUpPlan(text)
+        const { plan, suggestedActions: agentBar } = await resolveStudioFollowUpPlan(text, {
+          sessionId: sidRef,
+          promptType,
+          currentPrompt: snapshot.prompt_block,
+          chatMessages: [...chatMessages, { role: 'user', content: text }],
+        })
+        if (agentBar?.length) {
+          setSuggestedActions(agentBar)
+          setSuggestionsBarExpanded(false)
+        }
         const dbg =
           import.meta.env.DEV && plan.debug
             ? `\n\n\`\`\`text\n[Router] ${plan.type} · ${plan.debug}\n\`\`\``
@@ -1120,6 +1435,8 @@ export default function Home() {
     imageDeepMode,
     skillPresetId,
     skillBody,
+    expertLevel,
+    suggestedActions,
   ])
 
   const mergeStudioSkillTags = (raw: string): string[] => {
@@ -1769,17 +2086,33 @@ export default function Home() {
             <div className={styles.agentChatColumn}>
               <div className={styles.agentChatHeader}>
                 <div className={styles.agentChatHeaderTop}>
-                  <div className={styles.agentTaskTitleRow}>
-                    <h2 className="pageTitleGradient">Задача</h2>
-                    <div className={styles.promptTypeTabs}>
-                      {(['text', 'image', 'skill'] as const).map((pt) => (
+                  <div className={styles.agentHeaderLeft}>
+                    <div className={styles.agentTaskTitleRow}>
+                      <h2 className="pageTitleGradient">Задача</h2>
+                      <div className={styles.promptTypeTabs}>
+                        {(['text', 'image', 'skill'] as const).map((pt) => (
+                          <button
+                            key={pt}
+                            type="button"
+                            className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
+                            onClick={() => handlePromptTypeChange(pt)}
+                          >
+                            {pt === 'text' ? '📝 Текст' : pt === 'image' ? '📷 Фото' : '⚡ Скилл'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className={styles.expertLevelRow} title="Профиль генерации: вопросы, техники, температура">
+                      <span className={styles.expertLevelLabel}>Уровень</span>
+                      {(['junior', 'mid', 'senior', 'creative'] as const).map((el) => (
                         <button
-                          key={pt}
+                          key={el}
                           type="button"
-                          className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
-                          onClick={() => handlePromptTypeChange(pt)}
+                          className={`${styles.expertLevelTab} ${expertLevel === el ? styles.expertLevelTabActive : ''}`}
+                          title={EXPERT_LEVEL_HINTS[el]}
+                          onClick={() => handleExpertLevelChange(el)}
                         >
-                          {pt === 'text' ? '📝 Текст' : pt === 'image' ? '📷 Фото' : '⚡ Скилл'}
+                          {EXPERT_LEVEL_LABELS[el]}
                         </button>
                       ))}
                     </div>
@@ -1884,6 +2217,60 @@ export default function Home() {
               <div className={styles.agentChatBody}>
                 <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
                   {chatMessages.map((m) => {
+                    if (m.editPreviewCard) {
+                      const ep = m.editPreviewCard
+                      return (
+                        <div
+                          key={m.id}
+                          className={`${styles.chatBubbleAssistant} ${styles.editPreviewWrap}`}
+                        >
+                          <div className={styles.editPreviewHead}>
+                            <span className={styles.editPreviewTitle}>Превью правки</span>
+                            <span className={styles.editPreviewInstr} title={ep.instruction}>
+                              {ep.instruction.length > 120 ? `${ep.instruction.slice(0, 120)}…` : ep.instruction}
+                            </span>
+                          </div>
+                          {ep.diffOps.length > 0 ? (
+                            <ul className={styles.editPreviewDiff} aria-label="Построчные изменения">
+                              {ep.diffOps.map((row, i) => (
+                                <li
+                                  key={i}
+                                  className={
+                                    row.kind === 'ins'
+                                      ? styles.editPreviewIns
+                                      : row.kind === 'del'
+                                        ? styles.editPreviewDel
+                                        : styles.editPreviewEq
+                                  }
+                                >
+                                  {row.text || ' '}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <pre className={styles.editPreviewMono}>{ep.newPrompt}</pre>
+                          )}
+                          <div className={styles.editPreviewActions}>
+                            <button
+                              type="button"
+                              className={styles.editPreviewApply}
+                              disabled={loading}
+                              onClick={() => void handleEditPreviewApply(m.id, ep.newPrompt)}
+                            >
+                              Применить как новую версию
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.editPreviewCancel}
+                              disabled={loading}
+                              onClick={() => handleEditPreviewCancel(m.id)}
+                            >
+                              Отменить
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    }
                     if (m.appliedTip) {
                       return (
                         <details key={m.id} className={styles.chatBubbleTipApplied}>
@@ -2025,6 +2412,65 @@ export default function Home() {
                               </ul>
                             </div>
                           ) : null}
+                          {promptType === 'skill' ? (
+                            <div className={styles.skillDoneBar}>
+                              <button
+                                type="button"
+                                className={styles.skillSandboxOpenBtn}
+                                disabled={loading || !result?.prompt_block?.trim()}
+                                onClick={() => {
+                                  setSkillSandboxLog([])
+                                  setSkillSandboxInput('')
+                                  setSkillSandboxOpen(true)
+                                }}
+                              >
+                                Песочница
+                              </button>
+                            </div>
+                          ) : null}
+                          {card.skillTestCases && card.skillTestCases.length > 0 ? (
+                            <details className={styles.skillTestAccordion}>
+                              <summary className={styles.skillTestSummary}>
+                                Тест-кейсы ({card.skillTestCases.length})
+                                {skillTestRunning ? (
+                                  <span className={styles.skillTestRunning}> — проверка…</span>
+                                ) : null}
+                              </summary>
+                              <div className={styles.skillTestBody}>
+                                <ol className={styles.skillTestList}>
+                                  {card.skillTestCases.map((tc, idx) => (
+                                    <li key={idx}>
+                                      <div className={styles.skillTestUser}>{tc.user}</div>
+                                      <div className={styles.skillTestExpect}>
+                                        Ожидается подстрока: <code>{tc.expect_substring}</code>
+                                      </div>
+                                      {skillTestResults[idx] ? (
+                                        <span
+                                          className={
+                                            skillTestResults[idx] === 'pass'
+                                              ? styles.skillTestPass
+                                              : styles.skillTestFail
+                                          }
+                                        >
+                                          {skillTestResults[idx] === 'pass' ? 'OK' : 'Нет вхождения'}
+                                        </span>
+                                      ) : null}
+                                    </li>
+                                  ))}
+                                </ol>
+                                <button
+                                  type="button"
+                                  className={styles.skillTestRunAll}
+                                  disabled={
+                                    skillTestRunning || loading || !result?.prompt_block?.trim()
+                                  }
+                                  onClick={() => void runSkillTestCases(card.skillTestCases!)}
+                                >
+                                  Запустить все
+                                </button>
+                              </div>
+                            </details>
+                          ) : null}
                         </div>
                       )
                     }
@@ -2089,6 +2535,32 @@ export default function Home() {
                   result?.has_questions && !result?.has_prompt ? styles.agentComposerWithWizard : ''
                 }`}
               >
+                {result?.has_prompt && suggestedActions.length > 0 && !loading && (
+                  <div className={styles.suggestedActionsBar} role="region" aria-label="Подсказки">
+                    <div className={styles.suggestedActionsBarInner}>
+                      {(suggestionsBarExpanded ? suggestedActions : suggestedActions.slice(0, 3)).map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className={styles.suggestedActionChip}
+                          onClick={() => void handleSuggestedActionClick(a)}
+                        >
+                          {a.emoji ? <span className={styles.suggestedActionEmoji}>{a.emoji}</span> : null}
+                          <span>{a.title}</span>
+                        </button>
+                      ))}
+                      {suggestedActions.length > 3 ? (
+                        <button
+                          type="button"
+                          className={styles.suggestedActionsMore}
+                          onClick={() => setSuggestionsBarExpanded((v) => !v)}
+                        >
+                          {suggestionsBarExpanded ? 'Свернуть' : 'Ещё…'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
                 {result?.has_questions && !result?.has_prompt && (
                   <details
                     className={`${styles.agentWizardInComposer} ${styles.agentWizardDetails}`}
@@ -2347,6 +2819,72 @@ export default function Home() {
               </button>
               <button type="button" className="btn-ghost" onClick={() => setVersionRestoreConfirm(null)}>
                 Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {skillSandboxOpen ? (
+        <div
+          className={styles.skillSandboxBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Песочница скилла"
+          onClick={() => !skillSandboxBusy && setSkillSandboxOpen(false)}
+        >
+          <div className={styles.skillSandboxModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.skillSandboxHead}>
+              <h3 className={styles.skillSandboxTitle}>Песочница скилла</h3>
+              <button
+                type="button"
+                className={styles.skillSandboxClose}
+                disabled={skillSandboxBusy}
+                onClick={() => setSkillSandboxOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <p className={styles.skillSandboxHint}>
+              Один раунд: системный контекст = текущий промпт-скилл справа. Сообщения не сохраняются на сервере.
+            </p>
+            <div className={styles.skillSandboxLog}>
+              {skillSandboxLog.length === 0 ? (
+                <p className={styles.skillSandboxEmpty}>Напишите сообщение ниже.</p>
+              ) : (
+                skillSandboxLog.map((row, i) => (
+                  <div
+                    key={i}
+                    className={
+                      row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
+                    }
+                  >
+                    <MarkdownOutput>{row.content}</MarkdownOutput>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className={styles.skillSandboxComposer}>
+              <AutoTextarea
+                className={styles.skillSandboxTextarea}
+                value={skillSandboxInput}
+                onChange={(e) => setSkillSandboxInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    if (!skillSandboxBusy && skillSandboxInput.trim()) void sendSkillSandboxMessage()
+                  }
+                }}
+                minHeightPx={44}
+                maxHeightPx={120}
+                placeholder="Сообщение для модели…"
+              />
+              <button
+                type="button"
+                className={styles.skillSandboxSend}
+                disabled={skillSandboxBusy || !skillSandboxInput.trim()}
+                onClick={() => void sendSkillSandboxMessage()}
+              >
+                {skillSandboxBusy ? '…' : 'Отправить'}
               </button>
             </div>
           </div>

@@ -6,6 +6,8 @@ export type PromptDoneDiffRow = { kind: 'add' | 'rm' | 'chg'; text: string }
 /** Полный текст совета для итерации; в UI показывается как «Совет N». */
 export type PromptDoneSuggestion = { fullText: string }
 
+export type SkillTestCaseItem = { user: string; expect_substring: string }
+
 export type PromptDoneCard = {
   version: number
   completeness: number
@@ -18,6 +20,7 @@ export type PromptDoneCard = {
     toVersion: number
     rows: PromptDoneDiffRow[]
   }
+  skillTestCases?: SkillTestCaseItem[]
 }
 
 const FALLBACK_SUGGESTIONS = ['Сделать короче', 'Добавить примеры', 'Ужесточить ограничения']
@@ -66,6 +69,25 @@ export function pickSuggestionChips(res: GenerateResult): PromptDoneSuggestion[]
     }
   }
   return out.slice(0, 3)
+}
+
+function normalizeSkillTestCases(res: GenerateResult): SkillTestCaseItem[] {
+  const raw = res.test_cases
+  if (!Array.isArray(raw)) return []
+  const out: SkillTestCaseItem[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as Record<string, unknown>
+    const u = typeof o.user === 'string' ? o.user.trim() : ''
+    const exp =
+      typeof o.expect_substring === 'string'
+        ? o.expect_substring.trim()
+        : typeof o.must_contain === 'string'
+          ? o.must_contain.trim()
+          : ''
+    if (u && exp) out.push({ user: u, expect_substring: exp })
+  }
+  return out.slice(0, 12)
 }
 
 export function buildIterationDiffSummary(
@@ -130,6 +152,9 @@ export function buildPromptDoneCard(
   const techniquesLabel = shortTechniquesLabel(res.techniques)
   const suggestions = pickSuggestionChips(res)
   const promptSnapshot = res.prompt_block || ''
+  const skillCases = normalizeSkillTestCases(res)
+  const skillTestCases =
+    res.prompt_type === 'skill' && skillCases.length > 0 ? skillCases : undefined
 
   let diff: PromptDoneCard['diff'] | undefined
   if (
@@ -161,5 +186,6 @@ export function buildPromptDoneCard(
     promptSnapshot,
     suggestions,
     diff,
+    skillTestCases,
   }
 }

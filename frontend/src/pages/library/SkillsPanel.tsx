@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import LibraryTagChips from '../../components/LibraryTagChips'
 import MarkdownOutput from '../../components/MarkdownOutput'
@@ -33,6 +34,7 @@ function matchesSearch(item: SkillItem, q: string): boolean {
 }
 
 export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols = 3 }: SkillsPanelProps) {
+  const navigate = useNavigate()
   const [items, setItems] = useState<SkillItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
@@ -250,6 +252,18 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
                     URL.revokeObjectURL(url)
                   }}
                 />
+                <button
+                  type="button"
+                  className={styles.forkBtn}
+                  title="Открыть в студии (вкладка Скилл)"
+                  onClick={() =>
+                    navigate('/', {
+                      state: { studioForkSkill: { body: it.body, title: it.title } },
+                    })
+                  }
+                >
+                  Форк
+                </button>
                 <PencilIconButton title="Редактировать" onClick={() => openEdit(it)} />
                 <TrashIconButton title="Удалить скилл" onClick={() => remove(it.id)} />
               </div>

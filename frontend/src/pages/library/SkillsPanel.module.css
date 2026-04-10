@@ -158,6 +158,21 @@
   color: var(--primary);
 }
 
+.forkBtn {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--stroke));
+  background: color-mix(in srgb, var(--panel) 88%, var(--primary) 12%);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.forkBtn:hover {
+  border-color: var(--primary);
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;

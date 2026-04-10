@@ -4,6 +4,7 @@ Shared by the FastAPI backend (primary) and archived Streamlit UI (`app/`).
 """
 from __future__ import annotations
 
+import json
 import re
 
 PROMPT_OPEN = "[PROMPT]"
@@ -14,9 +15,11 @@ REASONING_OPEN = "[REASONING]"
 REASONING_CLOSE = "[/REASONING]"
 TITLE_OPEN = "[TITLE]"
 TITLE_CLOSE = "[/TITLE]"
+TEST_CASES_OPEN = "[TEST_CASES]"
+TEST_CASES_CLOSE = "[/TEST_CASES]"
 
 # Порядок: сначала более длинные имена не нужны — теги не пересекаются
-_PROTOCOL_TAG_NAMES = ("reasoning", "title", "questions", "prompt")
+_PROTOCOL_TAG_NAMES = ("reasoning", "title", "questions", "prompt", "test_cases")
 
 
 def _normalize_protocol_markers(text: str) -> str:
@@ -28,6 +31,26 @@ def _normalize_protocol_markers(text: str) -> str:
         upper = name.upper()
         out = re.sub(rf"\[{name}\]", f"[{upper}]", out, flags=re.IGNORECASE)
         out = re.sub(rf"\[/{name}\]", f"[/{upper}]", out, flags=re.IGNORECASE)
+    return out
+
+
+def _parse_test_cases_block(block: str | None) -> list[dict[str, str]]:
+    if not block or not str(block).strip():
+        return []
+    try:
+        data = json.loads(str(block).strip())
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in data[:16]:
+        if not isinstance(item, dict):
+            continue
+        u = item.get("user")
+        exp = item.get("expect_substring") or item.get("must_contain")
+        if isinstance(u, str) and isinstance(exp, str) and u.strip() and exp.strip():
+            out.append({"user": u.strip(), "expect_substring": exp.strip()})
     return out
 
 
@@ -130,6 +153,9 @@ def parse_reply(reply: str) -> dict:
     if len(title_clean) > 200:
         title_clean = title_clean[:197] + "…"
 
+    tc_block, _ = _extract_block(raw, TEST_CASES_OPEN, TEST_CASES_CLOSE)
+    test_cases = _parse_test_cases_block(tc_block)
+
     return {
         "reasoning": reasoning,
         "prompt_title": title_clean,
@@ -138,6 +164,7 @@ def parse_reply(reply: str) -> dict:
         "text": after_reasoning,
         "has_prompt": bool(prompt_block and prompt_block.strip()),
         "has_questions": bool(questions_block and questions_block.strip()),
+        "test_cases": test_cases,
     }
 
 

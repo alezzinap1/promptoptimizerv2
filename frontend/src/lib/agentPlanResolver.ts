@@ -1,4 +1,7 @@
 /**
+ * Fallback для студии при сбое POST /agent/process (сеть, таймаут).
+ * Основной путь: resolveStudioFollowUpPlan в agentStudioProcessPlan.ts.
+ *
  * Гибрид: семантический роутер (fastembed на сервере) + rule-based fallback.
  * Явные глаголы правки всегда переводят в iterate.
  */

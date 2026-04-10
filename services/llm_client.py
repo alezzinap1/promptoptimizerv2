@@ -133,6 +133,7 @@ class LLMClient:
         top_p: float | None = None,
         top_k: int | None = None,
         history: list[dict] | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """Single generation call without streaming."""
         model = self._get_model(provider)
@@ -143,6 +144,8 @@ class LLMClient:
         messages.append({"role": "user", "content": user_content})
 
         kwargs = self._build_completion_kwargs(model, messages, temperature, top_p, top_k)
+        if max_tokens is not None and max_tokens > 0:
+            kwargs["max_tokens"] = max_tokens
         response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 

@@ -105,6 +105,67 @@ export interface GenerateRequest {
   skill_preset_id?: string | null
   /** Недавние id техник — для разнообразия автоподбора на сервере */
   recent_technique_ids?: string[]
+  /** Профиль студии: junior | mid | senior | creative — подсказка бэкенду для политики вопросов */
+  expert_level?: string | null
+}
+
+export type SuggestedStudioAction = {
+  id: string
+  title: string
+  emoji?: string
+  action: 'iterate' | 'save_library' | 'eval_prompt' | 'nav_compare'
+  data?: { feedback?: string }
+}
+
+export function normalizeSuggestedStudioActions(raw: unknown): SuggestedStudioAction[] {
+  if (!Array.isArray(raw)) return []
+  const out: SuggestedStudioAction[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const id = typeof r.id === 'string' ? r.id : ''
+    const title = typeof r.title === 'string' ? r.title : ''
+    const action = r.action
+    if (
+      !id ||
+      !title ||
+      (action !== 'iterate' &&
+        action !== 'save_library' &&
+        action !== 'eval_prompt' &&
+        action !== 'nav_compare')
+    ) {
+      continue
+    }
+    const emoji = typeof r.emoji === 'string' ? r.emoji : undefined
+    let data: { feedback?: string } | undefined
+    if (r.data && typeof r.data === 'object') {
+      const d = r.data as Record<string, unknown>
+      if (typeof d.feedback === 'string') data = { feedback: d.feedback }
+    }
+    out.push({ id, title, emoji, action, data })
+  }
+  return out
+}
+
+export type AgentProcessChatTurn = { role: 'user' | 'assistant'; content: string }
+
+export interface AgentProcessRequest {
+  text: string
+  session_id?: string | null
+  has_prompt?: boolean
+  prompt_type?: string
+  current_prompt?: string
+  /** Последние реплики чата студии; без персистентности на сервере (P0). */
+  chat_history?: AgentProcessChatTurn[]
+}
+
+export interface AgentProcessResponse {
+  action: string
+  data: Record<string, unknown>
+  reasoning: string
+  classification?: Record<string, unknown>
+  features?: Record<string, boolean>
+  suggested_actions?: SuggestedStudioAction[]
 }
 
 export interface ImagePresetOption {
@@ -184,6 +245,11 @@ export interface GenerateResult {
   debug_issues?: PromptIdeIssue[]
   intent_graph?: PromptIdeNode[]
   workspace?: Workspace
+  suggested_actions?: SuggestedStudioAction[]
+  /** Режим студии text | image | skill — с сервера для UI (тесты скилла и т.д.). */
+  prompt_type?: string
+  /** Сгенерированные проверки для режима skill ([TEST_CASES] в ответе модели). */
+  test_cases?: { user: string; expect_substring: string }[]
 }
 
 export interface GenerateEstimateResponse {
@@ -196,6 +262,24 @@ export interface GenerateEstimateResponse {
     token_method?: string
   }
   context_gap: number
+}
+
+export interface PreviewEditRequest {
+  task_input: string
+  current_prompt: string
+  instruction: string
+  prompt_type?: string
+  gen_model?: string
+}
+
+export interface PreviewEditResponse {
+  new_prompt: string
+  reasoning?: string
+}
+
+export interface ApplySessionPromptRequest {
+  final_prompt: string
+  copy_metadata_from_version?: number
 }
 
 export interface PromptIdePreviewResponse {
@@ -351,6 +435,41 @@ export class ApiError extends Error {
 }
 
 /** Разбирает тело ошибки FastAPI (`{"detail": ...}`) и отдаёт строку для UI */
+export type GenerateStreamEvent =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; result: GenerateResult }
+  | { type: 'error'; message: string }
+
+/** Разбор SSE `data: {...}` из POST /generate/stream (тестируемо отдельно от fetch). */
+export async function parseGenerateSseLines(
+  body: ReadableStream<Uint8Array> | null,
+  onEvent: (e: GenerateStreamEvent) => void,
+): Promise<void> {
+  if (!body) return
+  const reader = body.getReader()
+  const dec = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    const parts = buf.split('\n\n')
+    buf = parts.pop() || ''
+    for (const block of parts) {
+      const line = block.trim()
+      if (!line.startsWith('data:')) continue
+      const jsonStr = line.slice(5).trim()
+      if (!jsonStr) continue
+      try {
+        const j = JSON.parse(jsonStr) as GenerateStreamEvent
+        onEvent(j)
+      } catch {
+        /* ignore malformed line */
+      }
+    }
+  }
+}
+
 function parseApiErrorBody(text: string, status: number): string {
   const t = text.trim()
   if (!t) {
@@ -462,6 +581,29 @@ export const api = {
 
   generate: (req: GenerateRequest) =>
     fetchApi<GenerateResult>('/generate', { method: 'POST', body: JSON.stringify(req) }),
+  generateStream: async (
+    req: GenerateRequest,
+    onEvent: (e: GenerateStreamEvent) => void,
+    init?: RequestInit,
+  ) => {
+    const headers = new Headers(init?.headers)
+    headers.set('Content-Type', 'application/json')
+    const sessionId = getAuthSessionId()
+    if (sessionId) headers.set('X-Session-Id', sessionId)
+    const res = await fetch(`${API_BASE}/generate/stream`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+      headers,
+      ...init,
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new ApiError(parseApiErrorBody(text, res.status), res.status)
+    }
+    await parseGenerateSseLines(res.body, onEvent)
+  },
+  previewPromptEdit: (req: PreviewEditRequest) =>
+    fetchApi<PreviewEditResponse>('/generate/preview-edit', { method: 'POST', body: JSON.stringify(req) }),
   estimateGenerate: (req: GenerateRequest) =>
     fetchApi<GenerateEstimateResponse>('/generate/estimate', { method: 'POST', body: JSON.stringify(req) }),
   getImageOptions: () => fetchApi<ImageMetaResponse>('/meta/image-options'),
@@ -488,14 +630,12 @@ export const api = {
       rejected_reason?: string
     }>('/agent/semantic-route', { method: 'POST', body: JSON.stringify(req) }),
 
-  agentProcess: (req: { text: string; session_id?: string | null; has_prompt?: boolean; prompt_type?: string; current_prompt?: string }) =>
-    fetchApi<{
-      action: string
-      data: Record<string, unknown>
-      reasoning: string
-      classification?: Record<string, unknown>
-      features?: Record<string, boolean>
-    }>('/agent/process', { method: 'POST', body: JSON.stringify(req) }),
+  agentProcess: (req: AgentProcessRequest, init?: RequestInit) =>
+    fetchApi<AgentProcessResponse>('/agent/process', {
+      method: 'POST',
+      body: JSON.stringify(req),
+      ...init,
+    }),
 
   getDomains: () => fetchApi<{ domains: { id: string; name: string }[] }>('/domains'),
 
@@ -553,6 +693,11 @@ export const api = {
 
   getSessionVersions: (sessionId: string) =>
     fetchApi<{ items: Record<string, unknown>[] }>(`/sessions/${sessionId}/versions`),
+  applySessionPrompt: (sessionId: string, body: ApplySessionPromptRequest) =>
+    fetchApi<{ ok: boolean; item: Record<string, unknown> | null }>(
+      `/sessions/${encodeURIComponent(sessionId)}/apply-prompt`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   getSessionPromptSpec: (sessionId: string) =>
     fetchApi<{ item: Record<string, unknown> | null }>(`/sessions/${sessionId}/prompt-spec`),
 
@@ -631,6 +776,12 @@ export const api = {
   },
 
   // Skills
+  skillSandboxChat: (req: { skill_body: string; user_message: string; gen_model?: string }) =>
+    fetchApi<{ reply: string; gen_model: string }>('/skills/sandbox/chat', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+
   getSkills: () => fetchApi<{ items: SkillRecord[] }>('/skills'),
   createSkill: (req: { name: string; body: string; description?: string; category?: string }) =>
     fetchApi<{ id: number }>('/skills', { method: 'POST', body: JSON.stringify(req) }),
