@@ -1,0 +1,13 @@
+
+--- SKILL PROMPT MODE ---
+The user wants a reusable skill/instruction block for AI assistants (injectable system-style skill),
+not a one-off chat reply.
+
+In [PROMPT], produce a **complete, copy-paste ready** skill. Prefer clear Markdown with sections such as:
+**ROLE** (who the assistant acts as), **SCOPE** (in/out of scope), **RULES** (hard constraints),
+**PROCEDURE** (ordered steps), **TOOLS / MCP** (if relevant — what may be invoked or forbidden),
+**MEMORY** (what to retain or ignore across turns), **OUTPUT FORMAT** (expected structure),
+**EDGE CASES** (fallbacks). Adapt or rename sections if the user named a framework (Cursor rules, Claude skill, etc.).
+
+Use bullet lists where helpful. The skill should be self-contained and not reference this chat.
+--- END SKILL PROMPT MODE ---

@@ -41,11 +41,23 @@ from services.prompt_workflow import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
+def _split_image_questions_rules(raw: str) -> tuple[str, str]:
+    m_a = "<<<IMAGE_QUESTIONS_APPEND>>>"
+    m_s = "<<<IMAGE_QUESTIONS_STRICT>>>"
+    if m_a not in raw or m_s not in raw:
+        raise RuntimeError("backend/image_questions_rules.txt must contain APPEND and STRICT markers")
+    _, after_a = raw.split(m_a, 1)
+    append_part, strict_part = after_a.split(m_s, 1)
+    return append_part.strip(), strict_part.strip()
+
+
 IMAGE_PROMPT_MODE_BLOCK = load_prompt("backend/image_prompt_mode.txt")
-IMAGE_QUESTIONS_APPEND = load_prompt("backend/image_questions_append.txt")
-IMAGE_QUESTIONS_STRICT = load_prompt("backend/image_questions_strict.txt")
+_IMAGE_QUESTIONS_RULES_RAW = load_prompt("backend/image_questions_rules.txt")
+IMAGE_QUESTIONS_APPEND, IMAGE_QUESTIONS_STRICT = _split_image_questions_rules(_IMAGE_QUESTIONS_RULES_RAW)
 TEXT_QUESTIONS_STRICT = load_prompt("backend/text_questions_strict.txt")
 SKILL_QUESTIONS_STRICT = load_prompt("backend/skill_questions_strict.txt")
+SKILL_PROMPT_MODE_BLOCK = load_prompt("backend/skill_prompt_mode.txt")
 QUESTIONS_CONTRACT_TEMPLATE = load_prompt("backend/questions_contract_system.txt")
 ITERATION_GUARD_BLOCK = load_prompt("backend/iteration_guard.txt")
 
@@ -136,6 +148,30 @@ def _scene_analysis_provider(using_host_key: bool) -> str:
     if not using_host_key:
         return "claude_haiku"
     return base
+
+
+def _classification_from_saved_version(latest: dict, task_input: str) -> dict:
+    """Восстановить классификацию с последней сохранённой версии сессии (итерация)."""
+    tt = latest.get("task_types") or []
+    if not isinstance(tt, list):
+        tt = []
+    if not tt:
+        tt = ["general"]
+    cx = str(latest.get("complexity") or "medium").lower()
+    if cx not in ("low", "medium", "high"):
+        cx = "medium"
+    wc = len(task_input.split())
+    has_code = bool(
+        re.search(r"```|def |class |import |function |SELECT |INSERT ", task_input)
+    )
+    return {
+        "task_types": tt,
+        "complexity": cx,
+        "word_count": wc,
+        "has_code": has_code,
+        "classification_source": "session_cache",
+        "classifier_confidence": 1.0,
+    }
 
 
 class GenerateRequest(BaseModel):
@@ -363,16 +399,7 @@ def _estimate_generation_input(
         if _is_primary_generation_with_unanswered_questions(req):
             system_prompt += IMAGE_QUESTIONS_STRICT
     elif req.prompt_type == "skill":
-        system_prompt += (
-            "\n\n--- SKILL PROMPT MODE ---\n"
-            "The user wants a reusable skill/instruction block for AI assistants (injectable system-style skill), "
-            "not a one-off chat reply.\n"
-            "In [PROMPT], produce a complete skill definition: role, scope, rules, procedure, output format, "
-            "edge cases. Use clear headings and bullet lists where helpful. "
-            "If the user asked for a specific framework (e.g. Cursor, Claude), adapt section titles accordingly.\n"
-            "The skill should be copy-paste ready and self-contained.\n"
-            "--- END SKILL PROMPT MODE ---"
-        )
+        system_prompt += SKILL_PROMPT_MODE_BLOCK
         sp_hint = _resolve_skill_preset_hint(req.skill_preset_id, user_id, db)
         if sp_hint:
             system_prompt += (
@@ -503,25 +530,40 @@ def generate_prompt(
     prefs_row = db.get_user_preferences(user_id)
     cls_mode = str(prefs_row.get("task_classification_mode") or "heuristic").lower()
     cls_model_pref = str(prefs_row.get("task_classifier_model") or "").strip()
-    if cls_mode == "llm":
-        cls_provider = cls_model_pref or PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
-        if using_host_key:
-            cmid = _get_openrouter_model_id(cls_provider)
-            if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
-                cls_provider = PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
-        classification = classify_task_with_llm(llm, cls_provider, req.task_input)
-        if using_host_key:
-            c_raw = len(req.task_input) + 400
-            model_id = _get_openrouter_model_id(cls_provider)
-            pr, cp = get_model_pricing(model_id)
-            db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
-    else:
-        hc = classify_task(req.task_input)
-        classification = {
-            **hc,
-            "classification_source": "heuristic",
-            "classifier_confidence": heuristic_classification_confidence(hc, req.task_input),
-        }
+
+    classification = None
+    want_pt = req.prompt_type or "text"
+    if (
+        cls_mode == "llm"
+        and req.previous_prompt
+        and str(req.previous_prompt).strip()
+    ):
+        latest_v = db.get_latest_version(session_id, user_id=user_id)
+        if latest_v:
+            saved_pt = (latest_v.get("metrics") or {}).get("studio_prompt_type")
+            if saved_pt == want_pt:
+                classification = _classification_from_saved_version(latest_v, req.task_input)
+
+    if classification is None:
+        if cls_mode == "llm":
+            cls_provider = cls_model_pref or PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
+            if using_host_key:
+                cmid = _get_openrouter_model_id(cls_provider)
+                if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
+                    cls_provider = PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
+            classification = classify_task_with_llm(llm, cls_provider, req.task_input)
+            if using_host_key:
+                c_raw = len(req.task_input) + 400
+                model_id = _get_openrouter_model_id(cls_provider)
+                pr, cp = get_model_pricing(model_id)
+                db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
+        else:
+            hc = classify_task(req.task_input)
+            classification = {
+                **hc,
+                "classification_source": "heuristic",
+                "classifier_confidence": heuristic_classification_confidence(hc, req.task_input),
+            }
 
     db.log_event(
         event_name="generate_requested",
@@ -609,6 +651,7 @@ def generate_prompt(
     if req.prompt_type == "image":
         image_preset_dict = _resolve_image_preset_dict(req.image_preset_id, user_id, db)
 
+    scene_analysis_applied = False
     if req.prompt_type == "image" and req.image_deep_mode:
         scene_user = _scene_analysis_user_text(req.task_input, clarification_answers_text, req.feedback)
         spa = _scene_analysis_provider(using_host_key)
@@ -632,6 +675,7 @@ def generate_prompt(
                 logger.warning("scene analysis failed with provider %s, trying next", sp_try, exc_info=True)
                 continue
         if scene_obj:
+            scene_analysis_applied = True
             combined_input += (
                 "\n\n--- STRUCTURED SCENE BRIEF (analyser output; treat as facts, expand into a rich image prompt) ---\n"
                 + json.dumps(scene_obj, ensure_ascii=False, indent=2)
@@ -667,16 +711,7 @@ def generate_prompt(
         if _is_primary_generation_with_unanswered_questions(req):
             system_prompt += IMAGE_QUESTIONS_STRICT
     elif req.prompt_type == "skill":
-        system_prompt += (
-            "\n\n--- SKILL PROMPT MODE ---\n"
-            "The user wants a reusable skill/instruction block for AI assistants (injectable system-style skill), "
-            "not a one-off chat reply.\n"
-            "In [PROMPT], produce a complete skill definition: role, scope, rules, procedure, output format, "
-            "edge cases. Use clear headings and bullet lists where helpful. "
-            "If the user asked for a specific framework (e.g. Cursor, Claude), adapt section titles accordingly.\n"
-            "The skill should be copy-paste ready and self-contained.\n"
-            "--- END SKILL PROMPT MODE ---"
-        )
+        system_prompt += SKILL_PROMPT_MODE_BLOCK
         sp_hint = _resolve_skill_preset_hint(req.skill_preset_id, user_id, db)
         if sp_hint:
             system_prompt += (
@@ -775,6 +810,14 @@ def generate_prompt(
         generation_issue = "questions_unparsed"
     elif gen_flags["weak_question_options"]:
         generation_issue = "weak_question_options"
+    if (
+        req.previous_prompt
+        and str(req.previous_prompt).strip()
+        and parsed.get("has_questions")
+        and not parsed.get("has_prompt")
+        and not generation_issue
+    ):
+        generation_issue = "iteration_with_questions"
     metrics = (
         analyze_prompt(
             parsed.get("prompt_block", ""),
@@ -811,11 +854,14 @@ def generate_prompt(
             "latency_ms": latency_ms,
             "technique_ids": technique_ids,
             "completeness_score": metrics.get("completeness_score", 0.0),
+            "questions_contract_used": bool(questions_enforced),
+            "scene_analysis_applied": scene_analysis_applied,
         },
         user_id=int(user["id"]),
     )
 
     if parsed.get("has_prompt"):
+        metrics_to_save = {**metrics, "studio_prompt_type": req.prompt_type or "text"}
         db.save_prompt_version(
             session_id=session_id,
             task_input=req.task_input,
@@ -826,7 +872,7 @@ def generate_prompt(
             techniques_used=technique_ids,
             reasoning=parsed.get("reasoning", ""),
             final_prompt=parsed["prompt_block"],
-            metrics=metrics,
+            metrics=metrics_to_save,
             user_id=int(user["id"]),
         )
         db.log_event(
@@ -894,4 +940,6 @@ def generate_prompt(
         "intent_graph": intent_graph,
         "workspace": normalize_workspace(workspace),
         "session_id": session_id,
+        "scene_analysis_applied": scene_analysis_applied,
+        "questions_contract_used": bool(questions_enforced),
     }

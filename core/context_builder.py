@@ -7,6 +7,7 @@ from __future__ import annotations
 from prompts import load_prompt
 
 from .domain_templates import get_domain_checklist
+from .shared_prompt_blocks import SHARED_EDITOR_RULES_BLOCK
 from .target_model_cards import get_target_model_guidance_block
 from .technique_registry import TechniqueRegistry
 
@@ -56,7 +57,7 @@ class ContextBuilder:
         questions_mode: bool = False,
         prompt_type: str = "text",
     ) -> str:
-        parts = [BASE_SYSTEM_PROMPT]
+        parts = [BASE_SYSTEM_PROMPT, SHARED_EDITOR_RULES_BLOCK]
 
         guidance = get_target_model_guidance_block(target_model)
         if guidance:

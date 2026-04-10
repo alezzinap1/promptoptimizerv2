@@ -53,6 +53,29 @@ def _extract_block(text: str, open_tag: str, close_tag: str) -> tuple[str, str]:
     return content, (before.strip() + "\n" + after.strip()).strip()
 
 
+def _prompt_has_closing_tag_in_raw(raw: str) -> bool:
+    """True если после первого [PROMPT] в ответе есть [/PROMPT] (парный закрывающий тег)."""
+    if PROMPT_OPEN not in raw:
+        return False
+    idx = raw.find(PROMPT_OPEN) + len(PROMPT_OPEN)
+    return PROMPT_CLOSE in raw[idx:]
+
+
+def _trim_misplaced_closes_in_prompt_block(prompt_block: str) -> str:
+    """
+    Убирает из текста промпта ошибочные границы других блоков (модель закрыла [PROMPT] как [/REASONING]).
+    """
+    if not prompt_block:
+        return prompt_block
+    pb = prompt_block
+    pb = _trim_before_line_start_marker(pb, REASONING_OPEN)
+    pb = _trim_before_line_start_marker(pb, REASONING_CLOSE)
+    t = pb.rstrip()
+    if t.endswith(REASONING_CLOSE):
+        pb = t[: -len(REASONING_CLOSE)].rstrip()
+    return pb
+
+
 def _trim_before_line_start_marker(content: str, marker: str) -> str:
     """
     Отрезает хвост от первого вхождения marker, которое начинается с новой строки
@@ -94,6 +117,14 @@ def parse_reply(reply: str) -> dict:
     # Без [/PROMPT] весь хвост часто включает [QUESTIONS]… — оставляем только текст промпта.
     if prompt_block and prompt_block.strip():
         prompt_block = _trim_before_line_start_marker(prompt_block, QUESTIONS_OPEN)
+
+    if prompt_block and prompt_block.strip():
+        pb_before_misplace = prompt_block
+        prompt_block = _trim_misplaced_closes_in_prompt_block(prompt_block)
+        # Незакрытый [PROMPT], но в хвосте ошибочно оказался [/REASONING] — это не готовый промпт.
+        if PROMPT_OPEN in raw and not _prompt_has_closing_tag_in_raw(raw):
+            if REASONING_CLOSE in pb_before_misplace:
+                prompt_block = ""
 
     title_clean = (title_block or "").strip().replace("\n", " ")
     if len(title_clean) > 200:

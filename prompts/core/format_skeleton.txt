@@ -2,4 +2,5 @@
 [REASONING]Задача: … Техники: … Целевая модель: …[/REASONING]
 [TITLE]Краткое название для библиотеки[/TITLE]
 [PROMPT]…готовый промпт…[/PROMPT]
-Первый символ ответа — «[». После [/REASONING] опционально [TITLE], затем [QUESTIONS] или [PROMPT].
+Начни ответ с `[REASONING]`; не добавляй преамбул до него. После [/REASONING] опционально [TITLE], затем [QUESTIONS] или [PROMPT].
+Блок [PROMPT] закрывай только парой `[/PROMPT]` — не `[/REASONING]` и не другие теги.

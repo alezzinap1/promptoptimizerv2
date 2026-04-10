@@ -1654,6 +1654,33 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   max-width: 180px;
 }
 
+.advancedSkillBodyBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.advancedSkillBodyLabel {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.advancedSkillBodyHint {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.88;
+  line-height: 1.35;
+}
+
+.advancedSkillBodyTextarea {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+
 .settingsPanel {
   margin-bottom: 14px;
   padding: 12px;

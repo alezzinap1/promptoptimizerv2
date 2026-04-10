@@ -34,6 +34,8 @@ export type AgentStudioSnapshot = {
   imageEngine: string
   imageDeepMode: boolean
   skillPresetId: string
+  /** Текст активного скилла — уходит в API как skill_body (контекст для генерации промпта). */
+  skillBody: string
 }
 
 const WELCOME_TEXT =
@@ -68,5 +70,6 @@ export function createEmptyStudioSnapshot(mode: PromptStudioMode): AgentStudioSn
     imageEngine: 'auto',
     imageDeepMode: false,
     skillPresetId: '',
+    skillBody: '',
   }
 }

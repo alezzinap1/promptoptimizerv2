@@ -192,6 +192,20 @@ P
         self.assertTrue(parsed["has_prompt"])
         self.assertIn("[QUESTIONS]", parsed["prompt_block"])
 
+    def test_parse_reply_rejects_unclosed_prompt_closed_with_reasoning_tag(self) -> None:
+        """Модель открыла [PROMPT] и закрыла [/REASONING] — не считаем это готовым промптом."""
+        reply = """
+[REASONING]
+Кратко.
+[/REASONING]
+
+[PROMPT]: Role Prompting, CoT. Техники.[/REASONING]
+""".strip()
+        parsed = parse_reply(reply)
+        self.assertFalse(parsed["has_prompt"])
+        self.assertEqual(parsed["prompt_block"].strip(), "")
+        self.assertTrue(diagnose_generation_response(parsed, [])["format_failure"])
+
 
 if __name__ == "__main__":
     unittest.main()

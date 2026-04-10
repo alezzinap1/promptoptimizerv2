@@ -60,6 +60,7 @@ function v1ToSnapshot(d: AgentDraftV1): AgentStudioSnapshot {
     imageEngine: d.imageEngine ?? 'auto',
     imageDeepMode: d.imageDeepMode ?? false,
     skillPresetId: d.skillPresetId ?? '',
+    skillBody: '',
   }
 }
 
@@ -69,6 +70,12 @@ export function loadAgentDraftV2(): AgentDraftV2 | null {
     if (raw) {
       const o = JSON.parse(raw) as AgentDraftV2
       if (o?.v === 2 && o.modes?.text && o.modes?.image && o.modes?.skill) {
+        for (const m of ['text', 'image', 'skill'] as const) {
+          const snap = o.modes[m]
+          if (snap && typeof snap.skillBody !== 'string') {
+            snap.skillBody = ''
+          }
+        }
         return o
       }
     }

@@ -282,6 +282,7 @@ export default function Home() {
     typeof window !== 'undefined' ? loadImageStyleFavoriteIds() : new Set(),
   )
   const [skillPresetId, setSkillPresetId] = useState('')
+  const [skillBody, setSkillBody] = useState('')
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
   const [quickSaved, setQuickSaved] = useState(false)
@@ -316,6 +317,7 @@ export default function Home() {
     setImageEngine(s.imageEngine)
     setImageDeepMode(s.imageDeepMode)
     setSkillPresetId(s.skillPresetId)
+    setSkillBody(typeof s.skillBody === 'string' ? s.skillBody : '')
     const pendingClar = [...s.chatMessages]
       .reverse()
       .find(
@@ -344,6 +346,7 @@ export default function Home() {
       imageEngine,
       imageDeepMode,
       skillPresetId,
+      skillBody,
     }
   }, [
     promptType,
@@ -362,6 +365,7 @@ export default function Home() {
     imageEngine,
     imageDeepMode,
     skillPresetId,
+    skillBody,
   ])
 
   const handlePromptTypeChange = useCallback(
@@ -407,6 +411,8 @@ export default function Home() {
       'Блок вопросов в ответе есть, но список не разобрался. Ниже можно открыть полный текст ответа или повторить генерацию.',
     weak_question_options:
       'Вопросы распознаны, но почти без вариантов ответа (остались заглушки). Имеет смысл повторить генерацию или заполнить поле «Свой ответ».',
+    iteration_with_questions:
+      'При доработке промпта модель вернула блок вопросов вместо обновлённого [PROMPT]. Повторите генерацию или сформулируйте правку конкретнее.',
   }
 
   useEffect(() => {
@@ -743,6 +749,7 @@ export default function Home() {
     questionAnswers?: { question: string; answers: string[] }[],
     opts?: GenerateOptions,
   ) => {
+    if (loading) return
     const requestPromptType = promptType
     const effectiveTask = (opts?.taskInputOverride ?? taskInput).trim()
     if (!effectiveTask) return
@@ -782,6 +789,7 @@ export default function Home() {
         image_engine: promptType === 'image' ? 'auto' : undefined,
         image_deep_mode: promptType === 'image' ? imageDeepMode : undefined,
         skill_preset_id: promptType === 'skill' && skillPresetId ? skillPresetId : undefined,
+        skill_body: skillBody.trim() || undefined,
         recent_technique_ids: loadRecentTechniqueIds(),
       }
       const res = normalizeClientGenerateResult(await api.generate(req))
@@ -799,6 +807,7 @@ export default function Home() {
             questionState: {},
             questionCarouselIdx: 0,
             quickSaved: false,
+            skillBody,
           }
         } else {
           let prevMsgs = (snap.chatMessages || []) as GenChatMsg[]
@@ -823,6 +832,7 @@ export default function Home() {
             questionState: {},
             questionCarouselIdx: 0,
             quickSaved: false,
+            skillBody,
           }
         }
         saveAgentDraftV2({
@@ -875,6 +885,7 @@ export default function Home() {
               imageEngine,
               imageDeepMode,
               skillPresetId,
+              skillBody,
             }
             saveAgentDraftV2({
               activePromptType: promptType,
@@ -1107,6 +1118,7 @@ export default function Home() {
     imageEngine,
     imageDeepMode,
     skillPresetId,
+    skillBody,
   ])
 
   const handleSaveToLibrary = async () => {
@@ -1434,6 +1446,11 @@ export default function Home() {
                   {promptCostStr ? (
                     <span className={styles.evalMetaSecondary} title={PROMPT_COST_TITLE}>
                       {promptCostStr}
+                    </span>
+                  ) : null}
+                  {result.scene_analysis_applied ? (
+                    <span className={styles.evalMeta} title="К промпту подмешан структурированный бриф сцены (глубокий режим)">
+                      Deep · сцена
                     </span>
                   ) : null}
                 </div>
@@ -2188,6 +2205,21 @@ export default function Home() {
                         <span>Вопросы</span>
                       </label>
                     </div>
+                    <label className={styles.advancedSkillBodyBlock}>
+                      <span className={styles.advancedSkillBodyLabel}>Контекст скилла (опционально)</span>
+                      <span className={styles.advancedSkillBodyHint}>
+                        Уходит в запрос как skill_body — контекст для генерации промпта.
+                      </span>
+                      <AutoTextarea
+                        className={styles.advancedSkillBodyTextarea}
+                        value={skillBody}
+                        onChange={(e) => setSkillBody(e.target.value)}
+                        placeholder="Текст скилла или инструкции…"
+                        minHeightPx={44}
+                        maxHeightPx={140}
+                        spellCheck
+                      />
+                    </label>
                   </div>
                 )}
               </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, type OpenRouterModel } from '../api/client'
 import {
   SIMPLE_PRESET_IDS,
   SIMPLE_PRESET_LABELS,
@@ -25,18 +25,28 @@ export default function SimpleImprove() {
   const [promptText, setPromptText] = useState('')
   const [preset, setPreset] = useState<SimplePresetId>('balanced')
   const [genModel, setGenModel] = useState('')
+  const [targetModel, setTargetModel] = useState('unknown')
   const [models, setModels] = useState<string[]>([])
+  const [preferredTargets, setPreferredTargets] = useState<string[]>(['unknown'])
+  const [modelLabels, setModelLabels] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [result, setResult] = useState('')
   const [metaHint, setMetaHint] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    api
-      .getSettings()
-      .then((s) => {
+    Promise.all([api.getSettings(), api.getModels()])
+      .then(([s, modelsRes]) => {
         const list = s.preferred_generation_models || []
         setModels(list)
         setGenModel((prev) => prev || list[0] || '')
+        const labels = modelsRes.data.reduce<Record<string, string>>((acc, item: OpenRouterModel) => {
+          acc[item.id] = item.name || item.id
+          return acc
+        }, { unknown: 'Неизвестно / Любая модель' })
+        setModelLabels(labels)
+        const targets = s.preferred_target_models?.length ? s.preferred_target_models : ['unknown']
+        setPreferredTargets(targets)
+        setTargetModel((prev) => (targets.includes(prev) ? prev : targets[0]))
         const p = s.simple_improve_preset as SimplePresetId
         if (SIMPLE_PRESET_IDS.includes(p)) setPreset(p)
         if (s.simple_improve_meta?.trim()) setMetaHint('В настройках задан дополнительный мета-промпт — он учитывается автоматически.')
@@ -48,6 +58,16 @@ export default function SimpleImprove() {
   const modelOptions = useMemo(
     () => models.map((m) => ({ value: m, label: shortGenerationModelLabel(m), title: m })),
     [models],
+  )
+
+  const targetOptions = useMemo(
+    () =>
+      preferredTargets.map((id) => ({
+        value: id,
+        label: modelLabels[id] || shortGenerationModelLabel(id),
+        title: id,
+      })),
+    [preferredTargets, modelLabels],
   )
 
   const run = async () => {
@@ -64,6 +84,7 @@ export default function SimpleImprove() {
         prompt_text: t,
         preset,
         gen_model: genModel.trim() || undefined,
+        target_model: targetModel.trim() || undefined,
       })
       if (!res.improved_text?.trim()) {
         setError('Модель вернула пустой ответ. Попробуйте ещё раз или смените модель.')
@@ -113,7 +134,7 @@ export default function SimpleImprove() {
             <div className={cb.composerFooter}>
               <div className={cb.composerFooterRow}>
                 <div className={cb.composerFooterStart}>
-                  <span className={cb.metaMuted}>Пресет и модель</span>
+                  <span className={cb.metaMuted}>Пресет, генерация, целевая</span>
                 </div>
                 <div className={cb.composerFooterMid}>
                   <SelectDropdown
@@ -127,9 +148,17 @@ export default function SimpleImprove() {
                     value={genModel}
                     options={modelOptions}
                     onChange={setGenModel}
-                    aria-label="Модель"
+                    aria-label="Модель генерации"
                     variant="composer"
                     footerLink={{ to: '/models', label: 'Добавить модель' }}
+                  />
+                  <SelectDropdown
+                    value={targetModel}
+                    options={targetOptions}
+                    onChange={setTargetModel}
+                    aria-label="Целевая модель промпта"
+                    variant="composer"
+                    footerLink={{ to: '/settings', label: 'Настроить список' }}
                   />
                 </div>
                 <div className={cb.composerFooterEnd}>

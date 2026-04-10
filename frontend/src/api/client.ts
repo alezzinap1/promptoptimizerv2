@@ -138,6 +138,7 @@ export type GenerationIssue =
   | 'format_failure'
   | 'questions_unparsed'
   | 'weak_question_options'
+  | 'iteration_with_questions'
 
 export interface GenerateResult {
   prompt_block: string
@@ -161,6 +162,10 @@ export interface GenerateResult {
   context_gap?: number
   questions_policy?: { mode: string; max_questions: number }
   questions_enforced?: boolean
+  /** Второй проход questions_contract (серверный) */
+  questions_contract_used?: boolean
+  /** Успешный vision-бриф при глубоком режиме изображения */
+  scene_analysis_applied?: boolean
   task_types: string[]
   complexity: string
   task_input?: string
@@ -224,6 +229,7 @@ export interface SimpleImproveResponse {
   improved_text: string
   preset_used: string
   gen_model: string
+  target_model: string
 }
 
 export interface CompareVariant {
@@ -434,7 +440,12 @@ export const api = {
   }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
 
-  simpleImprove: (req: { prompt_text: string; gen_model?: string; preset?: string }) =>
+  simpleImprove: (req: {
+    prompt_text: string
+    gen_model?: string
+    preset?: string
+    target_model?: string
+  }) =>
     fetchApi<SimpleImproveResponse>('/simple-improve', { method: 'POST', body: JSON.stringify(req) }),
 
   previewPromptIde: (req: {

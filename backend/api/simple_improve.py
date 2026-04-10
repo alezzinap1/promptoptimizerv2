@@ -34,12 +34,14 @@ class SimpleImproveRequest(BaseModel):
     prompt_text: str
     gen_model: str | None = None
     preset: str | None = None
+    target_model: str | None = None
 
 
 class SimpleImproveResponse(BaseModel):
     improved_text: str
     preset_used: str
     gen_model: str
+    target_model: str = "unknown"
 
 
 @router.post("/simple-improve", response_model=SimpleImproveResponse)
@@ -92,14 +94,21 @@ def simple_improve(
     preset_src = req.preset if req.preset is not None else prefs_row.get("simple_improve_preset")
     preset_used = normalize_preset(str(preset_src) if preset_src is not None else None)
     custom_meta = str(prefs_row.get("simple_improve_meta") or "")
-    system_prompt = build_simple_improve_system_prompt(preset_used, custom_meta)
+    targets_pref = payload.get("preferred_target_models") or []
+    tm = (req.target_model or "").strip()
+    if not tm and targets_pref:
+        tm = str(targets_pref[0]).strip()
+    target_model_resolved = tm or "unknown"
+    system_prompt = build_simple_improve_system_prompt(
+        preset_used, custom_meta, target_model_resolved
+    )
     user_message = build_simple_improve_user_message(text)
 
     llm = LLMClient(api_key)
     db.log_event(
         "simple_improve_requested",
         session_id=auth_session_id or "",
-        payload={"preset": preset_used, "gen_model": gen_model},
+        payload={"preset": preset_used, "gen_model": gen_model, "target_model": target_model_resolved},
         user_id=user_id,
     )
     started = time.perf_counter()
@@ -128,6 +137,7 @@ def simple_improve(
         payload={
             "preset": preset_used,
             "gen_model": gen_model,
+            "target_model": target_model_resolved,
             "latency_ms": latency_ms,
             "output_chars": len(improved),
         },
@@ -138,4 +148,5 @@ def simple_improve(
         improved_text=improved,
         preset_used=preset_used,
         gen_model=gen_model,
+        target_model=target_model_resolved,
     )
