@@ -1496,6 +1496,30 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   grid-column: span 4;
 }
 
+.resultColumnSkill {
+  border-color: color-mix(in srgb, var(--stroke) 50%, var(--primary) 50%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.resultColumnHeader {
+  margin-bottom: 0.35rem;
+}
+
+.resultColumnSub {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--muted);
+  max-width: 42rem;
+}
+
+.saveSkillHint {
+  margin: 0 0 0.75rem;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .panel,
 .resultSection,
 .metricsBox,

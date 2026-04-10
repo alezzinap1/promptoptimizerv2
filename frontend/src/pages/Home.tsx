@@ -44,6 +44,7 @@ import {
 import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
 import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
 import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
+import { appendLocalSkill } from '../lib/localSkillsStore'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import { buildPromptDoneCard } from '../lib/studioPromptDoneCard'
 import type { PromptDoneCard } from '../lib/studioPromptDoneCard'
@@ -1121,10 +1122,34 @@ export default function Home() {
     skillBody,
   ])
 
+  const mergeStudioSkillTags = (raw: string): string[] => {
+    const tags = raw.split(',').map((t) => t.trim()).filter(Boolean)
+    const lower = new Set(tags.map((t) => t.toLowerCase()))
+    if (!lower.has('скилл') && !lower.has('skill') && !lower.has('студия')) {
+      tags.push('студия')
+    }
+    return tags
+  }
+
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
     const fb = (baseTaskRef || taskInput).trim()
     const title = saveTitle.trim() || pickPromptTitle(result, fb)
+    if (promptType === 'skill') {
+      appendLocalSkill({
+        title,
+        body: result.prompt_block,
+        description: saveNotes.trim() || fb.slice(0, 500),
+        tags: mergeStudioSkillTags(saveTags),
+        frameworks: [],
+      })
+      window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+      setShowSaveDialog(false)
+      setSaveNotes('')
+      setSaveTags('')
+      setQuickSaved(true)
+      return
+    }
     await api.saveToLibrary({
       title,
       prompt: result.prompt_block,
@@ -1145,6 +1170,18 @@ export default function Home() {
     if (!result?.prompt_block) return
     const fb = (baseTaskRef || taskInput).trim()
     const title = pickPromptTitle(result, fb)
+    if (promptType === 'skill') {
+      appendLocalSkill({
+        title,
+        body: result.prompt_block,
+        description: fb.slice(0, 500),
+        tags: mergeStudioSkillTags(saveTags),
+        frameworks: [],
+      })
+      window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+      setQuickSaved(true)
+      return
+    }
     await api.saveToLibrary({
       title,
       prompt: result.prompt_block,
@@ -1379,9 +1416,14 @@ export default function Home() {
 
   const resultSection = (
         <section
-          className={`${styles.panel} ${styles.resultColumn} ${styles.bareColumn} ${styles.agentStackSection}`}
+          className={`${styles.panel} ${styles.resultColumn} ${styles.bareColumn} ${styles.agentStackSection} ${promptType === 'skill' ? styles.resultColumnSkill : ''}`}
         >
-          <h2 className="pageTitleGradient">Результат</h2>
+          <div className={styles.resultColumnHeader}>
+            <h2 className="pageTitleGradient">{promptType === 'skill' ? 'Скилл' : 'Результат'}</h2>
+            {promptType === 'skill' ? (
+              <p className={styles.resultColumnSub}>Текст ниже — тело скилла для ИИ-ассистента (не чат-ответ).</p>
+            ) : null}
+          </div>
           {result?.generation_issue && !issueBannerDismissed && (
             <div className={styles.issueBanner} role="alert">
               <button
@@ -1410,8 +1452,14 @@ export default function Home() {
                   <line x1="8" y1="17" x2="14" y2="17" />
                 </svg>
               </div>
-              <p className={styles.resultPlaceholderTitle}>Промпт появится здесь</p>
-              <p className={styles.resultPlaceholderHint}>Промпт появится здесь после диалога слева.</p>
+              <p className={styles.resultPlaceholderTitle}>
+                {promptType === 'skill' ? 'Текст скилла появится здесь' : 'Промпт появится здесь'}
+              </p>
+              <p className={styles.resultPlaceholderHint}>
+                {promptType === 'skill'
+                  ? 'После генерации сохраните во вкладку «Скиллы» в библиотеке — запись пойдёт туда, а не в список промптов.'
+                  : 'Промпт появится здесь после диалога слева.'}
+              </p>
             </div>
           )}
           {result?.has_prompt && (
@@ -1455,7 +1503,10 @@ export default function Home() {
                   ) : null}
                 </div>
                 <div className={styles.promptToolbar}>
-                  <CopyIconButton text={result.prompt_block} title="Копировать промпт" />
+                  <CopyIconButton
+                    text={result.prompt_block}
+                    title={promptType === 'skill' ? 'Копировать тело скилла' : 'Копировать промпт'}
+                  />
                   <TryInGeminiButton prompt={result.prompt_block} />
                   <button
                     type="button"
@@ -1472,14 +1523,17 @@ export default function Home() {
                     <button
                       type="button"
                       className={styles.quickSaveBtn}
-                      title="Сохранить в библиотеку"
+                      title={promptType === 'skill' ? 'Сохранить в библиотеку скиллов (локально)' : 'Сохранить в библиотеку'}
                       onClick={handleQuickSave}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                     </button>
                   )}
                   {quickSaved && (
-                    <span className={styles.quickSavedMark} title="Сохранено в библиотеку">
+                    <span
+                      className={styles.quickSavedMark}
+                      title={promptType === 'skill' ? 'Сохранено в библиотеку скиллов' : 'Сохранено в библиотеку'}
+                    >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                     </span>
                   )}
@@ -1586,9 +1640,11 @@ export default function Home() {
               )}
               {result?.has_prompt && (
                 <p className={styles.strategicHint} title={COMPLETENESS_SCORE_TITLE}>
-                  {result.metrics?.prompt_analysis_mode === 'image'
-                    ? 'Оценка полноты для изображений: субъект, стиль, композиция, свет/палитра, негатив, техника (эвристика на сервере). Это не оценка художественного качества картинки.'
-                    : 'Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.'}
+                  {promptType === 'skill'
+                    ? 'Оценка полноты для скилла смотрит на структуру инструкции (роль, шаги, формат). Это не оценка «умения» будущего ассистента.'
+                    : result.metrics?.prompt_analysis_mode === 'image'
+                      ? 'Оценка полноты для изображений: субъект, стиль, композиция, свет/палитра, негатив, техника (эвристика на сервере). Это не оценка художественного качества картинки.'
+                      : 'Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.'}
                 </p>
               )}
               <div className={styles.actions}>
@@ -1602,11 +1658,18 @@ export default function Home() {
                       return !prev
                     })
                   }}
-                >В библиотеку</button>
+                >
+                  {promptType === 'skill' ? 'В библиотеку скиллов' : 'В библиотеку'}
+                </button>
               </div>
               {showSaveDialog && (
                 <div className={styles.saveBox}>
-                  <h3>Сохранить в библиотеку</h3>
+                  <h3>{promptType === 'skill' ? 'Сохранить скилл' : 'Сохранить в библиотеку'}</h3>
+                  {promptType === 'skill' ? (
+                    <p className={styles.saveSkillHint}>
+                      Запись попадёт в <strong>Библиотека → Скиллы</strong> (локально в браузере), не в список промптов на сервере.
+                    </p>
+                  ) : null}
                   <label className={styles.saveFieldLabel}>
                     Название в библиотеке
                     <input

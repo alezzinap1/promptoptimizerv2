@@ -5,56 +5,10 @@ import MarkdownOutput from '../../components/MarkdownOutput'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import SelectDropdown from '../../components/SelectDropdown'
+import { loadLocalSkills, saveLocalSkills, type SkillItem } from '../../lib/localSkillsStore'
 import styles from './SkillsPanel.module.css'
 
-const STORAGE_KEY = 'prompt-engineer-skills-v1'
-
-export type SkillItem = {
-  id: string
-  title: string
-  description: string
-  frameworks: string[]
-  /** Произвольные теги для поиска и группировки */
-  tags: string[]
-  body: string
-  createdAt: string
-}
-
-function normalizeSkill(raw: unknown): SkillItem | null {
-  if (!raw || typeof raw !== 'object') return null
-  const o = raw as Record<string, unknown>
-  if (typeof o.id !== 'string' || typeof o.title !== 'string' || typeof o.body !== 'string') return null
-  const frameworks = Array.isArray(o.frameworks) ? o.frameworks.filter((x): x is string => typeof x === 'string') : []
-  const tags = Array.isArray(o.tags) ? o.tags.filter((x): x is string => typeof x === 'string') : []
-  return {
-    id: o.id,
-    title: o.title,
-    description: typeof o.description === 'string' ? o.description : '',
-    frameworks,
-    tags,
-    body: o.body,
-    createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date().toISOString(),
-  }
-}
-
-function loadSkills(): SkillItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const p = JSON.parse(raw)
-    if (!Array.isArray(p)) return []
-    return p
-      .map(normalizeSkill)
-      .filter((x): x is SkillItem => x !== null)
-      .map((it) => ({ ...it, tags: it.tags?.length ? it.tags : [] }))
-  } catch {
-    return []
-  }
-}
-
-function saveSkills(items: SkillItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-}
+export type { SkillItem }
 
 const emptyDraft = {
   title: '',
@@ -118,7 +72,13 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   }, [])
 
   useEffect(() => {
-    setItems(loadSkills())
+    setItems(loadLocalSkills())
+  }, [])
+
+  useEffect(() => {
+    const sync = () => setItems(loadLocalSkills())
+    window.addEventListener('metaprompt-nav-refresh', sync)
+    return () => window.removeEventListener('metaprompt-nav-refresh', sync)
   }, [])
 
   useEffect(() => {
@@ -148,7 +108,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
 
   const persist = (next: SkillItem[]) => {
     setItems(next)
-    saveSkills(next)
+    saveLocalSkills(next)
     window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
   }
 
