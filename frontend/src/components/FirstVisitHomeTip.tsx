@@ -31,6 +31,10 @@ export default function FirstVisitHomeTip() {
     <div className={styles.banner} role="region" aria-label="Краткий обзор режимов">
       <div className={styles.inner}>
         <p className={styles.title}>Студия — главный режим</p>
+        <p className={styles.lead}>
+          MetaPrompt собирает из вашей задачи структурированный промпт с техниками и версиями — это не просто чат с
+          моделью.
+        </p>
         <ul className={styles.list}>
           <li>
             <strong>Студия (эта страница):</strong> классификация задачи, подбор техник из базы, разбор в Prompt IDE,

@@ -44,6 +44,8 @@ export type AgentStudioSnapshot = {
   imageEngine: string
   imageDeepMode: boolean
   skillPresetId: string
+  /** Среда развёртывания скилла (skill_target_env в /generate). */
+  skillTargetEnv: string
   /** Текст активного скилла — уходит в API как skill_body (контекст для генерации промпта). */
   skillBody: string
   /** Профиль «режим эксперта» — влияет на вопросы, техники, температуру. */
@@ -93,6 +95,7 @@ export function createEmptyStudioSnapshot(mode: PromptStudioMode): AgentStudioSn
     imageEngine: 'auto',
     imageDeepMode: false,
     skillPresetId: '',
+    skillTargetEnv: 'generic',
     skillBody: '',
     expertLevel: 'mid',
     suggestedActions: [],

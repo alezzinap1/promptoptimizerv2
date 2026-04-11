@@ -103,6 +103,8 @@ export interface GenerateRequest {
   image_deep_mode?: boolean
   /** Пользовательский пресет для режима «Скилл» (u_{id}) */
   skill_preset_id?: string | null
+  /** Среда для скилла: generic | claude | openai | langgraph | crewai — подсказка в system prompt */
+  skill_target_env?: string | null
   /** Недавние id техник — для разнообразия автоподбора на сервере */
   recent_technique_ids?: string[]
   /** Профиль студии: junior | mid | senior | creative — подсказка бэкенду для политики вопросов */

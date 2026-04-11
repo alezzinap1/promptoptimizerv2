@@ -92,6 +92,33 @@ export function serializeLocalSkillsExport(): string {
   return JSON.stringify(buildLocalSkillsExportBundle(), null, 2)
 }
 
+/** Строка из GET /skills (без циклического импорта из api/client). */
+export type ServerSkillRow = {
+  id: number
+  name: string
+  description?: string
+  body: string
+  category?: string
+  created_at?: string
+}
+
+/** Подмешать скиллы с сервера в локальное хранилище (id `sk_srv_{numericId}`). Локальные записи без этого префикса сохраняются. */
+export function mergeServerSkillsIntoLocal(rows: ServerSkillRow[]): number {
+  const local = loadLocalSkills()
+  const kept = local.filter((x) => !x.id.startsWith('sk_srv_'))
+  const incoming: SkillItem[] = rows.map((r) => ({
+    id: `sk_srv_${r.id}`,
+    title: (r.name || '').trim() || `Скилл #${r.id}`,
+    description: typeof r.description === 'string' ? r.description.trim() : '',
+    frameworks: [],
+    tags: r.category && r.category !== 'general' ? [r.category] : [],
+    body: (r.body || '').trim(),
+    createdAt: r.created_at || new Date().toISOString(),
+  }))
+  saveLocalSkills([...incoming, ...kept])
+  return incoming.length
+}
+
 export function importLocalSkillsBundle(
   json: string,
   mode: 'merge' | 'replace',

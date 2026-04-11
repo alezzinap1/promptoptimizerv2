@@ -67,6 +67,7 @@ function v1ToSnapshot(d: AgentDraftV1): AgentStudioSnapshot {
     imageEngine: d.imageEngine ?? 'auto',
     imageDeepMode: d.imageDeepMode ?? false,
     skillPresetId: d.skillPresetId ?? '',
+    skillTargetEnv: 'generic',
     skillBody: '',
     expertLevel: 'mid',
     suggestedActions: [],
@@ -83,6 +84,9 @@ export function loadAgentDraftV2(): AgentDraftV2 | null {
           const snap = o.modes[m]
           if (snap && typeof snap.skillBody !== 'string') {
             snap.skillBody = ''
+          }
+          if (snap && typeof snap.skillTargetEnv !== 'string') {
+            snap.skillTargetEnv = 'generic'
           }
           if (snap && !snap.expertLevel) {
             snap.expertLevel = 'mid'

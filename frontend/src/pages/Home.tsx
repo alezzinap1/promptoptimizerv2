@@ -42,6 +42,7 @@ import {
 } from '../lib/expertLevelPresets'
 import { getLevelBundleForExpertLevel } from '../lib/levelBundle'
 import { filterManualTechsForReasoningModel, isReasoningModelId } from '../lib/modelReasoning'
+import { SKILL_TARGET_ENV_OPTIONS } from '../lib/skillTargetEnv'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
 import ImageStylePickerPopover from '../components/ImageStylePickerPopover'
 import PublishToCommunityModal, { type PublishToCommunityInitial } from '../components/PublishToCommunityModal'
@@ -323,6 +324,7 @@ export default function Home() {
     typeof window !== 'undefined' ? loadImageStyleFavoriteIds() : new Set(),
   )
   const [skillPresetId, setSkillPresetId] = useState('')
+  const [skillTargetEnv, setSkillTargetEnv] = useState('generic')
   const [skillBody, setSkillBody] = useState('')
   const [expertLevel, setExpertLevel] = useState<ExpertLevel>('mid')
   const [baseTaskRef, setBaseTaskRef] = useState('')
@@ -377,6 +379,7 @@ export default function Home() {
     setImageEngine(fresh.imageEngine)
     setImageDeepMode(fresh.imageDeepMode)
     setSkillPresetId(fresh.skillPresetId)
+    setSkillTargetEnv(typeof fresh.skillTargetEnv === 'string' && fresh.skillTargetEnv ? fresh.skillTargetEnv : 'generic')
     setSkillBody(typeof fresh.skillBody === 'string' ? fresh.skillBody : '')
     const pendingClar = [...fresh.chatMessages]
       .reverse()
@@ -409,6 +412,7 @@ export default function Home() {
       imageEngine,
       imageDeepMode,
       skillPresetId,
+      skillTargetEnv,
       skillBody,
       expertLevel,
       suggestedActions,
@@ -430,6 +434,7 @@ export default function Home() {
     imageEngine,
     imageDeepMode,
     skillPresetId,
+    skillTargetEnv,
     skillBody,
     expertLevel,
     suggestedActions,
@@ -483,6 +488,12 @@ export default function Home() {
   const [skillSandboxInput, setSkillSandboxInput] = useState('')
   const [skillSandboxLog, setSkillSandboxLog] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [skillSandboxBusy, setSkillSandboxBusy] = useState(false)
+  const [promptPlaygroundOpen, setPromptPlaygroundOpen] = useState(false)
+  const [promptPlaygroundInput, setPromptPlaygroundInput] = useState('')
+  const [promptPlaygroundLog, setPromptPlaygroundLog] = useState<{ role: 'user' | 'assistant'; content: string }[]>(
+    [],
+  )
+  const [promptPlaygroundBusy, setPromptPlaygroundBusy] = useState(false)
   const prevGenModelForReasoningRef = useRef<string>('')
   const techPickerBtnRef = useRef<HTMLButtonElement>(null)
   const [techPickerOpen, setTechPickerOpen] = useState(false)
@@ -985,6 +996,7 @@ export default function Home() {
         image_engine: promptType === 'image' ? 'auto' : undefined,
         image_deep_mode: promptType === 'image' ? imageDeepMode : undefined,
         skill_preset_id: promptType === 'skill' && skillPresetId ? skillPresetId : undefined,
+        skill_target_env: promptType === 'skill' ? skillTargetEnv : undefined,
         skill_body: skillBody.trim() || undefined,
         recent_technique_ids: loadRecentTechniqueIds(),
         expert_level: expertLevel,
@@ -1008,6 +1020,7 @@ export default function Home() {
             questionCarouselIdx: 0,
             quickSaved: false,
             skillBody,
+            skillTargetEnv,
             expertLevel,
             suggestedActions: nextSuggestions,
           })
@@ -1035,6 +1048,7 @@ export default function Home() {
             questionCarouselIdx: 0,
             quickSaved: false,
             skillBody,
+            skillTargetEnv,
             expertLevel,
             suggestedActions: nextSuggestions,
           })
@@ -1093,6 +1107,7 @@ export default function Home() {
               imageEngine,
               imageDeepMode,
               skillPresetId,
+              skillTargetEnv,
               skillBody,
               expertLevel,
               suggestedActions: nextSuggestions,
@@ -1256,6 +1271,34 @@ export default function Home() {
       }
     } finally {
       setSkillTestRunning(false)
+    }
+  }
+
+  const sendPromptPlaygroundMessage = async () => {
+    const promptText = (result?.prompt_block || '').trim()
+    const q = promptPlaygroundInput.trim()
+    if (!promptText || !q || promptPlaygroundBusy) return
+    setPromptPlaygroundBusy(true)
+    setPromptPlaygroundLog((prev) => [...prev, { role: 'user', content: q }])
+    setPromptPlaygroundInput('')
+    try {
+      const r = await api.playgroundRun({
+        prompt_text: promptText,
+        user_input: q,
+        gen_model: genModel || undefined,
+        temperature: 0.5,
+      })
+      setPromptPlaygroundLog((prev) => [...prev, { role: 'assistant', content: r.reply }])
+    } catch (e) {
+      setPromptPlaygroundLog((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Ошибка: ${e instanceof Error ? e.message : 'сбой запроса'}`,
+        },
+      ])
+    } finally {
+      setPromptPlaygroundBusy(false)
     }
   }
 
@@ -1619,6 +1662,7 @@ export default function Home() {
     imageEngine,
     imageDeepMode,
     skillPresetId,
+    skillTargetEnv,
     skillBody,
     expertLevel,
     suggestedActions,
@@ -1747,6 +1791,11 @@ export default function Home() {
   )
 
   const activeLevelBundle = useMemo(() => getLevelBundleForExpertLevel(expertLevel), [expertLevel])
+
+  const skillTargetEnvSelectOptions = useMemo(
+    () => SKILL_TARGET_ENV_OPTIONS.map((o) => ({ value: o.value, label: o.label, title: o.title })),
+    [],
+  )
 
   const latestVersionInChat = useMemo(() => {
     let m = 0
@@ -2014,6 +2063,21 @@ export default function Home() {
                     title={promptType === 'skill' ? 'Копировать тело скилла' : 'Копировать промпт'}
                   />
                   <TryInGeminiButton prompt={result.prompt_block} />
+                  {(promptType === 'text' || promptType === 'image') && (
+                    <button
+                      type="button"
+                      className={styles.quickSaveBtn}
+                      title="Проверить промпт: один раунд с выбранной моделью (POST /playground/run)"
+                      disabled={loading}
+                      onClick={() => {
+                        setPromptPlaygroundLog([])
+                        setPromptPlaygroundInput('')
+                        setPromptPlaygroundOpen(true)
+                      }}
+                    >
+                      Песочница
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={styles.quickSaveBtn}
@@ -2835,6 +2899,14 @@ export default function Home() {
                             footerLink={{ to: '/presets', label: 'Создать пресет…' }}
                           />
                           <SelectDropdown
+                            value={skillTargetEnv}
+                            options={skillTargetEnvSelectOptions}
+                            onChange={setSkillTargetEnv}
+                            aria-label="Среда для скилла"
+                            variant="composer"
+                            disabled={loading}
+                          />
+                          <SelectDropdown
                             value={targetModel}
                             options={targetModelSelectOptions}
                             onChange={setTargetModel}
@@ -3140,6 +3212,76 @@ export default function Home() {
           </div>
         </div>
       ) : null}
+      {promptPlaygroundOpen
+        ? createPortal(
+            <div
+              className={styles.skillSandboxBackdrop}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Песочница промпта"
+              onClick={() => !promptPlaygroundBusy && setPromptPlaygroundOpen(false)}
+            >
+              <div className={styles.skillSandboxModal} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.skillSandboxHead}>
+                  <h3 className={styles.skillSandboxTitle}>Песочница промпта</h3>
+                  <button
+                    type="button"
+                    className={styles.skillSandboxClose}
+                    disabled={promptPlaygroundBusy}
+                    onClick={() => setPromptPlaygroundOpen(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className={styles.skillSandboxHint}>
+                  Системный контекст = текущий промпт справа. Введите тестовый запрос пользователя — ответ модели
+                  появится ниже. Используется модель генерации из композера.
+                </p>
+                <div className={styles.skillSandboxLog}>
+                  {promptPlaygroundLog.length === 0 ? (
+                    <p className={styles.skillSandboxEmpty}>Напишите тестовый ввод ниже.</p>
+                  ) : (
+                    promptPlaygroundLog.map((row, i) => (
+                      <div
+                        key={i}
+                        className={
+                          row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
+                        }
+                      >
+                        <MarkdownOutput>{row.content}</MarkdownOutput>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className={styles.skillSandboxComposer}>
+                  <AutoTextarea
+                    className={styles.skillSandboxTextarea}
+                    value={promptPlaygroundInput}
+                    onChange={(e) => setPromptPlaygroundInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        if (!promptPlaygroundBusy && promptPlaygroundInput.trim()) void sendPromptPlaygroundMessage()
+                      }
+                    }}
+                    minHeightPx={44}
+                    maxHeightPx={120}
+                    placeholder="Тестовый ввод (как от пользователя)…"
+                  />
+                  <button
+                    type="button"
+                    className={styles.skillSandboxSend}
+                    disabled={promptPlaygroundBusy || !promptPlaygroundInput.trim() || !result?.prompt_block?.trim()}
+                    onClick={() => void sendPromptPlaygroundMessage()}
+                  >
+                    {promptPlaygroundBusy ? '…' : 'Отправить'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {skillSandboxOpen
         ? createPortal(
             <div

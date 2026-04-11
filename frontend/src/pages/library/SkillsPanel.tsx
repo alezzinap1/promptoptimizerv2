@@ -9,6 +9,7 @@ import SelectDropdown from '../../components/SelectDropdown'
 import {
   importLocalSkillsBundle,
   loadLocalSkills,
+  mergeServerSkillsIntoLocal,
   saveLocalSkills,
   serializeLocalSkillsExport,
   type SkillItem,
@@ -52,6 +53,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   const [generating, setGenerating] = useState(false)
   const [genDescription, setGenDescription] = useState('')
   const [publishSkill, setPublishSkill] = useState<SkillItem | null>(null)
+  const [serverPullBusy, setServerPullBusy] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const handleGenerate = useCallback(async () => {
@@ -197,8 +199,8 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   return (
     <div className={libStyles.library}>
       <p className={styles.leadCompact}>
-        Скиллы хранятся локально в браузере — сделайте резервную копию (экспорт JSON). Теги участвуют в поиске; цвет
-        тега — по нажатию на чип.
+        Локальная библиотека в браузере + опционально скиллы с сервера (кнопка «С сервера»). Резервная копия — экспорт
+        JSON. Теги в поиске; цвет чипа — по нажатию.
       </p>
 
       <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
@@ -228,6 +230,27 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
           onClick={() => importInputRef.current?.click()}
         >
           Импорт…
+        </button>
+        <button
+          type="button"
+          className={`${styles.primary} ${styles.primarySmall}`}
+          title="Подтянуть скиллы с сервера (аккаунт) в локальную библиотеку; записи id sk_srv_* обновятся"
+          disabled={serverPullBusy}
+          onClick={() => {
+            setServerPullBusy(true)
+            void api
+              .getSkills()
+              .then((r) => {
+                const n = mergeServerSkillsIntoLocal(r.items)
+                setItems(loadLocalSkills())
+                window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+                window.alert(`С сервера добавлено/обновлено: ${n} скилл(ов).`)
+              })
+              .catch(() => window.alert('Не удалось загрузить скиллы с сервера (войдите в аккаунт и проверьте сеть).'))
+              .finally(() => setServerPullBusy(false))
+          }}
+        >
+          {serverPullBusy ? 'Сервер…' : 'С сервера'}
         </button>
         <input
           ref={importInputRef}

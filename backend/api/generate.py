@@ -57,6 +57,37 @@ def _split_image_questions_rules(raw: str) -> tuple[str, str]:
     return append_part.strip(), strict_part.strip()
 
 
+def _skill_target_env_system_fragment(env: str | None) -> str:
+    """Короткий блок для skill-режима: под какую среду оптимизировать скилл (отчёт v5)."""
+    key = (env or "").strip().lower()
+    if not key or key == "generic":
+        return ""
+    hints = {
+        "claude": (
+            "Target: Claude / Anthropic. Prefer clear ROLE/SCOPE/RULES sections, markdown-friendly layout, "
+            "explicit refusal boundaries."
+        ),
+        "openai": (
+            "Target: OpenAI Chat Completions or Assistants. Keep instructions imperative; mention tools/JSON mode "
+            "only if the user task requires it."
+        ),
+        "langgraph": (
+            "Target: LangGraph / stateful agents. Call out state keys, node responsibilities, and conditional edges."
+        ),
+        "crewai": (
+            "Target: CrewAI-style crews. Separate agent roles, tools per role, and delegation rules."
+        ),
+    }
+    body = hints.get(key)
+    if not body:
+        return ""
+    return (
+        "\n\n--- SKILL TARGET ENVIRONMENT ---\n"
+        + body
+        + "\n--- END SKILL TARGET ENVIRONMENT ---"
+    )
+
+
 IMAGE_PROMPT_MODE_BLOCK = load_prompt("backend/image_prompt_mode.txt")
 _IMAGE_QUESTIONS_RULES_RAW = load_prompt("backend/image_questions_rules.txt")
 IMAGE_QUESTIONS_APPEND, IMAGE_QUESTIONS_STRICT = _split_image_questions_rules(_IMAGE_QUESTIONS_RULES_RAW)
@@ -205,6 +236,8 @@ class GenerateRequest(BaseModel):
     image_engine: str | None = None
     image_deep_mode: bool = False
     skill_preset_id: str | None = None
+    # Среда развёртывания скилла: generic | claude | openai | langgraph | crewai
+    skill_target_env: str | None = None
     recent_technique_ids: list[str] = Field(default_factory=list)
     expert_level: str | None = None
 
@@ -432,6 +465,7 @@ def _estimate_generation_input(
             )
         if _is_primary_generation_with_unanswered_questions(req):
             system_prompt += SKILL_QUESTIONS_STRICT
+        system_prompt += _skill_target_env_system_fragment(req.skill_target_env)
     if req.prompt_type == "text" and _is_primary_generation_with_unanswered_questions(req):
         system_prompt += TEXT_QUESTIONS_STRICT
     if req.skill_body and req.skill_body.strip():
@@ -746,6 +780,7 @@ def generate_prompt(
             )
         if _is_primary_generation_with_unanswered_questions(req):
             system_prompt += SKILL_QUESTIONS_STRICT
+        system_prompt += _skill_target_env_system_fragment(req.skill_target_env)
     if req.prompt_type == "text" and _is_primary_generation_with_unanswered_questions(req):
         system_prompt += TEXT_QUESTIONS_STRICT
     if req.skill_body and req.skill_body.strip():
