@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import LibraryTagChips from '../../components/LibraryTagChips'
@@ -6,7 +6,13 @@ import MarkdownOutput from '../../components/MarkdownOutput'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import SelectDropdown from '../../components/SelectDropdown'
-import { loadLocalSkills, saveLocalSkills, type SkillItem } from '../../lib/localSkillsStore'
+import {
+  importLocalSkillsBundle,
+  loadLocalSkills,
+  saveLocalSkills,
+  serializeLocalSkillsExport,
+  type SkillItem,
+} from '../../lib/localSkillsStore'
 import libStyles from '../Library.module.css'
 import styles from './SkillsPanel.module.css'
 
@@ -46,6 +52,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   const [generating, setGenerating] = useState(false)
   const [genDescription, setGenDescription] = useState('')
   const [publishSkill, setPublishSkill] = useState<SkillItem | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const handleGenerate = useCallback(async () => {
     const desc = genDescription.trim()
@@ -190,13 +197,61 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   return (
     <div className={libStyles.library}>
       <p className={styles.leadCompact}>
-        Скиллы хранятся локально в браузере. Теги участвуют в поиске; цвет тега — по нажатию на чип.
+        Скиллы хранятся локально в браузере — сделайте резервную копию (экспорт JSON). Теги участвуют в поиске; цвет
+        тега — по нажатию на чип.
       </p>
 
       <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
         <button type="button" className={`${styles.primary} ${styles.primarySmall} btn-primary`} onClick={openCreate}>
           + Скилл
         </button>
+        <button
+          type="button"
+          className={`${styles.primary} ${styles.primarySmall}`}
+          title="Скачать все скиллы как JSON"
+          onClick={() => {
+            const blob = new Blob([serializeLocalSkillsExport()], { type: 'application/json;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `metaprompt-skills-backup-${new Date().toISOString().slice(0, 10)}.json`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+        >
+          Экспорт JSON
+        </button>
+        <button
+          type="button"
+          className={`${styles.primary} ${styles.primarySmall}`}
+          title="Импорт из файла бэкапа (объединение по id)"
+          onClick={() => importInputRef.current?.click()}
+        >
+          Импорт…
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (!f) return
+            const reader = new FileReader()
+            reader.onload = () => {
+              const text = typeof reader.result === 'string' ? reader.result : ''
+              const r = importLocalSkillsBundle(text, 'merge')
+              if (r.ok) {
+                setItems(loadLocalSkills())
+                window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+              } else {
+                window.alert(r.error)
+              }
+            }
+            reader.readAsText(f)
+          }}
+        />
         <input
           type="search"
           className={styles.search}

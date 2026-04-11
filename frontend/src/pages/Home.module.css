@@ -776,45 +776,6 @@
   min-width: 0;
 }
 
-.expertLevelRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-}
-
-.expertLevelLabel {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-right: 2px;
-}
-
-.expertLevelTab {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--stroke);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.expertLevelTab:hover {
-  color: var(--text);
-  border-color: rgba(139, 92, 246, 0.35);
-}
-
-.expertLevelTabActive {
-  color: var(--primary);
-  border-color: var(--primary);
-  background: rgba(139, 92, 246, 0.12);
-}
-
 .agentChatHeader h2 {
   margin: 0;
   font-size: 1rem;
@@ -823,7 +784,28 @@
 .agentTaskTitleRow {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.expertLevelSelectWrap {
+  flex-shrink: 0;
+  max-width: 9.5rem;
+}
+
+.expertLevelSelectWrap button {
+  font-size: 0.72rem !important;
+  padding: 4px 8px !important;
+  min-height: 28px;
+}
+
+.studioCostHint {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
 }
 
 .taskTextEvalStrip {

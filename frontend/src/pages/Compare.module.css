@@ -36,15 +36,11 @@
   font-weight: 700;
 }
 
-.modeExplainer {
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  font-size: 0.88rem;
-  line-height: 1.5;
+.modeExplainerHint {
+  margin: 0 0 14px;
+  font-size: 0.78rem;
+  line-height: 1.45;
   color: var(--muted);
-  border-radius: 8px;
-  border: 1px solid var(--stroke);
-  background: var(--panel);
 }
 
 .badgeRow {

@@ -1,0 +1,405 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--color-text-primary);line-height:1.6;}
+.wrap{padding:.5rem 0;}
+.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.tab{padding:6px 13px;border-radius:20px;font-size:12.5px;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;transition:all .15s;}
+.tab:hover{background:var(--color-background-secondary);color:var(--color-text-primary);}
+.tab.active{background:var(--color-text-primary);color:var(--color-background-primary);border-color:transparent;}
+.section{display:none;}.section.active{display:block;}
+h2{font-size:16px;font-weight:500;margin-bottom:4px;}
+.sub{font-size:13px;color:var(--color-text-secondary);margin-bottom:1.25rem;}
+.card{border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:13px 15px;margin-bottom:9px;background:var(--color-background-primary);}
+.ch{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+.badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;}
+.red{background:var(--color-background-danger);color:var(--color-text-danger);}
+.amber{background:var(--color-background-warning);color:var(--color-text-warning);}
+.green{background:var(--color-background-success);color:var(--color-text-success);}
+.blue{background:var(--color-background-info);color:var(--color-text-info);}
+.purple{background:rgba(139,92,246,.12);color:#8b5cf6;}
+.ct{font-size:13px;font-weight:500;}
+.cb{font-size:13px;color:var(--color-text-secondary);line-height:1.55;}
+.fix{font-size:12.5px;color:var(--color-text-info);margin-top:7px;padding:7px 10px;border-radius:6px;background:var(--color-background-info);line-height:1.5;}
+.win{font-size:12.5px;color:var(--color-text-success);margin-top:7px;padding:7px 10px;border-radius:6px;background:var(--color-background-success);line-height:1.5;}
+h3{font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin:1.2rem 0 .6rem;}
+
+.code-block{background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:8px;padding:10px 12px;font-family:ui-monospace,'Cascadia Code',monospace;font-size:11.5px;color:var(--color-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:8px 0;}
+.code-block.good{border-color:rgba(80,180,100,.3);background:rgba(80,180,100,.05);}
+
+/* LEVEL GRID */
+.level-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0;}
+@media(max-width:500px){.level-grid{grid-template-columns:1fr 1fr;}}
+.level-card{border-radius:9px;padding:10px 12px;border:0.5px solid var(--color-border-tertiary);}
+.lc-name{font-size:13px;font-weight:600;margin-bottom:4px;}
+.lc-row{font-size:11.5px;color:var(--color-text-secondary);line-height:1.6;}
+.lc-issue{font-size:11px;color:var(--color-text-danger);margin-top:5px;padding:3px 7px;background:var(--color-background-danger);border-radius:4px;}
+.lc-ok{font-size:11px;color:var(--color-text-success);margin-top:5px;padding:3px 7px;background:var(--color-background-success);border-radius:4px;}
+
+/* BUNDLE MOCKUP */
+.bundle-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+.bundle-pill{flex:1;min-width:120px;border:1px solid var(--color-border-secondary);border-radius:10px;padding:10px 13px;cursor:pointer;transition:all .15s;}
+.bundle-pill:hover{border-color:var(--color-border-info);}
+.bundle-pill.selected{border-color:var(--color-border-info);background:var(--color-background-info);}
+.bp-name{font-size:13px;font-weight:600;}
+.bp-model{font-size:11px;color:var(--color-text-secondary);margin-top:2px;}
+.bp-calls{font-size:10.5px;color:var(--color-text-secondary);margin-top:4px;}
+
+/* TEST PLAN */
+.test-phase{border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:13px 15px;margin-bottom:9px;}
+.tp-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.tp-num{width:26px;height:26px;border-radius:50%;background:var(--color-background-info);color:var(--color-text-info);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.tp-title{font-size:13.5px;font-weight:500;}
+.tp-body{font-size:13px;color:var(--color-text-secondary);line-height:1.6;}
+.tp-metric{display:inline-block;font-size:11px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);padding:2px 8px;border-radius:4px;margin:3px 3px 0 0;}
+</style>
+
+<div class="wrap">
+<div class="tabs">
+  <button class="tab active" onclick="show('levels')">Уровни + модели</button>
+  <button class="tab" onclick="show('screens')">Скриншоты</button>
+  <button class="tab" onclick="show('product')">Продукт + беттинг</button>
+  <button class="tab" onclick="show('testing')">План тестирования</button>
+</div>
+
+<!-- LEVELS + MODELS -->
+<div id="levels" class="section active">
+<h2>Анализ системы уровней и моделей</h2>
+<div class="sub">Критический разбор + тренды апрель 2026 + предложения</div>
+
+<h3>Текущие пресеты — что не так</h3>
+<div class="level-grid">
+  <div class="level-card">
+    <div class="lc-name">Junior</div>
+    <div class="lc-row">T=0.45 · Вопросы вкл<br>Авто-техники</div>
+    <div class="lc-ok">Низкая температура — стабильно</div>
+    <div class="lc-issue">Слишком много вопросов (max 5) — раздражает новичков</div>
+  </div>
+  <div class="level-card">
+    <div class="lc-name">Mid</div>
+    <div class="lc-row">T=0.7 · Вопросы вкл<br>Авто-техники</div>
+    <div class="lc-ok">Баланс — хорошо</div>
+    <div class="lc-issue">top_p=1 при T=0.7 — лишнее разнообразие выборки</div>
+  </div>
+  <div class="level-card">
+    <div class="lc-name">Senior</div>
+    <div class="lc-row">T=0.85 · Вопросы выкл<br>Manual 5 техник</div>
+    <div class="lc-ok">Прямая генерация — быстро</div>
+    <div class="lc-issue">Техники хардкожены — нельзя кастомизировать без кода</div>
+  </div>
+  <div class="level-card">
+    <div class="lc-name">Creative</div>
+    <div class="lc-row">T=0.92 · Вопросы вкл<br>Manual 4 техники</div>
+    <div class="lc-issue">T=0.92 ломает формат [PROMPT] — документ сам это признаёт!</div>
+    <div class="lc-issue">Creative для Скилл отличается от Creative для Текста — неочевидно</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge red">КРИТИЧНО</span><span class="ct">Две независимые оси (уровень + модель) перегружают новичка</span></div>
+  <div class="cb">Пользователь видит: «Junior · Mid · Senior · Creative» И «DeepSeek V3 / Gemini / Mistral / Grok». Для него это 4×4 = 16 комбинаций без понимания разницы. Что выбрать? Документ сам признаёт проблему в разделе 10 — и предлагает решение (LevelBundle). Но это не реализовано.</div>
+  <div class="fix">→ Реализовать LevelBundle из раздела 10 документа. Каждый уровень = рекомендуемая модель + поведение. «Своя модель» — для продвинутых.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge red">КРИТИЧНО</span><span class="ct">target_model = «unknown» для Фото и Скилл — теряется контекст</span></div>
+  <div class="cb">При генерации промптов для изображений и скиллов бэкенд не знает под какую модель оптимизировать. Это значит model-specific hints не применяются. Для скиллов это особенно критично: промпт для Claude Agent ≠ промпт для GPT-4 Assistants API.</div>
+  <div class="fix">→ Для режима Скилл: добавить поле «Целевая среда» (Claude / GPT-4 / LangGraph / CrewAI / Общий) → передавать как target_model с маппингом на существующие карточки или как отдельное поле skill_target_env.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">Temperature cap 0.85 не реализован — документ предлагает, код не делает</span></div>
+  <div class="cb">Creative использует T=0.92 что сам документ называет проблемой («поломки формата»). Предложение ввести потолок есть в документе но не реализовано. Creative при T=0.92 регулярно нарушает [PROMPT] блок.</div>
+  <div class="fix">→ Одна строка в applyExpertPreset: <code>temperature: Math.min(preset.temperature, 0.85)</code>. Или серверный cap в generate.py. Для Creative добавить tooltip «Высокое разнообразие — иногда требует повторной генерации».</div>
+</div>
+
+<h3>Тренды апрель 2026 — что происходит в AI с выбором моделей</h3>
+
+<div class="card">
+  <div class="ch"><span class="badge blue">ТРЕНД 1</span><span class="ct">Model routing по задаче — автоматический выбор модели</span></div>
+  <div class="cb">OpenRouter, LangChain, Anthropic — все двигаются к auto-routing: задача отправляется к наиболее подходящей модели автоматически. GPT-4o для reasoning, Claude Haiku для форматирования, Gemini Flash для скорости. Пользователь не выбирает модель — он выбирает <em>цель</em>.</div>
+  <div class="fix">→ Для MetaPrompt: уровень «Авто» где система сама выбирает модель по типу задачи (classification → дешёвая, generation → качественная, скилл → reasoning). Пользователь видит только результат и цену запроса.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge blue">ТРЕНД 2</span><span class="ct">Reasoning models (o3, R1) требуют другой логики уровней</span></div>
+  <div class="cb">o3, DeepSeek R1, Claude Extended Thinking — у них встроенный CoT. Уровень «Senior» с manual техниками включая chain_of_thought бессмысленен для этих моделей — они делают это сами, и добавление CoT в промпт только мешает. Текущая система уровней это не учитывает вообще.</div>
+  <div class="fix">→ При выборе reasoning-модели (o3, R1, Sonnet Extended) — автоматически переключать технический пресет: убирать CoT из manual_techs, снижать temperature до 0.3–0.5, отключать questions_contract. Добавить флаг is_reasoning_model в model catalog.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge blue">ТРЕНД 3</span><span class="ct">Cost visibility — пользователи хотят знать цену до клика</span></div>
+  <div class="cb">Vercel AI SDK, OpenRouter UI, Anthropic Console — все показывают предполагаемую стоимость запроса до отправки. Это критично при выборе между «Creative + Фото + Deep mode» (3 LLM вызова) и «Junior + Текст» (1 вызов).</div>
+  <div class="fix">→ Рядом с кнопкой «Создать» показывать: «~$0.0003 · 1 вызов» или «~$0.002 · 3 вызова». Данные из LevelBundle + текущей модели. Это также объясняет почему Senior иногда быстрее Junior несмотря на «сложнее».</div>
+</div>
+
+<h3>Предлагаемый дизайн LevelBundle (улучшенный)</h3>
+<div class="card">
+  <div class="code-block good">// Новый пресет — связывает уровень + модель + поведение
+type LevelBundle = {
+  id: 'quick' | 'balanced' | 'precise' | 'creative'
+  label: string          // «Быстро», «Сбалансированно», «Точно», «Творчески»
+  icon: string           // ⚡ ⚖️ 🎯 ✨
+  defaultGenModel: string  // 'deepseek/deepseek-chat' | 'google/gemini-flash-2.0' | ...
+  behavior: ExpertLevelPreset
+  estimatedCalls: number   // 1 | 2 | 3
+  estimatedCostPerRequest: string  // '&lt;$0.001' | '~$0.002'
+  isReasoningModel: boolean  // если true → убрать CoT техники
+  description: string    // для tooltip
+}
+
+// Пример заполнения:
+{id:'quick',    label:'Быстро',       icon:'⚡', defaultGenModel:'deepseek/deepseek-chat',    estimatedCalls:1}
+{id:'balanced', label:'Стандарт',     icon:'⚖️', defaultGenModel:'google/gemini-flash-2.0',   estimatedCalls:1}
+{id:'precise',  label:'Точно',        icon:'🎯', defaultGenModel:'anthropic/claude-3-5-haiku', estimatedCalls:1}
+{id:'creative', label:'Творчески',    icon:'✨', defaultGenModel:'x-ai/grok-3',               estimatedCalls:2}</div>
+  <div class="fix">→ 4 профиля с человеческими именами вместо техническихJunior/Senior. Модель скрыта внутри, открывается по кнопке «Настроить».</div>
+</div>
+</div>
+
+<!-- SCREENS -->
+<div id="screens" class="section">
+<h2>Разбор новых скриншотов</h2>
+<div class="sub">Скрины 1–9 — детальный разбор каждого</div>
+
+<h3>Студия — главный экран (скрины 1–2)</h3>
+<div class="card">
+  <div class="ch"><span class="badge green">ОТЛИЧНО</span><span class="ct">Diff «Что изменилось V1→V2» + спарклайн версий — это реализовано!</span></div>
+  <div class="cb">«Убрано 1 строка · Добавлено 20 строк · Полнота: 25%→65%» — именно это я предлагал в прошлом ревью. Версии v3 80% · v2 65% · v1 25% с маленьким спарклайном графика — killer UX который нигде у конкурентов нет.</div>
+  <div class="win">→ Это самая сильная уникальная фича продукта. Сделать версии кликабельными для отката — тогда это станет настоящим undo-history для промптов.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge green">ХОРОШО</span><span class="ct">«Совет 1 / Совет 2 / Совет 3» как chips + «Применить всё»</span></div>
+  <div class="cb">Предложенная система chips-советов реализована. Кнопка «Применить всё» вверху — правильно.</div>
+  <div class="win">→ Следующий уровень: советы должны быть специфичными для конкретного промпта («Добавь пример для JSON-структуры»), а не общими («Few-Shot»). Генерировать их как часть основного ответа.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">«УРОВЕНЬ Junior · Mid · Senior · Creative» — строчка под вкладками</span></div>
+  <div class="cb">4 кнопки уровня + надпись «УРОВЕНЬ» занимают целую строку. Это 20px высоты для функции которую большинство пользователей не меняет. При открытии студии первое что видишь — три строки навигации: Текст/Фото/Скилл + Уровень + метаданные токенов.</div>
+  <div class="fix">→ Уровень убрать из основного UI. Разместить в тулбаре справа как маленький badge-дропдаун: «Mid ▾». Кликнул — раскрылся список. Экономит 20px и убирает визуальный шум.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">«≈66 tok исходный текст» — непонятный лейбл</span></div>
+  <div class="cb">Строка под кнопками уровней показывает «≈66 tok исходный текст». Что это? Размер входящего текста задачи? Размер предыдущего промпта? Для пользователя неочевидно.</div>
+  <div class="fix">→ Переименовать в понятный контекст: «Задача: ~66 токенов» или убрать совсем — пользователю это не нужно на глаза.</div>
+</div>
+
+<h3>A/B Сравнение (скрин 3)</h3>
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">Объяснение «Авто/Вручную» — текстовая стена</span></div>
+  <div class="cb">«Авто — техники подбираются по типу задачи. Вручную — только отмеченные ниже техники попадут в промпт. После генерации в каждом столбце появится текст промпта и метрики — так видна разница А и В.» — длинный абзац который никто не читает.</div>
+  <div class="fix">→ Заменить на две строки tooltip при hover на «Авто» и «Вручную». Основной экран — чистым.</div>
+</div>
+
+<h3>Библиотека (скрин 4)</h3>
+<div class="card">
+  <div class="ch"><span class="badge green">СИЛЬНО</span><span class="ct">Названия промптов теперь человеческие — большой прогресс</span></div>
+  <div class="cb">«Неформальная заметка с живым потоком мыслей», «Техники составления промптов для исследователей ИИ» — реальные человеческие названия. Это был главный запрос из всех ревью.</div>
+  <div class="win">→ Отлично. Теперь добавить сортировку «По последнему использованию» — самые актуальные наверху.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">Карточки: «Открыть» + «В чат» + «Копировать» + «Ещё» — неравномерная иерархия</span></div>
+  <div class="cb">«В чат ▾» — дропдаун со стрелкой рядом с «Открыть» — создаёт путаницу. «Ещё» в правом углу прячет важные действия. Пользователь не знает куда нажать.</div>
+  <div class="fix">→ Одна primary кнопка «Открыть». Остальное — hover-reveal или «...» меню. Сейчас 4 контрола первого уровня на карточку — много.</div>
+</div>
+
+<h3>Скиллы (скрины 5, 7, 8)</h3>
+<div class="card">
+  <div class="ch"><span class="badge green">БОЛЬШОЙ ПРОГРЕСС</span><span class="ct">Скилл теперь генерирует структуру ROLE/SCOPE/RULES/PROCEDURE</span></div>
+  <div class="cb">Скрин 8: сгенерированный скилл содержит секции ROLE, SCOPE (входящие/исходящие/не входит), RULES (4 правила), PROCEDURE (3 шага). Это именно та структура которую я предлагал в предыдущем анализе. Плюс «Песочница» и «Тест-кейсы (3)» — это фактически Eval Studio!</div>
+  <div class="win">→ Это одна из сильнейших реализаций в продукте. Скилл с тест-кейсами — дифференциатор рынка. Продвигать это как главную фичу.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">«Скиллы хранятся локально в браузере» — огромный UX-риск</span></div>
+  <div class="cb">Скрины 5 и 7: текст «Скиллы хранятся локально в браузере» встречается несколько раз. Это значит очистка кеша = потеря всех скиллов. Для пользователя который потратил час на создание скиллов — это катастрофа.</div>
+  <div class="fix">→ СРОЧНО: перенести скиллы на сервер (как промпты). Или хотя бы: кнопка «Экспорт всех скиллов» + предупреждение при выходе если есть несохранённые. Локальное хранение — антипаттерн для ценных данных.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">«Базовый текстовый навык для Claude» — «давай сделаем скилл»</span></div>
+  <div class="cb">Скрин 7: скилл называется «Базовый текстовый навык для Claude» но описание — «давай сделаем скилл». Это первая строка из чата задачи, не название скилла. Проблема auto-naming не полностью решена для скиллов.</div>
+  <div class="fix">→ При сохранении скилла — AI-генерация названия по первой секции ROLE. «Ты — текстовый ассистент» → «Текстовый ассистент без внешних ресурсов». Автоматически.</div>
+</div>
+
+<h3>Сообщество (скрин 6)</h3>
+<div class="card">
+  <div class="ch"><span class="badge green">ХОРОШО</span><span class="ct">Изображение в карточке сообщества — визуальный preview для фото-промптов</span></div>
+  <div class="cb">Карточка «Надо нарисовать черепашки ниндзя которые грабят м...» содержит AI-сгенерированное изображение. Это правильно — фото-промпт должен показывать результат, а не текст.</div>
+  <div class="win">→ Расширить: для текстовых промптов — показывать краткое описание задачи. Для скиллов — иконку типа скилла. Разные визуальные паттерны для разных типов контента.</div>
+</div>
+
+<h3>Дропдаун моделей (скрин 9)</h3>
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">«google/gemini-flash-1.5» в дропдауне — техническое название</span></div>
+  <div class="cb">Список моделей: «DeepSeek V3», «google/gemini-flash-1.5», «Mistral Nemo», «Grok 4.1 Fast». Второй пункт — сырой OpenRouter ID без нормализации. Несоответствие стиля.</div>
+  <div class="fix">→ Применить shortGenerationModelLabel из кодовой базы ко всем моделям в списке. «google/gemini-flash-1.5» → «Gemini Flash 1.5». Добавить иконки провайдеров.</div>
+</div>
+</div>
+
+<!-- PRODUCT BRAINSTORM -->
+<div id="product" class="section">
+<h2>Продуктовый брейнсторм</h2>
+<div class="sub">Критический взгляд на продукт — что есть, чего не хватает, куда двигаться</div>
+
+<h3>Что продукт реально умеет (сильные стороны)</h3>
+<div class="card">
+  <div class="cb" style="color:var(--color-text-success);line-height:2">
+    ✓ Генерация структурированных промптов из описания задачи — уникально на рынке<br>
+    ✓ Версионирование v1→v7 со score и diff — нигде у конкурентов нет<br>
+    ✓ Три режима: Текст / Фото / Скилл — охват разных use cases<br>
+    ✓ Скилл с ROLE/SCOPE/RULES + тест-кейсами — фактически Eval lite уже работает<br>
+    ✓ Сообщество с публикацией — growth механика<br>
+    ✓ A/B сравнение техник — образовательная ценность
+  </div>
+</div>
+
+<h3>Что мешает росту — честный разбор</h3>
+
+<div class="card">
+  <div class="ch"><span class="badge red">ГЛАВНАЯ ПРОБЛЕМА</span><span class="ct">Продукт не объясняет зачем он нужен при первом открытии</span></div>
+  <div class="cb">Новый пользователь видит: чат + поле задачи + переключатели. Он не понимает: «Чем это отличается от ChatGPT? Зачем мне промпт-оптимизатор если я могу просто написать в ChatGPT?» Нет onboarding flow, нет «до/после» демо, нет объяснения ценности.</div>
+  <div class="fix">→ Первый запуск: интерактивное демо. Показать один промпт «до» и результат «после» — прямо в интерфейсе без регистрации. «Попробуй сам → введи задачу».</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge red">ВАЖНО</span><span class="ct">Нет retention механики — пользователь сделал промпт и ушёл</span></div>
+  <div class="cb">Библиотека растёт но пользователи не возвращаются к промптам. Нет «коллекций», нет проектов, нет уведомлений «ваш промпт использован 5 раз в сообществе». Скиллы в localStorage — антипаттерн для retention.</div>
+  <div class="fix">→ «Проекты» как связка промптов + скиллов + пространств для конкретного usecase. «Мой проект: контент для YouTube» = набор промптов + скилл-редактор + пространство с брендом.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">Позиционирование размыто: для кого это?</span></div>
+  <div class="cb">Сейчас продукт пытается быть и для no-code (Junior, простые режимы) и для prompt engineers (Senior, manual техники, A/B). Это разные аудитории с разными ценностями. No-code хочет «просто работает», prompt engineer хочет «полный контроль».</div>
+  <div class="fix">→ Выбрать основную ЦА для беты: prompt engineers и разработчики AI-продуктов. Они понимают ценность, готовы платить, помогут с feedback. No-code — вторая волна после product-market fit.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge purple">BIG IDEA</span><span class="ct">«Playground» — тестирование промпта прямо в продукте</span></div>
+  <div class="cb">«Песочница» уже есть в скилл-режиме! Это зародыш Eval Studio. Расширить: для любого промпта — playground где можно ввести тестовый input и увидеть output прямо в MetaPrompt. Не нужно копировать в ChatGPT.</div>
+  <div class="fix">→ POST /playground: берёт промпт + user input → прогоняет через выбранную модель → показывает output. Score считается автоматически. Это замыкает loop: создал → протестировал → улучшил → сохранил.</div>
+</div>
+
+<div class="card">
+  <div class="ch"><span class="badge purple">BIG IDEA</span><span class="ct">«Prompt Templates» — sharable templates для типовых задач</span></div>
+  <div class="cb">Большинство пользователей делают одинаковые вещи: summarize, classify, extract, generate. Если MetaPrompt предложит стартовые шаблоны под каждый usecase (с уже выбранными техниками и уровнем) — friction при первом использовании упадёт кратно.</div>
+  <div class="fix">→ «Начать с шаблона»: 10–15 готовых сценариев (Анализ документа, Генерация контента, Код-ревью, Парсинг данных...). Кликаешь → заполнена задача + выбран режим + применены оптимальные техники.</div>
+  </div>
+
+<div class="card">
+  <div class="ch"><span class="badge blue">МЕТА-НАБЛЮДЕНИЕ</span><span class="ct">Продукт стал сложным быстрее чем стал понятным</span></div>
+  <div class="cb">За несколько месяцев добавились: 4 уровня + 3 режима + A/B + скиллы + сообщество + пресеты + пространства + модели. Каждая фича правильная — но вместе они создают cognitive overhead. Новый пользователь тонет.</div>
+  <div class="fix">→ Принцип: сначала один путь к успеху. Главный экран = одно действие: «Опиши что нужно → получи промпт». Все остальные настройки — progressive disclosure. Сложность открывается по мере использования.</div>
+</div>
+</div>
+
+<!-- TESTING PLAN -->
+<div id="testing" class="section">
+<h2>План тестирования с 10+ пользователями</h2>
+<div class="sub">Что нужно подготовить, как провести, что измерять</div>
+
+<h3>Что нужно исправить ДО теста</h3>
+<div class="card">
+  <div class="cb" style="line-height:2">
+    <strong style="color:var(--color-text-danger)">Обязательно до теста:</strong><br>
+    🔴 Скиллы перенести на сервер (потеря данных при очистке = катастрофа во время теста)<br>
+    🔴 Disabled кнопки при активной генерации (дубли ответов дискредитируют продукт)<br>
+    🟠 Онбординг: хотя бы 1 экран «что это и зачем» при первом входе<br>
+    🟠 Исправить «google/gemini-flash-1.5» → нормальное название в дропдауне<br>
+    🟡 Страница помощи / FAQ по уровням (Junior/Mid/Senior/Creative — что это значит)
+  </div>
+</div>
+
+<div class="test-phase">
+  <div class="tp-header"><div class="tp-num">1</div><div class="tp-title">Этап 1 — Онбординг и первый запуск (0–10 мин)</div></div>
+  <div class="tp-body">
+    <strong>Задача для пользователя:</strong> «Зарегистрируйся и создай первый промпт для любой своей задачи».<br><br>
+    <strong>Что наблюдать:</strong><br>
+    — Куда кликает в первую секунду? (eye tracking или просто наблюдение)<br>
+    — Понимает ли разницу Студия vs Улучшить без объяснений?<br>
+    — Выбирает ли уровень или игнорирует?<br>
+    — Сколько времени до первой успешной генерации?<br><br>
+    <strong>Метрики:</strong>
+    <div><span class="tp-metric">Время до первой генерации</span><span class="tp-metric">% нажавших Студия vs Улучшить</span><span class="tp-metric">% изменивших уровень</span></div>
+  </div>
+</div>
+
+<div class="test-phase">
+  <div class="tp-header"><div class="tp-num">2</div><div class="tp-title">Этап 2 — Итерация и качество (10–25 мин)</div></div>
+  <div class="tp-body">
+    <strong>Задача:</strong> «Улучши промпт — попроси его сделать более конкретным, затем короче».<br><br>
+    <strong>Что наблюдать:</strong><br>
+    — Замечает ли diff «Что изменилось»?<br>
+    — Кликает ли на версии v1/v2/v3?<br>
+    — Нажимает «+ Применить» к советам или игнорирует?<br>
+    — Понимает ли шкалу «Полнота 80%»?<br><br>
+    <strong>Метрики:</strong>
+    <div><span class="tp-metric">Среднее число итераций</span><span class="tp-metric">% кликнувших на версии</span><span class="tp-metric">% использовавших «Применить»</span><span class="tp-metric">NPS после первой успешной итерации</span></div>
+  </div>
+</div>
+
+<div class="test-phase">
+  <div class="tp-header"><div class="tp-num">3</div><div class="tp-title">Этап 3 — Продвинутые режимы (25–40 мин)</div></div>
+  <div class="tp-body">
+    <strong>Задача:</strong> «Создай скилл для ИИ-ассистента который помогает с кодом».<br><br>
+    <strong>Что наблюдать:</strong><br>
+    — Находит ли режим Скилл самостоятельно?<br>
+    — Понимает ли концепцию скилла (vs промпта)?<br>
+    — Использует ли тест-кейсы / Песочницу?<br>
+    — Сохраняет ли в библиотеку? Находит ли потом?<br><br>
+    <strong>Метрики:</strong>
+    <div><span class="tp-metric">% нашедших режим Скилл</span><span class="tp-metric">% завершивших создание</span><span class="tp-metric">% использовавших тест-кейсы</span></div>
+  </div>
+</div>
+
+<div class="test-phase">
+  <div class="tp-header"><div class="tp-num">4</div><div class="tp-title">Этап 4 — Retention сигнал (через 3 дня)</div></div>
+  <div class="tp-body">
+    <strong>Задача:</strong> «Вернись и найди промпт который сделал три дня назад».<br><br>
+    <strong>Что наблюдать:</strong><br>
+    — Возвращается ли пользователь без напоминания?<br>
+    — Находит ли библиотеку?<br>
+    — Открывает ли старый промпт и продолжает работу?<br><br>
+    <strong>Метрики:</strong>
+    <div><span class="tp-metric">D3 retention %</span><span class="tp-metric">Среднее число сессий за 3 дня</span><span class="tp-metric">% вернувшихся к библиотеке</span></div>
+  </div>
+</div>
+
+<h3>Анкета после теста (обязательные вопросы)</h3>
+<div class="card">
+  <div class="cb" style="line-height:2">
+    1. <strong>«Объясните продукт другу за одно предложение»</strong> — диагностика понимания value prop<br>
+    2. <strong>«Что было непонятно без объяснений?»</strong> — список friction points<br>
+    3. <strong>«Что вам понравилось больше всего?»</strong> — подтверждение differentiators<br>
+    4. <strong>«За что вы заплатили бы?»</strong> — сигнал willingness to pay<br>
+    5. <strong>«Что вам НЕ хватило для полноценной работы?»</strong> — следующий roadmap<br>
+    6. <strong>NPS 0–10: «Порекомендуете ли коллеге?»</strong> — стандартная метрика<br>
+    7. <strong>«Какой вы сделали промпт? Использовали ли его в реальной работе?»</strong> — реальное применение
+  </div>
+</div>
+
+<h3>Состав группы из 10+ человек</h3>
+<div class="card">
+  <div class="cb" style="line-height:2">
+    <strong style="color:var(--color-text-primary)">3–4 prompt engineers / AI разработчики</strong> — оценят техническую глубину, скиллы, A/B<br>
+    <strong style="color:var(--color-text-primary)">3–4 product/marketing специалисты</strong> — используют LLM ежедневно но не пишут код<br>
+    <strong style="color:var(--color-text-primary)">2–3 «обычных» пользователя</strong> — используют ChatGPT/Claude иногда, новички в prompt engineering<br>
+    <strong style="color:var(--color-text-primary)">1–2 скептика</strong> — «я и так умею писать промпты» — важно понять что заставит их изменить мнение
+  </div>
+</div>
+</div>
+
+</div>
+<script>
+function show(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const ids=['levels','screens','product','testing'];
+  document.querySelectorAll('.tab')[ids.indexOf(id)].classList.add('active');
+}
+</script>

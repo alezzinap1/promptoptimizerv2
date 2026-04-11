@@ -38,6 +38,7 @@ from backend.api import (
     library,
     metrics,
     models,
+    playground,
     presets,
     prompt_ide,
     sessions,
@@ -61,6 +62,7 @@ api_app.include_router(auth.router, tags=["auth"])
 api_app.include_router(settings.router, tags=["settings"])
 api_app.include_router(user_info.router, tags=["user-info"])
 api_app.include_router(models.router, tags=["models"])
+api_app.include_router(playground.router, tags=["playground"])
 api_app.include_router(workspaces.router, tags=["workspaces"])
 api_app.include_router(presets.router, tags=["presets"])
 api_app.include_router(metrics.router, tags=["metrics"])

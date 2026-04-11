@@ -7,6 +7,7 @@ import SelectDropdown from '../components/SelectDropdown'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
+import { EXPERT_GENERATION_TEMPERATURE_CAP } from '../lib/expertLevelPresets'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
@@ -206,7 +207,17 @@ export default function Compare() {
               <div className={styles.compareAdvRow}>
                 <label className={styles.compareAdvField}>
                   Температура {temperature}
-                  <input type="range" min={0.1} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} />
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={EXPERT_GENERATION_TEMPERATURE_CAP}
+                    step={0.05}
+                    value={Math.min(temperature, EXPERT_GENERATION_TEMPERATURE_CAP)}
+                    title="Согласовано со студией: потолок температуры для стабильного формата"
+                    onChange={(e) =>
+                      setTemperature(Math.min(parseFloat(e.target.value), EXPERT_GENERATION_TEMPERATURE_CAP))
+                    }
+                  />
                 </label>
                 <label className={styles.compareAdvField}>
                   Top-P {topP.toFixed(2)}
@@ -229,9 +240,8 @@ export default function Compare() {
         </button>
       </div>
 
-      <p className={styles.modeExplainer}>
-        <strong>Авто</strong> — техники подбираются по типу задачи. <strong>Вручную</strong> — только отмеченные ниже техники
-        попадут в промпт. После генерации в каждом столбце появится текст промпта и метрики — так видна разница A и B.
+      <p className={styles.modeExplainerHint}>
+        Режим техник задаётся в каждом столбце. Наведите курсор на «Авто» или «Вручную» — там полная подсказка.
       </p>
 
       <div className={styles.results}>
@@ -255,10 +265,10 @@ export default function Compare() {
             </ol>
           </div>
           <div className={`${styles.radioRow} ${styles.radioRowA}`}>
-            <label title="Техники выберет модель по классификации задачи">
+            <label title="Авто: техники подбираются по типу задачи (классификация). В промпт попадёт набор, который модель считает уместным для этой задачи.">
               <input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто
             </label>
-            <label title="Использовать только отмеченные ниже техники">
+            <label title="Вручную: в промпт попадут только отмеченные ниже техники. Если ничего не отмечено — сравнение может быть некорректным.">
               <input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную
             </label>
           </div>
@@ -301,10 +311,10 @@ export default function Compare() {
             </ol>
           </div>
           <div className={`${styles.radioRow} ${styles.radioRowB}`}>
-            <label title="Техники выберет модель по классификации задачи">
+            <label title="Авто: техники подбираются по типу задачи (классификация). В промпт попадёт набор, который модель считает уместным для этой задачи.">
               <input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто
             </label>
-            <label title="Использовать только отмеченные ниже техники">
+            <label title="Вручную: в промпт попадут только отмеченные ниже техники. Если ничего не отмечено — сравнение может быть некорректным.">
               <input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную
             </label>
           </div>

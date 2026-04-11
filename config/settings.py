@@ -52,3 +52,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if APP_ENV == "prod" else "DEBUG")
 # Косинус к центроидам; margin отсекает «почти равные» классы.
 SEMANTIC_ROUTE_MIN_CONFIDENCE = float(os.getenv("SEMANTIC_ROUTE_MIN_CONFIDENCE", "0.34"))
 SEMANTIC_ROUTE_MIN_MARGIN = float(os.getenv("SEMANTIC_ROUTE_MIN_MARGIN", "0.025"))
+
+# Пре-промпт: два класса (разговор vs задача); пороги чуть мягче, чем у follow-up.
+PRE_PROMPT_MIN_CONFIDENCE = float(os.getenv("PRE_PROMPT_MIN_CONFIDENCE", "0.30"))
+PRE_PROMPT_MIN_MARGIN = float(os.getenv("PRE_PROMPT_MIN_MARGIN", "0.018"))

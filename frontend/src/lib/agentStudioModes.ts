@@ -67,6 +67,15 @@ export function defaultWelcomeForMode(mode: PromptStudioMode): string {
   return WELCOME_TEXT
 }
 
+/** Глубокая копия снимка вкладки — без общих ссылок между text / image / skill и живым состоянием React. */
+export function cloneAgentStudioSnapshot(s: AgentStudioSnapshot): AgentStudioSnapshot {
+  try {
+    return structuredClone(s) as AgentStudioSnapshot
+  } catch {
+    return JSON.parse(JSON.stringify(s)) as AgentStudioSnapshot
+  }
+}
+
 export function createEmptyStudioSnapshot(mode: PromptStudioMode): AgentStudioSnapshot {
   return {
     chatMessages: [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode(mode) }],

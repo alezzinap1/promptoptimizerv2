@@ -782,6 +782,13 @@ export const api = {
       body: JSON.stringify(req),
     }),
 
+  /** Универсальная песочница: prompt_text → system, user_input → user message. */
+  playgroundRun: (req: { prompt_text: string; user_input: string; gen_model?: string; temperature?: number }) =>
+    fetchApi<{ reply: string; gen_model: string }>('/playground/run', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+
   getSkills: () => fetchApi<{ items: SkillRecord[] }>('/skills'),
   createSkill: (req: { name: string; body: string; description?: string; category?: string }) =>
     fetchApi<{ id: number }>('/skills', { method: 'POST', body: JSON.stringify(req) }),

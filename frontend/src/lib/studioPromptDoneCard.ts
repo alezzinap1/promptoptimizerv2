@@ -93,8 +93,8 @@ function normalizeSkillTestCases(res: GenerateResult): SkillTestCaseItem[] {
 export function buildIterationDiffSummary(
   prevPrompt: string,
   nextPrompt: string,
-  fromVersion: number,
-  toVersion: number,
+  _fromVersion: number,
+  _toVersion: number,
   prevScore: number,
   nextScore: number,
   prevTokens: number,

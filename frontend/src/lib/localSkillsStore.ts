@@ -69,3 +69,57 @@ export function appendLocalSkill(params: {
   saveLocalSkills([...items, item])
   return item
 }
+
+const EXPORT_FORMAT_VERSION = 1
+
+export type LocalSkillsExportBundle = {
+  format: 'metaprompt-local-skills'
+  version: number
+  exportedAt: string
+  skills: SkillItem[]
+}
+
+export function buildLocalSkillsExportBundle(): LocalSkillsExportBundle {
+  return {
+    format: 'metaprompt-local-skills',
+    version: EXPORT_FORMAT_VERSION,
+    exportedAt: new Date().toISOString(),
+    skills: loadLocalSkills(),
+  }
+}
+
+export function serializeLocalSkillsExport(): string {
+  return JSON.stringify(buildLocalSkillsExportBundle(), null, 2)
+}
+
+export function importLocalSkillsBundle(
+  json: string,
+  mode: 'merge' | 'replace',
+): { ok: true; count: number } | { ok: false; error: string } {
+  try {
+    const data = JSON.parse(json) as unknown
+    if (!data || typeof data !== 'object') return { ok: false, error: 'Неверный файл.' }
+    const o = data as Record<string, unknown>
+    const rawSkills = o.skills
+    if (!Array.isArray(rawSkills)) return { ok: false, error: 'В файле нет массива skills.' }
+    const parsed: SkillItem[] = []
+    for (const row of rawSkills) {
+      const it = normalizeSkill(row)
+      if (it) parsed.push(it)
+    }
+    if (mode === 'replace') {
+      saveLocalSkills(parsed)
+      return { ok: true, count: parsed.length }
+    }
+    const existing = loadLocalSkills()
+    const byId = new Map(existing.map((x) => [x.id, x]))
+    for (const it of parsed) {
+      byId.set(it.id, it)
+    }
+    const merged = [...byId.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    saveLocalSkills(merged)
+    return { ok: true, count: parsed.length }
+  } catch {
+    return { ok: false, error: 'Не удалось прочитать JSON.' }
+  }
+}

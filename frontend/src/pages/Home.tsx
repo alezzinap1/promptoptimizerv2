@@ -25,6 +25,7 @@ import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { clearAgentDraftV2, loadAgentDraftV2, saveAgentDraftV2 } from '../lib/agentDraft'
 import {
+  cloneAgentStudioSnapshot,
   createEmptyStudioSnapshot,
   defaultWelcomeForMode,
   type AgentStudioSnapshot,
@@ -33,10 +34,14 @@ import {
   type StudioAppliedTip,
 } from '../lib/agentStudioModes'
 import {
+  clampExpertGenerationTemperature,
+  EXPERT_GENERATION_TEMPERATURE_CAP,
   EXPERT_LEVEL_HINTS,
   EXPERT_LEVEL_LABELS,
   getExpertLevelPreset,
 } from '../lib/expertLevelPresets'
+import { getLevelBundleForExpertLevel } from '../lib/levelBundle'
+import { filterManualTechsForReasoningModel, isReasoningModelId } from '../lib/modelReasoning'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
 import ImageStylePickerPopover from '../components/ImageStylePickerPopover'
 import PublishToCommunityModal, { type PublishToCommunityInitial } from '../components/PublishToCommunityModal'
@@ -47,7 +52,7 @@ import {
 } from '../lib/conversationalGate'
 import { looksLikeStrongEdit } from '../lib/agentFollowUp'
 import { computeLineDiffOps } from '../lib/lineDiffLcs'
-import { resolveStudioFollowUpPlan } from '../lib/agentStudioProcessPlan'
+import { buildAgentChatHistory, resolveStudioFollowUpPlan } from '../lib/agentStudioProcessPlan'
 import {
   COMPLETENESS_SCORE_TITLE,
   PROMPT_COST_TITLE,
@@ -226,6 +231,12 @@ const AGENT_THINKING_PHASES = [
   'Проверяю согласованность и полноту…',
 ]
 
+const PRE_PROMPT_ROUTING_LINE = 'Определяю намерение реплики (лёгкий семантический разбор, без LLM)…'
+const PRE_PROMPT_TASK_LINE = 'Намерение: задача на промпт — подключаю генерацию…'
+const PRE_PROMPT_SKILL_LINE = 'Намерение: оформление скилла — подключаю генерацию…'
+
+const AGENT_PROCESS_PRE_TIMEOUT_MS = 15_000
+
 const DEFAULT_AGENT_SPLIT = 0.38
 function loadAgentSplit(): number {
   try {
@@ -329,9 +340,9 @@ export default function Home() {
   } | null>(null)
   /** Снимки студии по вкладкам «Текст / Фото / Скилл» — при переключении не смешиваем чаты и сессии. */
   const studioModesRef = useRef<Record<PromptStudioMode, AgentStudioSnapshot>>({
-    text: createEmptyStudioSnapshot('text'),
-    image: createEmptyStudioSnapshot('image'),
-    skill: createEmptyStudioSnapshot('skill'),
+    text: cloneAgentStudioSnapshot(createEmptyStudioSnapshot('text')),
+    image: cloneAgentStudioSnapshot(createEmptyStudioSnapshot('image')),
+    skill: cloneAgentStudioSnapshot(createEmptyStudioSnapshot('skill')),
   })
 
   const applyExpertPreset = useCallback((level: ExpertLevel, mode: PromptStudioMode) => {
@@ -346,27 +357,28 @@ export default function Home() {
 
   const hydrateFromSnapshot = useCallback(
     (s: AgentStudioSnapshot, targetMode?: PromptStudioMode) => {
-    setChatMessages(s.chatMessages as ChatMessage[])
-    setTaskInput(s.taskInput)
-    setBaseTaskRef(s.baseTaskRef)
-    setFeedback(s.feedback)
-    setResult(s.result)
-    setSessionId(s.sessionId)
-    setIterationMode(s.iterationMode)
-    setQuestionState(s.questionState)
-    setQuestionCarouselIdx(s.questionCarouselIdx)
-    setQuickSaved(s.quickSaved)
-    const lvl = s.expertLevel ?? 'mid'
+    const fresh = cloneAgentStudioSnapshot(s)
+    setChatMessages(fresh.chatMessages as ChatMessage[])
+    setTaskInput(fresh.taskInput)
+    setBaseTaskRef(fresh.baseTaskRef)
+    setFeedback(fresh.feedback)
+    setResult(fresh.result)
+    setSessionId(fresh.sessionId)
+    setIterationMode(fresh.iterationMode)
+    setQuestionState(fresh.questionState)
+    setQuestionCarouselIdx(fresh.questionCarouselIdx)
+    setQuickSaved(fresh.quickSaved)
+    const lvl = fresh.expertLevel ?? 'mid'
     setExpertLevel(lvl)
     const modeForPreset = targetMode ?? promptTypeRef.current
     applyExpertPreset(lvl, modeForPreset)
-    setImagePromptTags(s.imagePromptTags)
-    setImagePresetId(s.imagePresetId)
-    setImageEngine(s.imageEngine)
-    setImageDeepMode(s.imageDeepMode)
-    setSkillPresetId(s.skillPresetId)
-    setSkillBody(typeof s.skillBody === 'string' ? s.skillBody : '')
-    const pendingClar = [...s.chatMessages]
+    setImagePromptTags(fresh.imagePromptTags)
+    setImagePresetId(fresh.imagePresetId)
+    setImageEngine(fresh.imageEngine)
+    setImageDeepMode(fresh.imageDeepMode)
+    setSkillPresetId(fresh.skillPresetId)
+    setSkillBody(typeof fresh.skillBody === 'string' ? fresh.skillBody : '')
+    const pendingClar = [...fresh.chatMessages]
       .reverse()
       .find(
         (m) =>
@@ -375,13 +387,13 @@ export default function Home() {
           m.clarificationQA === undefined,
       )
     lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
-    setSuggestedActions(s.suggestedActions ?? [])
+    setSuggestedActions(fresh.suggestedActions ?? [])
   },
     [applyExpertPreset],
   )
 
   const persistCurrentModeToRef = useCallback(() => {
-    studioModesRef.current[promptType] = {
+    studioModesRef.current[promptType] = cloneAgentStudioSnapshot({
       chatMessages,
       taskInput,
       baseTaskRef,
@@ -400,7 +412,7 @@ export default function Home() {
       skillBody,
       expertLevel,
       suggestedActions,
-    }
+    })
   }, [
     promptType,
     chatMessages,
@@ -425,9 +437,10 @@ export default function Home() {
 
   const handlePromptTypeChange = useCallback(
     (next: PromptStudioMode) => {
+      if (loading) return
       if (next === promptType) return
       persistCurrentModeToRef()
-      const incoming = studioModesRef.current[next]
+      const incoming = cloneAgentStudioSnapshot(studioModesRef.current[next])
       hydrateFromSnapshot(incoming, next)
       setPromptType(next)
       if (incoming.sessionId?.trim()) {
@@ -438,19 +451,20 @@ export default function Home() {
       setError(null)
       setIssueBannerDismissed(false)
     },
-    [promptType, persistCurrentModeToRef, hydrateFromSnapshot],
+    [promptType, persistCurrentModeToRef, hydrateFromSnapshot, loading],
   )
 
   const handleExpertLevelChange = useCallback(
     (level: ExpertLevel) => {
+      if (loading) return
       setExpertLevel(level)
       applyExpertPreset(level, promptType)
-      studioModesRef.current[promptType] = {
+      studioModesRef.current[promptType] = cloneAgentStudioSnapshot({
         ...studioModesRef.current[promptType],
         expertLevel: level,
-      }
+      })
     },
-    [promptType, applyExpertPreset],
+    [promptType, applyExpertPreset, loading],
   )
 
   const agentSplitRootRef = useRef<HTMLDivElement>(null)
@@ -462,11 +476,14 @@ export default function Home() {
   const agentStudioBootstrappedRef = useRef(false)
   const restoredFromSidebarRef = useRef(false)
   const [agentThinkingIdx, setAgentThinkingIdx] = useState(0)
+  /** Фиксированная строка «думает» (роутинг / этап); если null — ротация AGENT_THINKING_PHASES */
+  const [agentThinkingLine, setAgentThinkingLine] = useState<string | null>(null)
   const [publishCommunityOpen, setPublishCommunityOpen] = useState(false)
   const [skillSandboxOpen, setSkillSandboxOpen] = useState(false)
   const [skillSandboxInput, setSkillSandboxInput] = useState('')
   const [skillSandboxLog, setSkillSandboxLog] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [skillSandboxBusy, setSkillSandboxBusy] = useState(false)
+  const prevGenModelForReasoningRef = useRef<string>('')
   const techPickerBtnRef = useRef<HTMLButtonElement>(null)
   const [techPickerOpen, setTechPickerOpen] = useState(false)
   const [techMenuFilter, setTechMenuFilter] = useState('')
@@ -631,8 +648,14 @@ export default function Home() {
     setSessionId(sid)
     const stored = loadSessionAgentChat(sid)
     if (stored && stored.length > 0) {
-      setChatMessages(stored as ChatMessage[])
-      const pendingClar = [...stored]
+      const restored = stored as ChatMessage[]
+      setChatMessages(restored)
+      studioModesRef.current.text = cloneAgentStudioSnapshot({
+        ...studioModesRef.current.text,
+        chatMessages: restored,
+        sessionId: sid,
+      })
+      const pendingClar = [...restored]
         .reverse()
         .find(
           (m) =>
@@ -642,7 +665,13 @@ export default function Home() {
         )
       lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
     } else {
-      setChatMessages([{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }])
+      const w: ChatMessage[] = [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
+      setChatMessages(w)
+      studioModesRef.current.text = cloneAgentStudioSnapshot({
+        ...studioModesRef.current.text,
+        chatMessages: w,
+        sessionId: sid,
+      })
       lastClarificationsMsgIdRef.current = null
     }
     navigate(location.pathname, { replace: true, state: null })
@@ -658,9 +687,13 @@ export default function Home() {
     agentStudioBootstrappedRef.current = true
     const draft = loadAgentDraftV2()
     if (draft) {
-      studioModesRef.current = draft.modes
+      studioModesRef.current = {
+        text: cloneAgentStudioSnapshot(draft.modes.text),
+        image: cloneAgentStudioSnapshot(draft.modes.image),
+        skill: cloneAgentStudioSnapshot(draft.modes.skill),
+      }
       setPromptType(draft.activePromptType)
-      hydrateFromSnapshot(draft.modes[draft.activePromptType], draft.activePromptType)
+      hydrateFromSnapshot(studioModesRef.current[draft.activePromptType], draft.activePromptType)
       const sid = draft.modes[draft.activePromptType].sessionId
       if (sid?.trim()) localStorage.setItem(ACTIVE_SESSION_KEY, sid)
       else localStorage.removeItem(ACTIVE_SESSION_KEY)
@@ -668,7 +701,12 @@ export default function Home() {
     }
     setChatMessages((msgs) => {
       if (msgs.length > 0) return msgs
-      return [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
+      const w: ChatMessage[] = [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
+      studioModesRef.current.text = cloneAgentStudioSnapshot({
+        ...studioModesRef.current.text,
+        chatMessages: w,
+      })
+      return w
     })
   }, [hydrateFromSnapshot])
 
@@ -682,10 +720,17 @@ export default function Home() {
       const t = state.prefillTask
       setTaskInput(t)
       setBaseTaskRef(t)
-      setChatMessages([
+      const prefillMsgs: ChatMessage[] = [
         { id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') },
         { id: crypto.randomUUID(), role: 'user', content: t },
-      ])
+      ]
+      setChatMessages(prefillMsgs)
+      studioModesRef.current.text = cloneAgentStudioSnapshot({
+        ...studioModesRef.current.text,
+        taskInput: t,
+        baseTaskRef: t,
+        chatMessages: prefillMsgs,
+      })
       if (state.clearResult) setResult(null)
       navigate(location.pathname, { replace: true, state: null })
     }
@@ -718,7 +763,7 @@ export default function Home() {
       sessionId: null,
       suggestedActions: [],
     }
-    studioModesRef.current.skill = snap
+    studioModesRef.current.skill = cloneAgentStudioSnapshot(snap)
     hydrateFromSnapshot(snap, 'skill')
     setPromptType('skill')
     setResult(null)
@@ -825,12 +870,15 @@ export default function Home() {
       setAgentThinkingIdx(0)
       return
     }
+    if (agentThinkingLine) {
+      return
+    }
     setAgentThinkingIdx(Math.floor(Math.random() * AGENT_THINKING_PHASES.length))
     const id = window.setInterval(() => {
       setAgentThinkingIdx((i) => (i + 1) % AGENT_THINKING_PHASES.length)
     }, 2600)
     return () => window.clearInterval(id)
-  }, [loading])
+  }, [loading, agentThinkingLine])
 
   useEffect(() => {
     setQuestionCarouselIdx(0)
@@ -842,7 +890,21 @@ export default function Home() {
     el.scrollTop = el.scrollHeight
   }, [chatMessages, result?.has_questions, result?.questions, loading, error])
 
-  const effectiveTargetModel = promptType === 'text' ? targetModel : 'unknown'
+  const effectiveTargetModel = useMemo(() => {
+    if (promptType === 'text' || promptType === 'skill') return targetModel
+    if (promptType === 'image') return (genModel && genModel.trim()) || 'unknown'
+    return 'unknown'
+  }, [promptType, targetModel, genModel])
+
+  useEffect(() => {
+    const prev = prevGenModelForReasoningRef.current
+    prevGenModelForReasoningRef.current = genModel
+    if (!isReasoningModelId(genModel)) return
+    if (isReasoningModelId(prev)) return
+    setTemperature((t) => Math.min(t, 0.45))
+    setManualTechs((ids) => filterManualTechsForReasoningModel(ids))
+    setQuestionsMode(false)
+  }, [genModel])
 
   useEffect(() => {
     const task = (baseTaskRef || taskInput).trim()
@@ -870,13 +932,15 @@ export default function Home() {
     skipAgentChatReplies?: boolean
     /** Сообщения, добавляемые в чат до блоков «размышления» / карточки результата (например «применён совет»). */
     chatAppendBeforeResult?: GenChatMsg[]
+    /** Вызов из пре-роутера: loading уже true, guard на loading не применять */
+    fromPrePromptRouter?: boolean
   }
 
   const handleGenerate = async (
     questionAnswers?: { question: string; answers: string[] }[],
     opts?: GenerateOptions,
   ) => {
-    if (loading) return
+    if (loading && !opts?.fromPrePromptRouter) return
     const requestPromptType = promptType
     const effectiveTask = (opts?.taskInputOverride ?? taskInput).trim()
     if (!effectiveTask) return
@@ -885,6 +949,9 @@ export default function Home() {
     setSuggestedActions([])
     setSuggestionsBarExpanded(false)
     setLoading(true)
+    if (!opts?.fromPrePromptRouter) {
+      setAgentThinkingLine(null)
+    }
     setError(null)
     const isIteration =
       opts?.forceIteration !== undefined ? opts.forceIteration : iterationMode
@@ -902,7 +969,7 @@ export default function Home() {
         domain: 'auto',
         technique_mode: techniqueMode,
         manual_techs: techniqueMode === 'manual' ? manualTechs : [],
-        temperature,
+        temperature: clampExpertGenerationTemperature(temperature),
         top_p: topP,
         prompt_type: promptType,
         top_k: topK === '' ? undefined : topK,
@@ -922,6 +989,7 @@ export default function Home() {
         recent_technique_ids: loadRecentTechniqueIds(),
         expert_level: expertLevel,
       }
+      setAgentThinkingLine(null)
       const res = normalizeClientGenerateResult(await api.generate(req))
       const nextSuggestions = normalizeSuggestedStudioActions(res.suggested_actions)
       setSuggestedActions(nextSuggestions)
@@ -931,7 +999,7 @@ export default function Home() {
       if (promptTypeRef.current !== requestPromptType) {
         const snap = studioModesRef.current[requestPromptType]
         if (opts?.skipAgentChatReplies) {
-          studioModesRef.current[requestPromptType] = {
+          studioModesRef.current[requestPromptType] = cloneAgentStudioSnapshot({
             ...snap,
             result: res,
             sessionId: res.session_id,
@@ -942,7 +1010,7 @@ export default function Home() {
             skillBody,
             expertLevel,
             suggestedActions: nextSuggestions,
-          }
+          })
         } else {
           let prevMsgs = (snap.chatMessages || []) as GenChatMsg[]
           if (opts?.chatAppendBeforeResult?.length) {
@@ -957,7 +1025,7 @@ export default function Home() {
             snapTarget.result,
           )
           const { next: nextMsgs } = computeChatAfterGeneration(prevMsgs, res, questionAnswers, doneCtx)
-          studioModesRef.current[requestPromptType] = {
+          studioModesRef.current[requestPromptType] = cloneAgentStudioSnapshot({
             ...snap,
             chatMessages: nextMsgs as ChatMessage[],
             result: res,
@@ -969,11 +1037,15 @@ export default function Home() {
             skillBody,
             expertLevel,
             suggestedActions: nextSuggestions,
-          }
+          })
         }
         saveAgentDraftV2({
           activePromptType: promptType,
-          modes: { ...studioModesRef.current },
+          modes: {
+            text: cloneAgentStudioSnapshot(studioModesRef.current.text),
+            image: cloneAgentStudioSnapshot(studioModesRef.current.image),
+            skill: cloneAgentStudioSnapshot(studioModesRef.current.skill),
+          },
         })
         return
       }
@@ -1005,7 +1077,7 @@ export default function Home() {
           )
           lastClarificationsMsgIdRef.current = lastClarificationsMsgId
           queueMicrotask(() => {
-            studioModesRef.current[requestPromptType] = {
+            studioModesRef.current[requestPromptType] = cloneAgentStudioSnapshot({
               chatMessages: next as ChatMessage[],
               baseTaskRef,
               taskInput,
@@ -1024,10 +1096,14 @@ export default function Home() {
               skillBody,
               expertLevel,
               suggestedActions: nextSuggestions,
-            }
+            })
             saveAgentDraftV2({
               activePromptType: promptType,
-              modes: { ...studioModesRef.current },
+              modes: {
+                text: cloneAgentStudioSnapshot(studioModesRef.current.text),
+                image: cloneAgentStudioSnapshot(studioModesRef.current.image),
+                skill: cloneAgentStudioSnapshot(studioModesRef.current.skill),
+              },
             })
           })
           return next as ChatMessage[]
@@ -1036,6 +1112,7 @@ export default function Home() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка генерации')
     } finally {
+      setAgentThinkingLine(null)
       setLoading(false)
     }
   }
@@ -1213,8 +1290,9 @@ export default function Home() {
   }
 
   const resetAgentDialog = () => {
+    if (loading) return
     if (sessionId?.trim()) clearSessionAgentChat(sessionId)
-    const fresh = createEmptyStudioSnapshot(promptType)
+    const fresh = cloneAgentStudioSnapshot(createEmptyStudioSnapshot(promptType))
     studioModesRef.current[promptType] = fresh
     hydrateFromSnapshot(fresh, promptType)
     setChatInput('')
@@ -1422,9 +1500,53 @@ export default function Home() {
 
     const base = (baseTaskRef || taskInput).trim()
     if (!base) {
-      setBaseTaskRef(text)
-      setTaskInput(text)
-      void handleGenerate(undefined, { taskInputOverride: text })
+      void (async () => {
+        setLoading(true)
+        setError(null)
+        setAgentThinkingLine(PRE_PROMPT_ROUTING_LINE)
+        const chatHist = buildAgentChatHistory([...chatMessages, { role: 'user', content: text }])
+        try {
+          const ac = new AbortController()
+          const tid = window.setTimeout(() => ac.abort(), AGENT_PROCESS_PRE_TIMEOUT_MS)
+          try {
+            const res = await api.agentProcess(
+              {
+                text,
+                has_prompt: false,
+                prompt_type: promptType,
+                chat_history: chatHist,
+              },
+              { signal: ac.signal },
+            )
+            if (res.action === 'chat') {
+              setAgentThinkingLine(null)
+              const msg =
+                String((res.data as { message?: string }).message || '').trim() || pickConversationalReply()
+              setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', content: msg }])
+              setLoading(false)
+              return
+            }
+            if (res.action === 'generate' || res.action === 'generate_skill') {
+              setAgentThinkingLine(res.action === 'generate_skill' ? PRE_PROMPT_SKILL_LINE : PRE_PROMPT_TASK_LINE)
+              setBaseTaskRef(text)
+              setTaskInput(text)
+              await handleGenerate(undefined, { taskInputOverride: text, fromPrePromptRouter: true })
+              return
+            }
+            setAgentThinkingLine(PRE_PROMPT_TASK_LINE)
+            setBaseTaskRef(text)
+            setTaskInput(text)
+            await handleGenerate(undefined, { taskInputOverride: text, fromPrePromptRouter: true })
+          } finally {
+            window.clearTimeout(tid)
+          }
+        } catch {
+          setAgentThinkingLine(PRE_PROMPT_TASK_LINE)
+          setBaseTaskRef(text)
+          setTaskInput(text)
+          await handleGenerate(undefined, { taskInputOverride: text, fromPrePromptRouter: true })
+        }
+      })()
       return
     }
 
@@ -1472,7 +1594,11 @@ export default function Home() {
       persistCurrentModeToRef()
       saveAgentDraftV2({
         activePromptType: promptType,
-        modes: { ...studioModesRef.current },
+        modes: {
+          text: cloneAgentStudioSnapshot(studioModesRef.current.text),
+          image: cloneAgentStudioSnapshot(studioModesRef.current.image),
+          skill: cloneAgentStudioSnapshot(studioModesRef.current.skill),
+        },
       })
     }, 450)
     return () => window.clearTimeout(t)
@@ -1609,6 +1735,19 @@ export default function Home() {
       })),
     [preferredTargetModels, modelLabels],
   )
+
+  const expertLevelSelectOptions = useMemo(
+    () =>
+      (['junior', 'mid', 'senior', 'creative'] as const).map((el) => ({
+        value: el,
+        label: EXPERT_LEVEL_LABELS[el],
+        title: `${EXPERT_LEVEL_HINTS[el]} · ${getLevelBundleForExpertLevel(el).estimatedCostHint}`,
+      })),
+    [],
+  )
+
+  const activeLevelBundle = useMemo(() => getLevelBundleForExpertLevel(expertLevel), [expertLevel])
+
   const latestVersionInChat = useMemo(() => {
     let m = 0
     for (const msg of chatMessages) {
@@ -2145,29 +2284,31 @@ export default function Home() {
                             key={pt}
                             type="button"
                             className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
+                            disabled={loading}
                             onClick={() => handlePromptTypeChange(pt)}
                           >
                             {pt === 'text' ? '📝 Текст' : pt === 'image' ? '📷 Фото' : '⚡ Скилл'}
                           </button>
                         ))}
                       </div>
-                    </div>
-                    <div className={styles.expertLevelRow} title="Профиль генерации: вопросы, техники, температура">
-                      <span className={styles.expertLevelLabel}>Уровень</span>
-                      {(['junior', 'mid', 'senior', 'creative'] as const).map((el) => (
-                        <button
-                          key={el}
-                          type="button"
-                          className={`${styles.expertLevelTab} ${expertLevel === el ? styles.expertLevelTabActive : ''}`}
-                          title={EXPERT_LEVEL_HINTS[el]}
-                          onClick={() => handleExpertLevelChange(el)}
-                        >
-                          {EXPERT_LEVEL_LABELS[el]}
-                        </button>
-                      ))}
+                      <SelectDropdown
+                        value={expertLevel}
+                        options={expertLevelSelectOptions}
+                        onChange={(v) => handleExpertLevelChange(v as ExpertLevel)}
+                        aria-label="Уровень студии"
+                        variant="toolbar"
+                        className={styles.expertLevelSelectWrap}
+                        disabled={loading}
+                        footerLink={{ to: '/help', label: 'Справка: уровни' }}
+                      />
                     </div>
                   </div>
-                  <button type="button" className={styles.agentNewChatBtn} onClick={resetAgentDialog}>
+                  <button
+                    type="button"
+                    className={styles.agentNewChatBtn}
+                    disabled={loading}
+                    onClick={resetAgentDialog}
+                  >
                     Новый диалог
                   </button>
                 </div>
@@ -2189,9 +2330,9 @@ export default function Home() {
                       )}
                       <span
                         className={styles.evalMeta}
-                        title="Размер исходной формулировки до улучшения; сравните с ≈tok у готового промпта справа"
+                        title="Размер исходной формулировки задачи; сравните с ≈tok у готового промпта справа"
                       >
-                        исходный текст
+                        задача
                       </span>
                     </div>
                   </div>
@@ -2256,6 +2397,7 @@ export default function Home() {
                         key={label}
                         type="button"
                         className={styles.skillQuickChip}
+                        disabled={loading}
                         onClick={() => setChatInput(seed)}
                       >
                         {label}
@@ -2573,7 +2715,8 @@ export default function Home() {
                   {loading && (
                     <div className={styles.agentThinking} aria-live="polite">
                       <span className={styles.agentThinkingInner}>
-                        {AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]}
+                        {agentThinkingLine ??
+                          AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]}
                       </span>
                     </div>
                   )}
@@ -2649,12 +2792,19 @@ export default function Home() {
                 <div className={cb.composerFooter}>
                   <div className={cb.composerFooterRow}>
                     <div className={cb.composerFooterMid}>
+                      <span
+                        className={styles.studioCostHint}
+                        title={`Ориентир по профилю «${activeLevelBundle.label}»: фактические токены и цена зависят от модели и длины.`}
+                      >
+                        {activeLevelBundle.estimatedCalls} вызов(ов) · {activeLevelBundle.estimatedCostHint}
+                      </span>
                       <SelectDropdown
                         value={genModel}
                         options={genModelSelectOptions}
                         onChange={setGenModel}
                         aria-label="Модель генерации"
                         variant="composer"
+                        disabled={loading}
                         footerLink={{ to: '/models', label: 'Добавить модель' }}
                       />
                       <WorkspacePicker
@@ -2670,17 +2820,32 @@ export default function Home() {
                           onChange={setImagePresetId}
                           aria-label="Пресет стиля для изображения"
                           variant="composer"
+                          disabled={loading}
                           footerLink={{ to: '/presets', label: 'Создать пресет…' }}
                         />
                       ) : promptType === 'skill' ? (
-                        <SelectDropdown
-                          value={skillPresetId}
-                          options={skillPresetSelectOptions}
-                          onChange={setSkillPresetId}
-                          aria-label="Пресет для генерации скилла"
-                          variant="composer"
-                          footerLink={{ to: '/presets', label: 'Создать пресет…' }}
-                        />
+                        <>
+                          <SelectDropdown
+                            value={skillPresetId}
+                            options={skillPresetSelectOptions}
+                            onChange={setSkillPresetId}
+                            aria-label="Пресет для генерации скилла"
+                            variant="composer"
+                            disabled={loading}
+                            footerLink={{ to: '/presets', label: 'Создать пресет…' }}
+                          />
+                          <SelectDropdown
+                            value={targetModel}
+                            options={targetModelSelectOptions}
+                            onChange={setTargetModel}
+                            aria-label="Целевая модель или среда для скилла"
+                            variant="composer"
+                            disabled={loading}
+                            footerLink={{ to: '/models', label: 'Каталог моделей' }}
+                            triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
+                            triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
+                          />
+                        </>
                       ) : (
                         <SelectDropdown
                           value={targetModel}
@@ -2688,6 +2853,7 @@ export default function Home() {
                           onChange={setTargetModel}
                           aria-label="Модель, для которой пишется промпт"
                           variant="composer"
+                          disabled={loading}
                           footerLink={{ to: '/models', label: 'Каталог моделей' }}
                           triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
                           triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
@@ -2699,6 +2865,7 @@ export default function Home() {
                         title={techniqueMode === 'auto' ? 'Техники: авто — нажмите для выбора вручную' : 'Техники: вручную — нажмите для авто'}
                         aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
                         aria-pressed={techniqueMode === 'manual'}
+                        disabled={loading}
                         onClick={() => setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))}
                       >
                         {techniqueMode === 'auto' ? 'A' : '✎'}
@@ -2706,6 +2873,7 @@ export default function Home() {
                       <button
                         type="button"
                         className={cb.composerGhostBtn}
+                        disabled={loading}
                         onClick={() => setShowAdvanced(!showAdvanced)}
                       >
                         {showAdvanced ? 'Меньше' : 'Доп.'}
@@ -2735,7 +2903,8 @@ export default function Home() {
                         aria-expanded={techPickerOpen}
                         aria-haspopup="listbox"
                         aria-label="Выбор техник для генерации"
-                        onClick={() => setTechPickerOpen((o) => !o)}
+                        disabled={loading}
+                        onClick={() => !loading && setTechPickerOpen((o) => !o)}
                       >
                         Техники
                         {manualTechs.length > 0 ? (
@@ -2798,14 +2967,16 @@ export default function Home() {
                   <div className={cb.composerInset}>
                     <div className={styles.advancedInline}>
                       <label className={styles.advancedInlineField}>
-                        Т° {temperature}
+                        Т° {clampExpertGenerationTemperature(temperature)}
                         <input
                           type="range"
                           min={0.1}
-                          max={1}
-                          step={0.1}
-                          value={temperature}
-                          onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                          max={EXPERT_GENERATION_TEMPERATURE_CAP}
+                          step={0.05}
+                          value={clampExpertGenerationTemperature(temperature)}
+                          title="Потолок температуры для стабильного блока [PROMPT]"
+                          disabled={loading}
+                          onChange={(e) => setTemperature(clampExpertGenerationTemperature(parseFloat(e.target.value)))}
                         />
                       </label>
                       <label className={styles.advancedInlineField}>
@@ -2816,6 +2987,7 @@ export default function Home() {
                           max={1}
                           step={0.05}
                           value={topP}
+                          disabled={loading}
                           onChange={(e) => setTopP(parseFloat(e.target.value))}
                         />
                       </label>
@@ -2824,12 +2996,18 @@ export default function Home() {
                         <input
                           type="number"
                           value={topK}
+                          disabled={loading}
                           onChange={(e) => setTopK(e.target.value ? Number(e.target.value) : '')}
                           className={styles.topKInput}
                         />
                       </label>
                       <label className={styles.questionsCompact}>
-                        <input type="checkbox" checked={questionsMode} onChange={(e) => setQuestionsMode(e.target.checked)} />
+                        <input
+                          type="checkbox"
+                          checked={questionsMode}
+                          disabled={loading}
+                          onChange={(e) => setQuestionsMode(e.target.checked)}
+                        />
                         <span>Вопросы</span>
                       </label>
                     </div>

@@ -43,6 +43,9 @@ from services.prompt_workflow import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Согласовано с фронтом: потолок для стабильного [PROMPT] (отчёт v5).
+_GENERATION_TEMPERATURE_CAP = 0.85
+
 
 def _split_image_questions_rules(raw: str) -> tuple[str, str]:
     m_a = "<<<IMAGE_QUESTIONS_APPEND>>>"
@@ -539,6 +542,7 @@ def generate_prompt(
             )
 
     llm = LLMClient(api_key)
+    effective_temperature = min(float(req.temperature), _GENERATION_TEMPERATURE_CAP)
     session_id = req.session_id or str(uuid.uuid4())
     workspace = None
     if req.workspace_id:
@@ -771,7 +775,7 @@ def generate_prompt(
         system_prompt,
         user_content,
         req.gen_model,
-        req.temperature,
+        effective_temperature,
         top_p=req.top_p,
         top_k=req.top_k,
     ):

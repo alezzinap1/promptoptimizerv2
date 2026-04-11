@@ -1,5 +1,12 @@
 import type { PromptStudioMode } from './agentStudioModes'
 
+/** Потолок температуры генерации (отчёт v5 / стабильность блока [PROMPT]). */
+export const EXPERT_GENERATION_TEMPERATURE_CAP = 0.85
+
+export function clampExpertGenerationTemperature(t: number): number {
+  return Math.min(t, EXPERT_GENERATION_TEMPERATURE_CAP)
+}
+
 export type ExpertLevel = 'junior' | 'mid' | 'senior' | 'creative'
 
 /** Сильные техники для режима Senior (id как в techniques/*.yaml). */
@@ -55,7 +62,7 @@ export function getExpertLevelPreset(level: ExpertLevel, mode: PromptStudioMode)
         questionsMode: mode === 'skill' ? false : true,
         techniqueMode: mode === 'text' ? 'manual' : 'auto',
         manualTechs: mode === 'text' ? [...SENIOR_MANUAL_TECHNIQUE_IDS].slice(0, 4) : [],
-        temperature: 0.92,
+        temperature: EXPERT_GENERATION_TEMPERATURE_CAP,
         topP: 1,
         imageDeepMode: mode === 'image',
       }

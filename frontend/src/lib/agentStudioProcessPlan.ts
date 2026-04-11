@@ -2,7 +2,12 @@
  * Студия: основной путь маршрутизации — POST /agent/process (core/agent_followup_rules.py).
  * При ошибке сети / таймауте — resolveAgentFollowUpPlan (клиентский гибрид).
  */
-import { api, normalizeSuggestedStudioActions, type SuggestedStudioAction } from '../api/client'
+import {
+  api,
+  normalizeSuggestedStudioActions,
+  type AgentProcessResponse,
+  type SuggestedStudioAction,
+} from '../api/client'
 import type { FollowUpPlan } from './agentFollowUp'
 import { resolveAgentFollowUpPlan } from './agentPlanResolver'
 
@@ -90,6 +95,6 @@ export async function resolveStudioFollowUpPlan(
       window.clearTimeout(tid)
     }
   } catch {
-    return { plan: resolveAgentFollowUpPlan(text) }
+    return { plan: await resolveAgentFollowUpPlan(text) }
   }
 }

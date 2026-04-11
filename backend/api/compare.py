@@ -20,6 +20,8 @@ from services.openrouter_models import get_model_pricing, completion_price_per_m
 
 router = APIRouter()
 
+_GENERATION_TEMPERATURE_CAP = 0.85
+
 
 def _get_openrouter_model_id(provider: str) -> str:
     if provider in PROVIDER_MODELS:
@@ -74,6 +76,7 @@ def compare_prompts(
             raise HTTPException(403, f"Модель недоступна в пробном режиме. Введите свой API ключ в Настройках.")
 
     llm = LLMClient(api_key)
+    eff_temp = min(float(req.temperature), _GENERATION_TEMPERATURE_CAP)
     builder = ContextBuilder(registry)
 
     classification = classify_task(req.task_input)
@@ -114,13 +117,13 @@ def compare_prompts(
     # Generate A
     system_a = builder.build_system_prompt(technique_ids=ids_a, target_model=req.target_model)
     result_a_text = ""
-    for chunk in llm.stream(system_a, user_content, req.gen_model, req.temperature, top_p=req.top_p):
+    for chunk in llm.stream(system_a, user_content, req.gen_model, eff_temp, top_p=req.top_p):
         result_a_text += chunk
 
     # Generate B
     system_b = builder.build_system_prompt(technique_ids=ids_b, target_model=req.target_model)
     result_b_text = ""
-    for chunk in llm.stream(system_b, user_content, req.gen_model, req.temperature, top_p=req.top_p):
+    for chunk in llm.stream(system_b, user_content, req.gen_model, eff_temp, top_p=req.top_p):
         result_b_text += chunk
 
     parsed_a = parse_reply(result_a_text)
