@@ -186,7 +186,7 @@
   cursor: pointer;
   color: rgba(255, 255, 255, 0.85);
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(5px);
   transition: background 0.15s, color 0.15s, transform 0.12s;
 }
 

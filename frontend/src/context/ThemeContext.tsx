@@ -138,6 +138,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyDom(prefs.palette, prefs.mode, prefs.font)
   }, [prefs.palette, prefs.mode, prefs.font])
 
+  /** Подгрузка DM Sans при смене шрифта (не в main — меньше начальный бандл для остальных). */
+  useEffect(() => {
+    if (prefs.font !== 'dmsans') return
+    void import('@fontsource-variable/dm-sans/wght.css')
+  }, [prefs.font])
+
   const pushServer = useCallback(
     async (palette: PaletteId, font: FontId, mode: ColorMode) => {
       if (!user || user.id === 0) return

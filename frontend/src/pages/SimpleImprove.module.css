@@ -67,7 +67,7 @@
   border-radius: 9px;
   background: var(--panel);
   border: 1px solid var(--stroke);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(9px);
 }
 
 .label {
@@ -116,7 +116,7 @@
   border-radius: 7px;
   background: var(--panel);
   border: 1px solid var(--stroke);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
   transition: border-color 0.2s ease;
 }
 

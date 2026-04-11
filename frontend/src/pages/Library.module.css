@@ -1,12 +1,12 @@
 .library {
   max-width: 1200px;
-  animation: pageEnter 0.5s ease-out;
+  animation: pageEnter 0.42s ease-out;
 }
 
 @keyframes pageEnter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -57,7 +57,7 @@
   border-radius: 9px;
   background: var(--panel);
   border: 1px solid var(--stroke);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(9px);
 }
 
 .toolbarCompact {
@@ -161,7 +161,7 @@
   background: var(--panel);
   border-radius: 9px;
   border: 1px solid var(--stroke);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(9px);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -176,9 +176,9 @@
 }
 
 .card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   border-color: rgba(110, 231, 183, 0.25);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .card h3 {

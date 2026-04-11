@@ -114,7 +114,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.25s ease;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(5px);
 }
 
 .secondaryBtn:hover {
@@ -139,7 +139,7 @@
   border-radius: 9px;
   background: var(--panel);
   border: 1px solid var(--stroke);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 

@@ -1,12 +1,12 @@
 .techniques {
   max-width: 1200px;
-  animation: pageEnter 0.5s ease-out;
+  animation: pageEnter 0.42s ease-out;
 }
 
 @keyframes pageEnter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -17,8 +17,8 @@
 .card {
   padding: 16px 18px;
   background: var(--panel);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   border-radius: 6px;
   border: 1px solid var(--stroke);
   cursor: pointer;
@@ -28,7 +28,7 @@
 
 .card:hover {
   border-color: color-mix(in srgb, var(--primary) 55%, var(--stroke));
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 7px 24px rgba(0, 0, 0, 0.16);
   transform: translateY(-1px);
 }
 
@@ -184,8 +184,8 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -392,8 +392,8 @@
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   color: var(--text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }

@@ -889,8 +889,8 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   animation: fadeInOverlay 0.2s ease;
 }
 
@@ -1745,7 +1745,8 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   justify-content: center;
   padding: 24px;
   background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .versionRestoreBox {
@@ -1968,7 +1969,7 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   border-radius: 7px;
   border: 1px solid var(--stroke);
   box-shadow: var(--glow);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(9px);
   position: relative;
   overflow: hidden;
 }
@@ -2802,8 +2803,8 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   width: 100vw;
   max-width: 100%;
   background: rgba(0, 0, 0, 0.52);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;

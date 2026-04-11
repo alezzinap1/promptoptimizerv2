@@ -45,8 +45,8 @@
   inset: 0;
   z-index: 0;
   background: var(--header-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
   pointer-events: none;
@@ -234,7 +234,7 @@
   padding: 16px 20px 28px;
   font-size: 14px;
   line-height: 1.55;
-  animation: fadeIn 0.45s ease-out;
+  animation: fadeIn 0.4s ease-out;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -278,8 +278,8 @@
   inset: 0;
   z-index: -1;
   background: var(--header-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   mask-image: linear-gradient(to bottom, black 0%, black 75%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 75%, transparent 100%);
   pointer-events: none;

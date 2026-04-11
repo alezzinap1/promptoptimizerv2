@@ -17,7 +17,7 @@
   border-radius: 12px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.05),
@@ -427,7 +427,7 @@
   text-decoration: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(5px);
 }
 
 .githubButton:hover {
