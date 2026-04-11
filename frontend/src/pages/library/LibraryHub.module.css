@@ -1,7 +1,13 @@
 .hub {
+  /* Растягиваем на всю ширину колонки main: иначе при align-items:center у предка
+     ширина = max-content детей — у «Скиллов» узкий контент сжимает всю библиотеку по центру. */
+  width: 100%;
   max-width: 1220px;
   margin: 0 auto;
+  box-sizing: border-box;
+  align-self: stretch;
   animation: pageEnter 0.45s ease-out;
+  text-align: start;
 }
 
 @keyframes pageEnter {
@@ -147,27 +153,22 @@
 }
 
 .viewport {
-  overflow: hidden;
   width: 100%;
-}
-
-.track {
+  min-width: 0;
   display: flex;
-  width: 300%;
-  transition: transform 300ms ease;
-  will-change: transform;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .panel {
-  flex: 0 0 calc(100% / 3);
-  width: calc(100% / 3);
   min-width: 0;
-  padding-right: 12px;
   box-sizing: border-box;
+  width: 100%;
+  align-self: stretch;
 }
 
-.panel:last-child {
-  padding-right: 0;
+.panel[hidden] {
+  display: none !important;
 }
 
 @media (max-width: 640px) {

@@ -7,6 +7,7 @@ import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton }
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import SelectDropdown from '../../components/SelectDropdown'
 import { loadLocalSkills, saveLocalSkills, type SkillItem } from '../../lib/localSkillsStore'
+import libStyles from '../Library.module.css'
 import styles from './SkillsPanel.module.css'
 
 export type { SkillItem }
@@ -187,7 +188,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   const chipTags = (it: SkillItem) => [...it.tags, ...it.frameworks]
 
   return (
-    <div className={styles.root}>
+    <div className={libStyles.library}>
       <p className={styles.leadCompact}>
         Скиллы хранятся локально в браузере. Теги участвуют в поиске; цвет тега — по нажатию на чип.
       </p>

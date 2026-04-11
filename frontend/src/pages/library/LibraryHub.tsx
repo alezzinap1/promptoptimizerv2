@@ -35,8 +35,6 @@ function normalizeTab(raw: string | null): TabId {
 export default function LibraryHub() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = useMemo(() => normalizeTab(searchParams.get('tab')), [searchParams])
-  const idx = TABS.findIndex((t) => t.id === tab)
-  const index = idx >= 0 ? idx : 0
 
   const [counts, setCounts] = useState({ prompts: 0, techniques: 0, skills: 0 })
   const [gridCols, setGridCols] = useState<GridCols>(() => loadGridCols())
@@ -59,7 +57,12 @@ export default function LibraryHub() {
   }, [refreshPromptCount, refreshTechniqueCount])
 
   const setTab = (id: TabId) => {
-    setSearchParams(id === 'prompts' ? {} : { tab: id })
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (id === 'prompts') next.delete('tab')
+      else next.set('tab', id)
+      return next
+    })
   }
 
   const setGrid = (n: GridCols) => {
@@ -112,24 +115,21 @@ export default function LibraryHub() {
       </div>
 
       <div className={hubStyles.viewport}>
-        <div
-          className={hubStyles.track}
-          style={{ transform: `translateX(calc(-${index} * 100% / 3))` }}
-        >
-          <div className={hubStyles.panel}>
-            <PromptsPanel onPromptCountChanged={refreshPromptCount} gridCols={gridCols} />
-          </div>
-          <div className={hubStyles.panel}>
-            <Techniques
-              variant="embedded"
-              libraryActiveTab={tab}
-              onCatalogChanged={refreshTechniqueCount}
-              gridCols={gridCols}
-            />
-          </div>
-          <div className={hubStyles.panel}>
-            <SkillsPanel libraryActiveTab={tab} onCountChange={handleSkillsCount} gridCols={gridCols} />
-          </div>
+        {/* Одна видимая панель за раз (hidden), без translateX-карусели — иначе после модалок
+            фокус/скролл могли «подсвечивать» соседнюю колонку и визуально путать вкладки. */}
+        <div className={hubStyles.panel} hidden={tab !== 'prompts'}>
+          <PromptsPanel onPromptCountChanged={refreshPromptCount} gridCols={gridCols} />
+        </div>
+        <div className={hubStyles.panel} hidden={tab !== 'techniques'}>
+          <Techniques
+            variant="embedded"
+            libraryActiveTab={tab}
+            onCatalogChanged={refreshTechniqueCount}
+            gridCols={gridCols}
+          />
+        </div>
+        <div className={hubStyles.panel} hidden={tab !== 'skills'}>
+          <SkillsPanel libraryActiveTab={tab} onCountChange={handleSkillsCount} gridCols={gridCols} />
         </div>
       </div>
     </div>
