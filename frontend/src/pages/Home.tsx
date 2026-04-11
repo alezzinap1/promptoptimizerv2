@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   api,
@@ -13,7 +14,9 @@ import {
   type Workspace,
 } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
+import menuStyles from '../components/DropdownMenu.module.css'
 import MarkdownOutput from '../components/MarkdownOutput'
+import PortalDropdown from '../components/PortalDropdown'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
 import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
@@ -54,7 +57,7 @@ import {
 import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
 import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
 import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
-import { appendLocalSkill } from '../lib/localSkillsStore'
+import { appendLocalSkill, loadLocalSkills } from '../lib/localSkillsStore'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import { buildPromptDoneCard } from '../lib/studioPromptDoneCard'
 import type { PromptDoneCard } from '../lib/studioPromptDoneCard'
@@ -77,6 +80,15 @@ function pickPromptTitle(res: GenerateResult | null, taskFallback: string): stri
   if (typeof m === 'string' && m.trim()) return m.trim()
   if (res?.prompt_title?.trim()) return res.prompt_title.trim()
   return suggestLibraryTitle(taskFallback)
+}
+
+function mergeStudioSkillTags(raw: string): string[] {
+  const tags = raw.split(',').map((t) => t.trim()).filter(Boolean)
+  const lower = new Set(tags.map((t) => t.toLowerCase()))
+  if (!lower.has('скилл') && !lower.has('skill') && !lower.has('студия')) {
+    tags.push('студия')
+  }
+  return tags
 }
 
 type GenChatMsg = {
@@ -455,6 +467,12 @@ export default function Home() {
   const [skillSandboxInput, setSkillSandboxInput] = useState('')
   const [skillSandboxLog, setSkillSandboxLog] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [skillSandboxBusy, setSkillSandboxBusy] = useState(false)
+  const techPickerBtnRef = useRef<HTMLButtonElement>(null)
+  const [techPickerOpen, setTechPickerOpen] = useState(false)
+  const [techMenuFilter, setTechMenuFilter] = useState('')
+  const skillInsertBtnRef = useRef<HTMLButtonElement>(null)
+  const [skillInsertOpen, setSkillInsertOpen] = useState(false)
+  const [localSkillsTick, setLocalSkillsTick] = useState(0)
   const [skillTestRunning, setSkillTestRunning] = useState(false)
   const [skillTestResults, setSkillTestResults] = useState<Record<number, 'pass' | 'fail'>>({})
   /** Токены только текста задачи (baseTaskRef || taskInput), без system и без истории чата */
@@ -464,6 +482,18 @@ export default function Home() {
   useEffect(() => {
     promptTypeRef.current = promptType
   }, [promptType])
+
+  useEffect(() => {
+    const fn = () => setLocalSkillsTick((x) => x + 1)
+    window.addEventListener('metaprompt-nav-refresh', fn)
+    return () => window.removeEventListener('metaprompt-nav-refresh', fn)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!techPickerOpen) setTechMenuFilter('')
+  }, [techPickerOpen])
+
+  const localSkillsForPicker = useMemo(() => loadLocalSkills(), [localSkillsTick])
 
   const GENERATION_ISSUE_TEXT: Record<GenerationIssue, string> = {
     format_failure:
@@ -1034,17 +1064,30 @@ export default function Home() {
     if (item.action === 'save_library') {
       try {
         const title = pickPromptTitle(snapshot, taskRef)
-        await api.saveToLibrary({
-          title,
-          prompt: snapshot.prompt_block,
-          tags: [],
-          target_model: tm,
-          task_type: snapshot.task_types?.[0] || 'general',
-          techniques: snapshot.technique_ids,
-        })
-        window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
-        setQuickSaved(true)
-        pushAssistant(`Сохранено в библиотеку как «${title}».`)
+        if (promptType === 'skill') {
+          appendLocalSkill({
+            title,
+            body: snapshot.prompt_block,
+            description: taskRef.slice(0, 500),
+            tags: mergeStudioSkillTags(''),
+            frameworks: [],
+          })
+          window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+          setQuickSaved(true)
+          pushAssistant(`Сохранено в **локальные скиллы** как «${title}». Откройте Библиотека → Скиллы.`)
+        } else {
+          await api.saveToLibrary({
+            title,
+            prompt: snapshot.prompt_block,
+            tags: [],
+            target_model: tm,
+            task_type: snapshot.task_types?.[0] || 'general',
+            techniques: snapshot.technique_ids,
+          })
+          window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+          setQuickSaved(true)
+          pushAssistant(`Сохранено в библиотеку как «${title}».`)
+        }
       } catch (e) {
         pushAssistant(e instanceof Error ? e.message : 'Не удалось сохранить.')
       }
@@ -1298,18 +1341,34 @@ export default function Home() {
         try {
           if (plan.type === 'save_library') {
             const title = plan.titleHint?.trim() || pickPromptTitle(snapshot, taskRef)
-            await api.saveToLibrary({
-              title,
-              prompt: snapshot.prompt_block,
-              tags: plan.tags,
-              target_model: tm,
-              task_type: snapshot.task_types?.[0] || 'general',
-              techniques: snapshot.technique_ids,
-            })
-            window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
-            setQuickSaved(true)
-            const tagStr = plan.tags.length ? ` Теги: ${plan.tags.join(', ')}.` : ''
-            pushAssistant(`Сохранено в библиотеку как «${title}».${tagStr}`)
+            if (promptType === 'skill') {
+              appendLocalSkill({
+                title,
+                body: snapshot.prompt_block,
+                description: taskRef.slice(0, 500),
+                tags: mergeStudioSkillTags(plan.tags.join(',')),
+                frameworks: [],
+              })
+              window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+              setQuickSaved(true)
+              const tagStr = plan.tags.length ? ` Теги: ${plan.tags.join(', ')}.` : ''
+              pushAssistant(
+                `Сохранено в **локальные скиллы** как «${title}».${tagStr} Библиотека → Скиллы.`,
+              )
+            } else {
+              await api.saveToLibrary({
+                title,
+                prompt: snapshot.prompt_block,
+                tags: plan.tags,
+                target_model: tm,
+                task_type: snapshot.task_types?.[0] || 'general',
+                techniques: snapshot.technique_ids,
+              })
+              window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+              setQuickSaved(true)
+              const tagStr = plan.tags.length ? ` Теги: ${plan.tags.join(', ')}.` : ''
+              pushAssistant(`Сохранено в библиотеку как «${title}».${tagStr}`)
+            }
             return
           }
           if (plan.type === 'eval_prompt') {
@@ -1438,15 +1497,6 @@ export default function Home() {
     expertLevel,
     suggestedActions,
   ])
-
-  const mergeStudioSkillTags = (raw: string): string[] => {
-    const tags = raw.split(',').map((t) => t.trim()).filter(Boolean)
-    const lower = new Set(tags.map((t) => t.toLowerCase()))
-    if (!lower.has('скилл') && !lower.has('skill') && !lower.has('студия')) {
-      tags.push('студия')
-    }
-    return tags
-  }
 
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
@@ -2677,27 +2727,70 @@ export default function Home() {
                 </div>
                 {techniqueMode === 'manual' && (
                   <div className={`${cb.composerInset} ${styles.techPickerInset}`}>
-                    <div className={styles.techPickerHead}>
-                      <span className={styles.techListLabel}>Техники</span>
-                      {manualTechs.length > 0 ? (
-                        <span className={styles.techPickCount}>Выбрано: {manualTechs.length}</span>
-                      ) : null}
-                    </div>
-                    <div className={checkboxList.gridWrap} role="group" aria-label="Выбор техник для генерации">
-                      {techniques.map((t) => (
-                        <label key={t.id} className={checkboxList.optionCheck}>
-                          <input
-                            type="checkbox"
-                            checked={manualTechs.includes(t.id)}
-                            onChange={() => {
-                              setManualTechs((prev) =>
-                                prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                              )
-                            }}
-                          />
-                          <span>{t.name}</span>
-                        </label>
-                      ))}
+                    <div className={styles.techPickerBar}>
+                      <button
+                        ref={techPickerBtnRef}
+                        type="button"
+                        className={`${styles.techPickerTrigger} ${cb.composerGhostBtn}`}
+                        aria-expanded={techPickerOpen}
+                        aria-haspopup="listbox"
+                        aria-label="Выбор техник для генерации"
+                        onClick={() => setTechPickerOpen((o) => !o)}
+                      >
+                        Техники
+                        {manualTechs.length > 0 ? (
+                          <span className={styles.techPickerTriggerCount}>{manualTechs.length}</span>
+                        ) : null}
+                      </button>
+                      <PortalDropdown
+                        open={techPickerOpen}
+                        onClose={() => setTechPickerOpen(false)}
+                        anchorRef={techPickerBtnRef}
+                        minWidth={300}
+                        align="left"
+                      >
+                        <input
+                          type="search"
+                          className={styles.techMenuSearch}
+                          placeholder="Поиск по названию или id…"
+                          value={techMenuFilter}
+                          onChange={(e) => setTechMenuFilter(e.target.value)}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          aria-label="Фильтр списка техник"
+                        />
+                        {techniques
+                          .filter((t) => {
+                            const q = techMenuFilter.trim().toLowerCase()
+                            if (!q) return true
+                            return (
+                              t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
+                            )
+                          })
+                          .map((t) => {
+                            const on = manualTechs.includes(t.id)
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                role="option"
+                                aria-selected={on}
+                                className={`${menuStyles.menuItem} ${on ? menuStyles.menuItemActive : ''}`}
+                                onClick={() => {
+                                  setManualTechs((prev) =>
+                                    prev.includes(t.id)
+                                      ? prev.filter((x) => x !== t.id)
+                                      : [...prev, t.id],
+                                  )
+                                }}
+                              >
+                                <span className={styles.techMenuCheck} aria-hidden>
+                                  {on ? '\u2713 ' : '\u2003'}
+                                </span>
+                                {t.name}
+                              </button>
+                            )
+                          })}
+                      </PortalDropdown>
                     </div>
                   </div>
                 )}
@@ -2740,8 +2833,53 @@ export default function Home() {
                         <span>Вопросы</span>
                       </label>
                     </div>
-                    <label className={styles.advancedSkillBodyBlock}>
-                      <span className={styles.advancedSkillBodyLabel}>Контекст скилла (опционально)</span>
+                    <div className={styles.advancedSkillBodyBlock}>
+                      <span className={styles.advancedSkillBodyTop}>
+                        <span className={styles.advancedSkillBodyLabel}>Контекст скилла (опционально)</span>
+                        {localSkillsForPicker.length > 0 ? (
+                          <>
+                            <button
+                              ref={skillInsertBtnRef}
+                              type="button"
+                              className={styles.skillInsertFromLibBtn}
+                              onClick={() => setSkillInsertOpen((o) => !o)}
+                              aria-expanded={skillInsertOpen}
+                              aria-haspopup="listbox"
+                            >
+                              Из библиотеки
+                            </button>
+                            <PortalDropdown
+                              open={skillInsertOpen}
+                              onClose={() => setSkillInsertOpen(false)}
+                              anchorRef={skillInsertBtnRef}
+                              minWidth={260}
+                              align="right"
+                            >
+                              {localSkillsForPicker.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  role="option"
+                                  className={menuStyles.menuItem}
+                                  title={s.description || s.title}
+                                  onClick={() => {
+                                    setSkillBody((prev) => {
+                                      const next = (prev || '').trim()
+                                      const block = (s.body || '').trim()
+                                      if (!block) return prev
+                                      if (!next) return block
+                                      return `${next}\n\n---\n${s.title}\n\n${block}`
+                                    })
+                                    setSkillInsertOpen(false)
+                                  }}
+                                >
+                                  {s.title}
+                                </button>
+                              ))}
+                            </PortalDropdown>
+                          </>
+                        ) : null}
+                      </span>
                       <span className={styles.advancedSkillBodyHint}>
                         Уходит в запрос как skill_body — контекст для генерации промпта.
                       </span>
@@ -2754,7 +2892,7 @@ export default function Home() {
                         maxHeightPx={140}
                         spellCheck
                       />
-                    </label>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2824,72 +2962,76 @@ export default function Home() {
           </div>
         </div>
       ) : null}
-      {skillSandboxOpen ? (
-        <div
-          className={styles.skillSandboxBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Песочница скилла"
-          onClick={() => !skillSandboxBusy && setSkillSandboxOpen(false)}
-        >
-          <div className={styles.skillSandboxModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.skillSandboxHead}>
-              <h3 className={styles.skillSandboxTitle}>Песочница скилла</h3>
-              <button
-                type="button"
-                className={styles.skillSandboxClose}
-                disabled={skillSandboxBusy}
-                onClick={() => setSkillSandboxOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <p className={styles.skillSandboxHint}>
-              Один раунд: системный контекст = текущий промпт-скилл справа. Сообщения не сохраняются на сервере.
-            </p>
-            <div className={styles.skillSandboxLog}>
-              {skillSandboxLog.length === 0 ? (
-                <p className={styles.skillSandboxEmpty}>Напишите сообщение ниже.</p>
-              ) : (
-                skillSandboxLog.map((row, i) => (
-                  <div
-                    key={i}
-                    className={
-                      row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
-                    }
+      {skillSandboxOpen
+        ? createPortal(
+            <div
+              className={styles.skillSandboxBackdrop}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Песочница скилла"
+              onClick={() => !skillSandboxBusy && setSkillSandboxOpen(false)}
+            >
+              <div className={styles.skillSandboxModal} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.skillSandboxHead}>
+                  <h3 className={styles.skillSandboxTitle}>Песочница скилла</h3>
+                  <button
+                    type="button"
+                    className={styles.skillSandboxClose}
+                    disabled={skillSandboxBusy}
+                    onClick={() => setSkillSandboxOpen(false)}
                   >
-                    <MarkdownOutput>{row.content}</MarkdownOutput>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className={styles.skillSandboxComposer}>
-              <AutoTextarea
-                className={styles.skillSandboxTextarea}
-                value={skillSandboxInput}
-                onChange={(e) => setSkillSandboxInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    if (!skillSandboxBusy && skillSandboxInput.trim()) void sendSkillSandboxMessage()
-                  }
-                }}
-                minHeightPx={44}
-                maxHeightPx={120}
-                placeholder="Сообщение для модели…"
-              />
-              <button
-                type="button"
-                className={styles.skillSandboxSend}
-                disabled={skillSandboxBusy || !skillSandboxInput.trim()}
-                onClick={() => void sendSkillSandboxMessage()}
-              >
-                {skillSandboxBusy ? '…' : 'Отправить'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                    ×
+                  </button>
+                </div>
+                <p className={styles.skillSandboxHint}>
+                  Один раунд: системный контекст = текущий промпт-скилл справа. Сообщения не сохраняются на
+                  сервере.
+                </p>
+                <div className={styles.skillSandboxLog}>
+                  {skillSandboxLog.length === 0 ? (
+                    <p className={styles.skillSandboxEmpty}>Напишите сообщение ниже.</p>
+                  ) : (
+                    skillSandboxLog.map((row, i) => (
+                      <div
+                        key={i}
+                        className={
+                          row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
+                        }
+                      >
+                        <MarkdownOutput>{row.content}</MarkdownOutput>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className={styles.skillSandboxComposer}>
+                  <AutoTextarea
+                    className={styles.skillSandboxTextarea}
+                    value={skillSandboxInput}
+                    onChange={(e) => setSkillSandboxInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        if (!skillSandboxBusy && skillSandboxInput.trim()) void sendSkillSandboxMessage()
+                      }
+                    }}
+                    minHeightPx={44}
+                    maxHeightPx={120}
+                    placeholder="Сообщение для модели…"
+                  />
+                  <button
+                    type="button"
+                    className={styles.skillSandboxSend}
+                    disabled={skillSandboxBusy || !skillSandboxInput.trim()}
+                    onClick={() => void sendSkillSandboxMessage()}
+                  >
+                    {skillSandboxBusy ? '…' : 'Отправить'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }
