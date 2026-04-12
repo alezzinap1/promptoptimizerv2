@@ -1,6 +1,6 @@
 """
 Parsing utilities for LLM response blocks.
-Shared by the FastAPI backend (primary) and archived Streamlit UI (`app/`).
+Shared by the FastAPI backend and other internal callers (no UI framework coupling).
 """
 from __future__ import annotations
 

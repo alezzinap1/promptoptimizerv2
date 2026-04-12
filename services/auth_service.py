@@ -1,5 +1,5 @@
 """
-Auth helpers shared by FastAPI and Streamlit.
+Auth helpers used by the FastAPI backend and shared user/session flows.
 """
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 """
-Shared configuration for app (Streamlit) and backend (FastAPI).
+Shared configuration for the Prompt Optimizer stack: FastAPI backend, core domain logic, and scripts.
 """
 from config.settings import (
     APP_ENV,

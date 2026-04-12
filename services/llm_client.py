@@ -1,7 +1,7 @@
 """
 Sync LLM client via OpenRouter.
-Uses synchronous OpenAI SDK for Streamlit compatibility.
-Supports streaming for st.write_stream integration.
+Uses the synchronous OpenAI SDK (blocking calls; suitable for sync call sites and streaming via chunk iterator).
+Streaming yields text chunks for consumers that iterate over tokens (e.g. API streaming endpoints).
 
 Примечание: у провайдеров вроде OpenAI «structured outputs» / JSON Schema (response_format)
 дают более жёсткую гарантию формата, чем текстовые теги в system prompt; при расширении
@@ -87,7 +87,7 @@ def get_model_for_tier(tier: str, preferred: str | None = None) -> str:
 
 
 class LLMClient:
-    """Synchronous LLM client for Streamlit compatibility."""
+    """Synchronous LLM client for call sites that do not use an async event loop."""
 
     def __init__(self, api_key: str, timeout: float = DEFAULT_TIMEOUT):
         self._client = OpenAI(
@@ -204,8 +204,7 @@ class LLMClient:
         history: list[dict] | None = None,
     ) -> Iterator[str]:
         """
-        Streaming generation — yields text chunks.
-        Compatible with Streamlit's st.write_stream().
+        Streaming generation — yields text chunks for streaming HTTP responses or other consumers.
         """
         model = self._get_model(provider)
         messages = [{"role": "system", "content": system_prompt}]
