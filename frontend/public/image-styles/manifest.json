@@ -3,234 +3,273 @@
     "id": "photography",
     "label": "Photography",
     "file": "/image-styles/photography.png",
-    "adaptation": "Typography as the hero subject: large photoreal 3D letterforms with believable studio materials (matte paint, brushed metal, or frosted acrylic), crisp edge highlights from large softboxes, natural shadow falloff and contact shadows, specular response faithful to photography; integrate with the background via matching white balance and depth of field so the set reads as a real product shoot, not CGI plastic."
+    "adaptation": "Typography as the hero subject: large photoreal 3D letterforms with believable studio materials (matte paint, brushed metal, or frosted acrylic), crisp edge highlights from large softboxes, natural shadow falloff and contact shadows, specular response faithful to photography; integrate with the background via matching white balance and depth of field so the set reads as a real product shoot, not CGI plastic.",
+    "style_brief": "For «Photography», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "teal_orange",
     "label": "Teal & Orange",
     "file": "/image-styles/teal_orange.png",
-    "adaptation": "Hollywood blockbuster grade: push teal into shadows and midtones, warm tungsten or sunset orange in skin- and highlight-adjacent regions, lifted black floor with filmic contrast; letterforms should show rim-lit edges, atmospheric haze interaction, and subtle halation—cohesive with a cinematic wide establishing background."
+    "adaptation": "Hollywood blockbuster grade: push teal into shadows and midtones, warm tungsten or sunset orange in skin- and highlight-adjacent regions, lifted black floor with filmic contrast; letterforms should show rim-lit edges, atmospheric haze interaction, and subtle halation—cohesive with a cinematic wide establishing background.",
+    "style_brief": "For «Teal & Orange», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "glass",
     "label": "Glass",
     "file": "/image-styles/glass.png",
-    "adaptation": "Solid-glass letterforms: thin-shell refraction, dispersion fringes at glancing angles, internal bubbles or frost optional, caustic pools and sharp light shards cast onto surfaces behind; maintain energy-conserving speculars and parallax so typography feels volumetric and physically present in the scene."
+    "adaptation": "Solid-glass letterforms: thin-shell refraction, dispersion fringes at glancing angles, internal bubbles or frost optional, caustic pools and sharp light shards cast onto surfaces behind; maintain energy-conserving speculars and parallax so typography feels volumetric and physically present in the scene.",
+    "style_brief": "For «Glass», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "dreamcore",
     "label": "Dreamcore",
     "file": "/image-styles/dreamcore.png",
-    "adaptation": "Soft-liminal typography: slightly inflated or pillowy letter volumes, pastel bloom and gentle chromatic drift, low-contrast edges, subtle grain; letters may float with mild perspective skew but remain readable—match the surreal, comforting unease of dreamcore lighting (glow, fog, soft vignette)."
+    "adaptation": "Soft-liminal typography: slightly inflated or pillowy letter volumes, pastel bloom and gentle chromatic drift, low-contrast edges, subtle grain; letters may float with mild perspective skew but remain readable—match the surreal, comforting unease of dreamcore lighting (glow, fog, soft vignette).",
+    "style_brief": "For «Dreamcore», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "knit_fabric",
     "label": "Knit Fabric",
     "file": "/image-styles/knit_fabric.png",
-    "adaptation": "Knitted yarn letterforms: visible stitch rows, occasional dropped-stitch imperfections, fuzzy fiber scatter, warm subsurface softness; directional light rakes across loops to reveal micro-texture—typography should feel hand-knit and tactile, harmonized with a cozy craft-environment background."
+    "adaptation": "Knitted yarn letterforms: visible stitch rows, occasional dropped-stitch imperfections, fuzzy fiber scatter, warm subsurface softness; directional light rakes across loops to reveal micro-texture—typography should feel hand-knit and tactile, harmonized with a cozy craft-environment background.",
+    "style_brief": "For «Knit Fabric», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "retro_film",
     "label": "Retro Film",
     "file": "/image-styles/retro_film.png",
-    "adaptation": "35mm photochemical look: fine grain structure, halation on bright edges, slight gate weave, lifted shadows with milky blacks, occasional lens dust and edge light leak; color as faded Ektachrome or Kodachrome memory—typography inherits the same emulsion texture and period lens softness."
+    "adaptation": "35mm photochemical look: fine grain structure, halation on bright edges, slight gate weave, lifted shadows with milky blacks, occasional lens dust and edge light leak; color as faded Ektachrome or Kodachrome memory—typography inherits the same emulsion texture and period lens softness.",
+    "style_brief": "For «Retro Film», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "wool_felt_style",
     "label": "Wool Felt Style",
     "file": "/image-styles/wool_felt_style.png",
-    "adaptation": "Dense wool-felt letters: fibrous fuzzy silhouette, pressed-layer edges, matte light absorption, tiny pilling; soft studio key with gentle bounce fill—forms read as handcrafted appliqué integrated into a felt-diorama scene."
+    "adaptation": "Dense wool-felt letters: fibrous fuzzy silhouette, pressed-layer edges, matte light absorption, tiny pilling; soft studio key with gentle bounce fill—forms read as handcrafted appliqué integrated into a felt-diorama scene.",
+    "style_brief": "For «Wool Felt Style», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "macaron_color",
     "label": "Macaron Color",
     "file": "/image-styles/macaron_color.png",
-    "adaptation": "Pastel patisserie palette: desaturated sweet hues with airy gradients, soft ambient occlusion in crevices, sugar-dust micro-highlight; glossy-macaron shell suggestion on rounded letter corners—overall dreamy, clean, and appetizing without neon saturation."
+    "adaptation": "Pastel patisserie palette: desaturated sweet hues with airy gradients, soft ambient occlusion in crevices, sugar-dust micro-highlight; glossy-macaron shell suggestion on rounded letter corners—overall dreamy, clean, and appetizing without neon saturation.",
+    "style_brief": "For «Macaron Color», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "plaster",
     "label": "Plaster",
     "file": "/image-styles/plaster.png",
-    "adaptation": "Cast plaster or stucco letter sculpture: chalky matte response, fine cracks and pitting, classical studio chiaroscuro; subtle ivory warmth and dust in recesses—typography should feel museum-statuary against a complementary classical or atelier background."
+    "adaptation": "Cast plaster or stucco letter sculpture: chalky matte response, fine cracks and pitting, classical studio chiaroscuro; subtle ivory warmth and dust in recesses—typography should feel museum-statuary against a complementary classical or atelier background.",
+    "style_brief": "For «Plaster», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "plush_texture",
     "label": "Plush Texture",
     "file": "/image-styles/plush_texture.png",
-    "adaptation": "Velvet-plush letterforms: dense pile shading that shifts with light direction, visible seam lines and tufting, ultra-soft specular breakup; warm key light to emphasize tactile pile—readable silhouettes with cuddly material honesty."
+    "adaptation": "Velvet-plush letterforms: dense pile shading that shifts with light direction, visible seam lines and tufting, ultra-soft specular breakup; warm key light to emphasize tactile pile—readable silhouettes with cuddly material honesty.",
+    "style_brief": "For «Plush Texture», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "cartoon_c4d",
     "label": "Cartoon C4D",
     "file": "/image-styles/cartoon_c4d.png",
-    "adaptation": "3D cartoon plastic: saturated candy colors, rounded bevels, exaggerated squash-friendly proportions, crisp contact shadows; Pixar-adjacent global illumination with bounce color bleed—typography matches a playful C4D world with clean rim lights."
+    "adaptation": "3D cartoon plastic: saturated candy colors, rounded bevels, exaggerated squash-friendly proportions, crisp contact shadows; Pixar-adjacent global illumination with bounce color bleed—typography matches a playful C4D world with clean rim lights.",
+    "style_brief": "For «Cartoon C4D», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "cg_rendering",
     "label": "CG Rendering",
     "file": "/image-styles/cg_rendering.png",
-    "adaptation": "High-end CGI hero pass: multi-bounce GI, accurate roughness/metalness, thin-film or anisotropic highlights where appropriate, subtle DOF; SSS on translucent materials—letterforms should read as award-show productviz quality aligned with a premium HDRI stage."
+    "adaptation": "High-end CGI hero pass: multi-bounce GI, accurate roughness/metalness, thin-film or anisotropic highlights where appropriate, subtle DOF; SSS on translucent materials—letterforms should read as award-show productviz quality aligned with a premium HDRI stage.",
+    "style_brief": "For «CG Rendering», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "steampunk",
     "label": "Steampunk",
     "file": "/image-styles/steampunk.png",
-    "adaptation": "Brass-and-copper mechanical letters: riveted plates, miniature gears, vented pistons, wisps of steam, oil sheen in crevices; warm tungsten key with cool fill bounce from steel—Victorian-industrial detail density without cluttering legibility."
+    "adaptation": "Brass-and-copper mechanical letters: riveted plates, miniature gears, vented pistons, wisps of steam, oil sheen in crevices; warm tungsten key with cool fill bounce from steel—Victorian-industrial detail density without cluttering legibility.",
+    "style_brief": "For «Steampunk», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "pixel_art",
     "label": "Pixel Art",
     "file": "/image-styles/pixel_art.png",
-    "adaptation": "Strict pixel grid typography: no sub-pixel anti-aliasing on letter edges, limited indexed palette, selective dither between ramps, crisp 1–2 px highlights; letters sit in the same perspective and lighting rules as an authentic retro game backdrop."
+    "adaptation": "Strict pixel grid typography: no sub-pixel anti-aliasing on letter edges, limited indexed palette, selective dither between ramps, crisp 1–2 px highlights; letters sit in the same perspective and lighting rules as an authentic retro game backdrop.",
+    "style_brief": "For «Pixel Art», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "ghibli",
     "label": "Ghibli",
     "file": "/image-styles/ghibli.png",
-    "adaptation": "Hand-painted anime backgrounds with soft watercolor skies and gentle foliage detail; typography as cel-painted shapes with mild outline, warm daylight wrap, no harsh speculars—whimsical, pastoral, emotionally bright, matching Ghibli-like environmental storytelling."
+    "adaptation": "Hand-painted anime backgrounds with soft watercolor skies and gentle foliage detail; typography as cel-painted shapes with mild outline, warm daylight wrap, no harsh speculars—whimsical, pastoral, emotionally bright, matching Ghibli-like environmental storytelling.",
+    "style_brief": "For «Ghibli», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "anime_cartoon",
     "label": "Anime Cartoon",
     "file": "/image-styles/anime_cartoon.png",
-    "adaptation": "Modern TV-anime cel look: bold ink outlines with variable weight, flat fills plus hard-edged cel shadows, occasional gradient-only backgrounds; punchy saturated colors, screen-tone optional in shadows—dynamic readable letterforms suited to an urban or sky-action backdrop."
+    "adaptation": "Modern TV-anime cel look: bold ink outlines with variable weight, flat fills plus hard-edged cel shadows, occasional gradient-only backgrounds; punchy saturated colors, screen-tone optional in shadows—dynamic readable letterforms suited to an urban or sky-action backdrop.",
+    "style_brief": "For «Anime Cartoon», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "impasto_oil",
     "label": "Impasto Oil",
     "file": "/image-styles/impasto_oil.png",
-    "adaptation": "Heavy impasto oil: thick palette-knife ridges casting micro-shadows, bristle track visibility, wet-looking peaks; color mixing on the surface—typography as sculpted paint mass consistent with a painter's studio environment."
+    "adaptation": "Heavy impasto oil: thick palette-knife ridges casting micro-shadows, bristle track visibility, wet-looking peaks; color mixing on the surface—typography as sculpted paint mass consistent with a painter's studio environment.",
+    "style_brief": "For «Impasto Oil», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "monet",
     "label": "Monet",
     "file": "/image-styles/monet.png",
-    "adaptation": "Impressionist broken color: small complementary brush dabs, vibrating light on edges, soft lost-and-found contours; atmospheric perspective with blue-violet distance—letterforms dissolve slightly into light like a Monet bridge or lily study."
+    "adaptation": "Impressionist broken color: small complementary brush dabs, vibrating light on edges, soft lost-and-found contours; atmospheric perspective with blue-violet distance—letterforms dissolve slightly into light like a Monet bridge or lily study.",
+    "style_brief": "For «Monet», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "dunhuang_murals",
     "label": "Dunhuang Murals",
     "file": "/image-styles/dunhuang_murals.png",
-    "adaptation": "Mineral-pigment fresco look: aged mineral reds and greens, micro-crackle, gold leaf accents on halos or ribbons, dry-brush mineral texture; flat decorative perspective with flowing Dunhuang drapery motifs integrated around letterforms."
+    "adaptation": "Mineral-pigment fresco look: aged mineral reds and greens, micro-crackle, gold leaf accents on halos or ribbons, dry-brush mineral texture; flat decorative perspective with flowing Dunhuang drapery motifs integrated around letterforms.",
+    "style_brief": "For «Dunhuang Murals», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "design_draft",
     "label": "Design Draft",
     "file": "/image-styles/design_draft.png",
-    "adaptation": "Architectural pencil/technical draft: precise linework, light construction ticks, restrained graphite value range, trace-paper ghost lines; typography reads as measured blueprint lettering aligned to a drafting-table scene."
+    "adaptation": "Architectural pencil/technical draft: precise linework, light construction ticks, restrained graphite value range, trace-paper ghost lines; typography reads as measured blueprint lettering aligned to a drafting-table scene.",
+    "style_brief": "For «Design Draft», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "watercolor_painting",
     "label": "Watercolor Painting",
     "file": "/image-styles/watercolor_painting.png",
-    "adaptation": "Transparent watercolor: wet-on-wet blooms, granulation in shadows, paper deckle awareness, soft backruns; cool-to-warm transitions—letters built from luminous washes rather than opaque fills, matching botanical or sky wash backgrounds."
+    "adaptation": "Transparent watercolor: wet-on-wet blooms, granulation in shadows, paper deckle awareness, soft backruns; cool-to-warm transitions—letters built from luminous washes rather than opaque fills, matching botanical or sky wash backgrounds.",
+    "style_brief": "For «Watercolor Painting», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "cyberpunk",
     "label": "Cyberpunk",
     "file": "/image-styles/cyberpunk.png",
-    "adaptation": "Neon glass typography: emissive edge tubing, holographic shimmer, rain streak refraction, wet-street bounce light; cyan/magenta split with deep shadow noise—letterforms feel integrated into a rainy megacity alley with volumetric fog."
+    "adaptation": "Neon glass typography: emissive edge tubing, holographic shimmer, rain streak refraction, wet-street bounce light; cyan/magenta split with deep shadow noise—letterforms feel integrated into a rainy megacity alley with volumetric fog.",
+    "style_brief": "For «Cyberpunk», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "pencil_sketch",
     "label": "Pencil Sketch",
     "file": "/image-styles/pencil_sketch.png",
-    "adaptation": "Graphite rendering: HB to 6B range, directional hatching and cross-hatch for form, smudge in ambient occlusion, paper tooth visible; crisp letter contours with soft tonal modeling—consistent with observational still-life sketch lighting."
+    "adaptation": "Graphite rendering: HB to 6B range, directional hatching and cross-hatch for form, smudge in ambient occlusion, paper tooth visible; crisp letter contours with soft tonal modeling—consistent with observational still-life sketch lighting.",
+    "style_brief": "For «Pencil Sketch», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "chinese_ink_wash",
     "label": "Chinese Ink Wash",
     "file": "/image-styles/chinese_ink_wash.png",
-    "adaptation": "Sumi-e ink discipline: wet-to-dry brush pressure modulation, intentional white reserve, misty mountain dissolve at edges; restrained palette (ink + slight warm wash)—letterforms as brush constructions harmonized with negative space."
+    "adaptation": "Sumi-e ink discipline: wet-to-dry brush pressure modulation, intentional white reserve, misty mountain dissolve at edges; restrained palette (ink + slight warm wash)—letterforms as brush constructions harmonized with negative space.",
+    "style_brief": "For «Chinese Ink Wash», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "surrealism",
     "label": "Surrealism",
     "file": "/image-styles/surrealism.png",
-    "adaptation": "Surrealist object-logic: partial melt, scale paradox, soft antigravity lift, painterly cohesion; muted surreal palette with one accent hue—typography participates in dream narrative without becoming illegible abstraction."
+    "adaptation": "Surrealist object-logic: partial melt, scale paradox, soft antigravity lift, painterly cohesion; muted surreal palette with one accent hue—typography participates in dream narrative without becoming illegible abstraction.",
+    "style_brief": "For «Surrealism», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "art_nouveau",
     "label": "Art Nouveau",
     "file": "/image-styles/art_nouveau.png",
-    "adaptation": "Whiplash curves and floral ironwork integration: letters grown from stems and tendrils, stained-glass color patches, whiplash asymmetry; brass or enamel material hints with elegant filigree—typography as jewelry-like architecture."
+    "adaptation": "Whiplash curves and floral ironwork integration: letters grown from stems and tendrils, stained-glass color patches, whiplash asymmetry; brass or enamel material hints with elegant filigree—typography as jewelry-like architecture.",
+    "style_brief": "For «Art Nouveau», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "baroque_painting",
     "label": "Baroque Painting",
     "file": "/image-styles/baroque_painting.png",
-    "adaptation": "Baroque oil drama: strong tenebrism, glazes on deep reds and golds, ornate carved surrounds implied in light; letterforms modeled like marble or gilded stone under candle and window keys—grand, theatrical, readable silhouettes."
+    "adaptation": "Baroque oil drama: strong tenebrism, glazes on deep reds and golds, ornate carved surrounds implied in light; letterforms modeled like marble or gilded stone under candle and window keys—grand, theatrical, readable silhouettes.",
+    "style_brief": "For «Baroque Painting», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "gothic",
     "label": "Gothic",
     "file": "/image-styles/gothic.png",
-    "adaptation": "Victorian gothic letter architecture: pointed arch negative spaces, tracery, weathered stone and iron, moonlit rim with cold fill; desaturated palette with violet shadow—moody but sharp-edged readability."
+    "adaptation": "Victorian gothic letter architecture: pointed arch negative spaces, tracery, weathered stone and iron, moonlit rim with cold fill; desaturated palette with violet shadow—moody but sharp-edged readability.",
+    "style_brief": "For «Gothic», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "minimalist",
     "label": "Minimalist",
     "file": "/image-styles/minimalist.png",
-    "adaptation": "Swiss-modern restraint: generous whitespace, single sans family logic, micro-contrast through subtle shadow or paper emboss only; one restrained accent color or material truth—no ornament beyond precise grid alignment."
+    "adaptation": "Swiss-modern restraint: generous whitespace, single sans family logic, micro-contrast through subtle shadow or paper emboss only; one restrained accent color or material truth—no ornament beyond precise grid alignment.",
+    "style_brief": "For «Minimalist», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "abstract_expressionism",
     "label": "Abstract Expressionism",
     "file": "/image-styles/abstract_expressionism.png",
-    "adaptation": "Gestural energy fields: sweeping strokes, splatter accretion, impasto and thin paint in conflict; high color velocity around letterforms—typography emerges from abstract canvas chaos while preserving letter identity."
+    "adaptation": "Gestural energy fields: sweeping strokes, splatter accretion, impasto and thin paint in conflict; high color velocity around letterforms—typography emerges from abstract canvas chaos while preserving letter identity.",
+    "style_brief": "For «Abstract Expressionism», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "ukiyo_e",
     "label": "Ukiyo-e",
     "file": "/image-styles/ukiyo_e.png",
-    "adaptation": "Woodblock print flat planes: notan separation, bokashi gradient edges, keyline contour dominance, limited flat pigments; stylized waves or Fuji distance as compositional rhyme—letterforms as printed shapes with carved edge honesty."
+    "adaptation": "Woodblock print flat planes: notan separation, bokashi gradient edges, keyline contour dominance, limited flat pigments; stylized waves or Fuji distance as compositional rhyme—letterforms as printed shapes with carved edge honesty.",
+    "style_brief": "For «Ukiyo-e», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "vector_flat_illustration",
     "label": "Vector Flat Illustration",
     "file": "/image-styles/vector_flat_illustration.png",
-    "adaptation": "Vector-flat discipline: uniform stroke weights, snap-to-grid curves, solid fills, long-shadow or minimal isometric depth only; editorial clarity—typography matches contemporary app or magazine illustration systems."
+    "adaptation": "Vector-flat discipline: uniform stroke weights, snap-to-grid curves, solid fills, long-shadow or minimal isometric depth only; editorial clarity—typography matches contemporary app or magazine illustration systems.",
+    "style_brief": "For «Vector Flat Illustration», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "low_poly",
     "label": "Low Poly",
     "file": "/image-styles/low_poly.png",
-    "adaptation": "Faceted low-poly mesh letters: hard normals, triangulation visible, flat-shaded lambert with optional rim, crisp cast shadows; color per face or gentle vertex color—consistent with stylized game environment lighting."
+    "adaptation": "Faceted low-poly mesh letters: hard normals, triangulation visible, flat-shaded lambert with optional rim, crisp cast shadows; color per face or gentle vertex color—consistent with stylized game environment lighting.",
+    "style_brief": "For «Low Poly», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "papercut_art",
     "label": "Papercut Art",
     "file": "/image-styles/papercut_art.png",
-    "adaptation": "Layered paper craft: stacked color sheets with contact shadow gaps, micro paper fiber edge, laser-cut precision; directional light to emphasize depth between layers—letterforms built from overlapping paper strata."
+    "adaptation": "Layered paper craft: stacked color sheets with contact shadow gaps, micro paper fiber edge, laser-cut precision; directional light to emphasize depth between layers—letterforms built from overlapping paper strata.",
+    "style_brief": "For «Papercut Art», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "embroidery_texture",
     "label": "Embroidery Texture",
     "file": "/image-styles/embroidery_texture.png",
-    "adaptation": "Machine or hand embroidery: satin stitch sheen, directional thread highlight, fabric weave underlay; thread color blocks with tidy edge density—typography stitched onto cloth consistent with hoop-and-textile scene."
+    "adaptation": "Machine or hand embroidery: satin stitch sheen, directional thread highlight, fabric weave underlay; thread color blocks with tidy edge density—typography stitched onto cloth consistent with hoop-and-textile scene.",
+    "style_brief": "For «Embroidery Texture», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "blueprint_sketch",
     "label": "Blueprint Sketch",
     "file": "/image-styles/blueprint_sketch.png",
-    "adaptation": "Cyanotype/blueprint line language: uniform technical lineweight, dimension tick marks, leader lines optional, white ink on deep blue field or inverse; engineering clarity—letterforms as stamped title block typography."
+    "adaptation": "Cyanotype/blueprint line language: uniform technical lineweight, dimension tick marks, leader lines optional, white ink on deep blue field or inverse; engineering clarity—letterforms as stamped title block typography.",
+    "style_brief": "For «Blueprint Sketch», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "film_noir",
     "label": "Film Noir",
     "file": "/image-styles/film_noir.png",
-    "adaptation": "Monochrome silver-gelatin: hard key from venetian blind or streetlamp, deep crushed blacks, high micro-contrast, slight halation; wet pavement reflections—letterforms sculpted by single-source noir lighting."
+    "adaptation": "Monochrome silver-gelatin: hard key from venetian blind or streetlamp, deep crushed blacks, high micro-contrast, slight halation; wet pavement reflections—letterforms sculpted by single-source noir lighting.",
+    "style_brief": "For «Film Noir», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "pixar_3d_animation",
     "label": "Pixar 3D Animation",
     "file": "/image-styles/pixar_3d_animation.png",
-    "adaptation": "Feature-animation surfacing: rounded appealing forms, subsurface on skin-like plastics, warm bounce light, expressive but clean silhouettes; cinematic single-key hero light—letters as character-props in a Pixar-like story world."
+    "adaptation": "Feature-animation surfacing: rounded appealing forms, subsurface on skin-like plastics, warm bounce light, expressive but clean silhouettes; cinematic single-key hero light—letters as character-props in a Pixar-like story world.",
+    "style_brief": "For «Pixar 3D Animation», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   },
   {
     "id": "comic_book_style",
     "label": "Comic Book Style",
     "file": "/image-styles/comic_book_style.png",
-    "adaptation": "American comic printing: bold ink holds, flat CMYK fills, Ben-Day or halftone in shadows, spotted blacks; kinetic outlines and occasional speed lines—letterforms as cover-logotype energy matching four-color city action."
+    "adaptation": "American comic printing: bold ink holds, flat CMYK fills, Ben-Day or halftone in shadows, spotted blacks; kinetic outlines and occasional speed lines—letterforms as cover-logotype energy matching four-color city action.",
+    "style_brief": "For «Comic Book Style», treat the adaptation block above as non-negotiable art direction for materials, edges, and light. Keep one consistent visual language end-to-end: do not mix unrelated movements or accidental photoreal/CGI cues unless the primary adaptation calls for it; preserve readable silhouettes and intentional negative space."
   }
 ]

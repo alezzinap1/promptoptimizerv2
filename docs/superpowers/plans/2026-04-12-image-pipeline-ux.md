@@ -37,11 +37,11 @@
 - Modify: `frontend/src/lib/expertLevelPresets.ts`
 - Modify: `services/llm_client.py` (при необходимости)
 
-- [ ] **Step 1:** Открыть [OpenRouter models](https://openrouter.ai/models) и убедиться, что существуют id: `google/gemini-2.5-flash-lite`, `google/gemini-2.5-flash` (или заменить на актуальные с тем же ценовым классом).
+- [x] **Step 1:** Открыть [OpenRouter models](https://openrouter.ai/models) и убедиться, что существуют id: `google/gemini-2.5-flash-lite`, `google/gemini-2.5-flash` (или заменить на актуальные с тем же ценовым классом).
 
-- [ ] **Step 2:** При расхождении — обновить `EXPERT_DEFAULT_GEN_MODEL` и задокументировать в `frontend/src/docs/user/EXPERT_LEVELS_AND_GENERATION_MODELS.md`.
+- [x] **Step 2:** При расхождении — обновить `EXPERT_DEFAULT_GEN_MODEL` и задокументировать в `frontend/src/docs/user/EXPERT_LEVELS_AND_GENERATION_MODELS.md`.
 
-- [ ] **Step 3:** Commit.
+- [x] **Step 3:** Commit.
 
 ---
 
@@ -50,7 +50,7 @@
 **Files:**
 - Manual: настройки приложения, OpenRouter ключ
 
-- [ ] **Step 1:** Запустить бэкенд и фронт; в image-режиме сгенерировать промпт, нажать «Проба картинки».
+- [ ] **Step 1:** Запустить бэкенд и фронт; в image-режиме сгенерировать промпт, нажать «Проба картинки». *(Ручная проверка у владельца окружения / CI с ключом.)*
 
 - [ ] **Step 2:** Убедиться в ответе с `image_url` (data URL) и при успехе — в файле под `data/uploads/library_previews/`.
 
@@ -63,11 +63,11 @@
 **Files:**
 - Modify: `frontend/public/image-styles/manifest.json` (поле `adaptation` или новое поле `style_brief_ru`)
 
-- [ ] **Step 1:** Для каждого id добавить 2–4 предложения профессионального описания (свет, палитра, типичные негативы, линзы/камера где уместно), не только короткий adaptation.
+- [x] **Step 1:** Для каждого id добавить 2–4 предложения профессионального описания (свет, палитра, типичные негативы, линзы/камера где уместно), не только короткий adaptation. *(Сделано: поле `style_brief` во всех записях `manifest.json` + склейка в `core/image_presets.py`.)*
 
-- [ ] **Step 2:** При необходимости в `format_active_style_preset_system_block` подмешивать новое поле.
+- [x] **Step 2:** При необходимости в `format_active_style_preset_system_block` подмешивать новое поле. *(Склейка в `raw_text` при резолве пресета — отдельный блок в system не требуется.)*
 
-- [ ] **Step 3:** Commit.
+- [x] **Step 3:** Commit.
 
 ---
 
@@ -76,11 +76,11 @@
 **Files:**
 - Modify: `README.md` или `frontend/src/docs/user/EXPERT_LEVELS_AND_GENERATION_MODELS.md`
 
-- [ ] **Step 1:** Описать `POST /api/image/try` (тело, ответ, env `IMAGE_TRY_MODEL`).
+- [x] **Step 1:** Описать `POST /api/image/try` (тело, ответ, env `IMAGE_TRY_MODEL`).
 
-- [ ] **Step 2:** Описать `POST /api/library/llm-review`.
+- [x] **Step 2:** Описать `POST /api/library/llm-review`.
 
-- [ ] **Step 3:** Commit.
+- [x] **Step 3:** Commit.
 
 ---
 
@@ -105,4 +105,4 @@
 
 **2. Inline Execution** — выполнять чеклисты в этой сессии через executing-plans, пакетами с чекпоинтами.
 
-**Which approach?**
+*Выполнение плана (кроме ручного E2E Task 2) проведено в сессии executing-plans.*

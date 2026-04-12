@@ -171,11 +171,42 @@ curl http://localhost:8000/api/health
 
 ---
 
+## Дополнительные API (студия и библиотека)
+
+Базовый префикс в dev: **`/api`** (прокси с Vite на бэкенд).
+
+### `POST /api/image/try`
+
+Пробная генерация изображения через OpenRouter (модели с выходом `image`: запрос с `modalities` и при необходимости `image_config`). Нужен валидный ключ OpenRouter (пользовательский или хоста в пределах trial).
+
+**Тело (JSON):**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `prompt_text` | string | Текст промпта к изображению |
+| `gen_model` | string, optional | Короткое имя из `PROVIDER_MODELS` (например `nano_banana`) или полный id вида `google/...` |
+| `aspect_ratio` | string, optional | Например `1:1`, `16:9` (зависит от модели) |
+
+**Ответ:** `image_url` (data URL), `gen_model` (фактический id), `saved_path` — относительный URL сохранённого WebP-превью под `data/uploads/library_previews/` или `null`, если сохранение не удалось.
+
+**Переменная окружения:** `IMAGE_TRY_MODEL` — полный OpenRouter id по умолчанию, если в запросе не передан подходящий `gen_model` (в коде дефолт — `google/gemini-3.1-flash-image-preview`).
+
+### `POST /api/library/llm-review`
+
+Краткая текстовая оценка промпта отдельным вызовом LLM («судья»). Тело: `prompt`, `prompt_type` (`text` \| `image` \| `skill`), опционально `original_task`, `judge_model`.
+
+### Сохранение превью в библиотеку
+
+В **`POST /api/library`** опциональное поле **`cover_image_path`**: передайте значение `saved_path` из ответа `/image/try`, чтобы к записи библиотеки привязать превью (колонка `cover_image_path` в SQLite).
+
+---
+
 ## Переменные окружения
 
 | Переменная | Описание |
 |------------|----------|
 | `OPENROUTER_API_KEY` | Ключ OpenRouter на стороне сервера (trial / дефолт, если у пользователя нет своего ключа) |
+| `IMAGE_TRY_MODEL` | (Опционально) Полный OpenRouter id для `POST /api/image/try`, если клиент не передал модель |
 | `USER_API_KEY_FERNET_SECRET` | Ключ Fernet (base64) для шифрования пользовательских OpenRouter-ключей в SQLite; для публичного деплоя задавать обязательно |
 | `DB_PATH` | Путь к SQLite (по умолчанию `data/web_agent.db`) |
 | `APP_ENV` | `dev` \| `demo` \| `prod` |

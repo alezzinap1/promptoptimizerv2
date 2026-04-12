@@ -32,11 +32,19 @@ def _manifest_style_presets() -> dict[str, dict[str, Any]]:
                     continue
                 label = str(item.get("label") or item.get("id") or "").strip()
                 adapt = str(item.get("adaptation") or "").strip()
+                brief = str(item.get("style_brief") or "").strip()
+                raw = adapt
+                if brief:
+                    raw = (
+                        f"{adapt}\n\n--- Style brief (technical lock-in) ---\n{brief}".strip()
+                        if adapt
+                        else brief
+                    )
                 out[pid] = {
                     "id": str(item.get("id") or pid),
                     "name": label or pid,
                     "description": "",
-                    "raw_text": adapt,
+                    "raw_text": raw,
                 }
     except (OSError, json.JSONDecodeError, TypeError):
         pass
