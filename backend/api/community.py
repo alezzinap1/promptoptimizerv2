@@ -23,7 +23,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 UPLOAD_DIR = _ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IMAGE_SIZE = 12 * 1024 * 1024  # до PIL; после ресайза файл маленький
-# Вход: распространённые форматы; выход всегда .webp 256×256
+# Вход: распространённые форматы; выход .webp 512×512 (см. image_utils.COMMUNITY_CARD_SIZE)
 ALLOWED_EXTENSIONS = {
     ".jpg",
     ".jpeg",

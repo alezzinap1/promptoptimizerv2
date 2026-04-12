@@ -27,6 +27,11 @@ QUESTIONS_MODE_STRONG = (
     "Не спеши с [PROMPT], если без ответов рискуешь угадать важные параметры. Дополнительные правила для режима «фото/скилл/текст» могут быть ниже в system."
 )
 
+IMAGE_QUESTIONS_MODE_STRONG = (
+    "[Режим вопросов — изображение] Спрашивай только про картинку: кадр и композицию, стиль и освещение, палитру, детализацию, соотношение сторон, негатив/ограничения. "
+    "Не задавай вопросов про сюжетную задачу, «решение в сценарии», аудиторию текстового ответа или формат вывода LLM (Markdown/JSON и т.д.)."
+)
+
 CLARIFICATION_ANSWERS_PROVIDED = """[Режим] Пользователь ответил на уточнения (см. его сообщение). Итог: [REASONING] затем только [PROMPT]...[/PROMPT]. Новый [QUESTIONS] не открывай без фатальной нехватки данных."""
 
 PREFERENCE_LABELS = {
@@ -70,6 +75,8 @@ class ContextBuilder:
 
         if questions_mode:
             parts.append(QUESTIONS_MODE_STRONG)
+            if (prompt_type or "text") == "image":
+                parts.append(IMAGE_QUESTIONS_MODE_STRONG)
 
         if technique_ids:
             tech_context = self._registry.build_technique_context(technique_ids, prompt_type=prompt_type or "text")

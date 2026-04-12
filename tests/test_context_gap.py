@@ -24,3 +24,18 @@ def test_policy_skip_vs_required():
 def test_gap_missing_summary_non_empty():
     s = gap_missing_summary("коротко", "text")
     assert len(s) > 5
+
+
+def test_gap_missing_summary_image_avoids_text_audience_format():
+    s = gap_missing_summary("лисица в лесу", "image")
+    assert "аудитория" not in s.lower()
+    assert "формат вывода" not in s.lower()
+    assert "стиль" in s.lower() or "визуальн" in s.lower() or "кадр" in s.lower()
+
+
+def test_compute_context_gap_image_skips_text_signals():
+    # Long filler: same length bucket, but text mode still penalizes missing audience/format/domain.
+    filler = " ".join([f"w{i}" for i in range(55)])
+    g_img = compute_context_gap(filler, workspace=None, prompt_type="image")
+    g_text = compute_context_gap(filler, workspace=None, prompt_type="text")
+    assert g_text > g_img

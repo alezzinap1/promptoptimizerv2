@@ -2349,6 +2349,37 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 
+/* Текстовая кнопка в тулбаре результата (не 28×28 — иначе обрезает «Песочница») */
+.toolbarTextBtn {
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbarTextBtn:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.toolbarTextBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toolbarSaveInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .quickSavedMark {
   width: 28px;
   height: 28px;
@@ -2963,6 +2994,49 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
 
 .ideModalBtn:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.ideModalBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mutedSmall {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.imageTryPreview {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--panel) 92%, var(--primary) 8%);
+}
+
+.imageTryPreviewLabel {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.imageTryPreviewImg {
+  display: block;
+  max-width: min(100%, 520px);
+  max-height: 520px;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  margin: 0 auto;
+}
+
+.llmReviewBody {
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .modalOverlay {

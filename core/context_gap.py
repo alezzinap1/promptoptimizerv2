@@ -28,6 +28,10 @@ _VISUAL_ANCHOR_PAT = re.compile(
     r"(стиль|свет|палитр|композиц|камер|фон|персонаж|объект|сцена|midjourney|dall|sdxl|realistic|аниме)",
     re.I,
 )
+_ASPECT_OR_FRAMING_PAT = re.compile(
+    r"(16:9|9:16|1:1|4:3|3:2|квадрат|портретн|ландшафт|aspect ratio|соотношен|кадр|кадрир|wide shot|close-?up)",
+    re.I,
+)
 
 
 def has_audience_signal(text: str) -> bool:
@@ -50,6 +54,10 @@ def has_visual_anchors(text: str) -> bool:
     return bool(_VISUAL_ANCHOR_PAT.search(text))
 
 
+def has_aspect_or_framing_signal(text: str) -> bool:
+    return bool(_ASPECT_OR_FRAMING_PAT.search(text))
+
+
 def compute_context_gap(
     task_input: str,
     *,
@@ -69,6 +77,17 @@ def compute_context_gap(
     elif n < 45:
         score += 0.12
 
+    if prompt_type == "image":
+        if has_contradiction_signals(text):
+            score += 0.18
+        if not has_visual_anchors(text) and n < 35:
+            score += 0.32
+        elif not has_visual_anchors(text):
+            score += 0.18
+        if not has_aspect_or_framing_signal(text) and n < 40:
+            score += 0.1
+        return min(1.0, score)
+
     if not has_audience_signal(text):
         score += 0.14
     if not has_format_signal(text):
@@ -77,12 +96,6 @@ def compute_context_gap(
         score += 0.12
     if has_contradiction_signals(text):
         score += 0.18
-
-    if prompt_type == "image":
-        if not has_visual_anchors(text) and n < 35:
-            score += 0.28
-        elif not has_visual_anchors(text):
-            score += 0.14
 
     if prompt_type == "skill":
         if n < 18:
@@ -112,6 +125,20 @@ def gap_missing_summary(task_input: str, prompt_type: str) -> str:
     lines: list[str] = []
     t = (task_input or "").strip()
     words = t.split()
+    pt = (prompt_type or "text").strip().lower()
+
+    if pt == "image":
+        if len(words) < 12:
+            lines.append("сцена или объект описаны очень кратко — мало визуальных деталей")
+        if not has_visual_anchors(t):
+            lines.append("стиль, свет, палитра, композиция или ракурс")
+        if not has_aspect_or_framing_signal(t) and len(words) < 45:
+            lines.append("соотношение сторон, кадр или план (общий/крупный)")
+        if has_contradiction_signals(t):
+            lines.append("противоречивые визуальные указания (реализм vs стилизация и т.п.)")
+        if not lines:
+            lines.append("детали, влияющие на итоговый визуальный промпт")
+        return "; ".join(lines[:6])
 
     if len(words) < 12:
         lines.append("цель и контекст задачи сформулированы очень кратко")
@@ -121,9 +148,7 @@ def gap_missing_summary(task_input: str, prompt_type: str) -> str:
         lines.append("желаемый формат вывода")
     if not has_domain_signal(t):
         lines.append("предметная область или среда применения")
-    if prompt_type == "image" and not has_visual_anchors(t):
-        lines.append("визуальные якоря: стиль, свет, палитра, композиция")
-    if prompt_type == "skill":
+    if pt == "skill":
         lines.append("целевая среда (Cursor, Claude Code, универсально) и границы скилла")
     if has_contradiction_signals(t):
         lines.append("уточнить противоречивые требования (кратко vs подробно и т.п.)")

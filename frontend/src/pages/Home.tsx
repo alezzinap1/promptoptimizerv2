@@ -309,7 +309,13 @@ export default function Home() {
   const [saveTags, setSaveTags] = useState('')
   const [saveNotes, setSaveNotes] = useState('')
   const [questionState, setQuestionState] = useState<Record<number, { options: string[]; custom: string }>>({})
-  const [showIdeModal, setShowIdeModal] = useState(false)
+  const [llmReviewOpen, setLlmReviewOpen] = useState(false)
+  const [llmReviewText, setLlmReviewText] = useState('')
+  const [llmReviewBusy, setLlmReviewBusy] = useState(false)
+  const [llmReviewModel, setLlmReviewModel] = useState('')
+  const [imageTryBusy, setImageTryBusy] = useState(false)
+  const [imageTryCoverPath, setImageTryCoverPath] = useState<string | null>(null)
+  const [imageTryDataUrl, setImageTryDataUrl] = useState<string | null>(null)
   const [modelsData, setModelsData] = useState<OpenRouterModel[]>([])
   const [preferredTargetModels, setPreferredTargetModels] = useState<string[]>(['unknown'])
   const [targetModel, setTargetModel] = useState('unknown')
@@ -656,7 +662,12 @@ export default function Home() {
       ...userPresetsImage.map((p) => `u_${p.id}`),
     ])
     if (imagePresetId && !allowed.has(imagePresetId)) setImagePresetId('')
-  }, [imageMeta, userPresetsImage, imagePresetId])
+   }, [imageMeta, userPresetsImage, imagePresetId])
+
+  useEffect(() => {
+    setImageTryCoverPath(null)
+    setImageTryDataUrl(null)
+  }, [result?.prompt_block])
 
   useEffect(() => {
     const allowed = new Set(['', ...userPresetsSkill.map((p) => `u_${p.id}`)])
@@ -1838,6 +1849,54 @@ export default function Home() {
     suggestedActions,
   ])
 
+  const runImageTryNano = async () => {
+    if (!result?.prompt_block || promptType !== 'image') return
+    setImageTryBusy(true)
+    try {
+      const r = await api.imageTry({
+        prompt_text: result.prompt_block,
+        gen_model: 'nano_banana',
+        aspect_ratio: '1:1',
+      })
+      setImageTryDataUrl(r.image_url)
+      setImageTryCoverPath(r.saved_path || null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `imgtry-err-${Date.now()}`,
+          role: 'assistant',
+          content: `Не удалось сделать пробную картинку (Nano Banana): ${msg}`,
+        },
+      ])
+    } finally {
+      setImageTryBusy(false)
+    }
+  }
+
+  const runLlmReview = async () => {
+    if (!result?.prompt_block) return
+    setLlmReviewBusy(true)
+    setLlmReviewOpen(true)
+    setLlmReviewText('')
+    setLlmReviewModel('')
+    try {
+      const r = await api.libraryLlmReview({
+        prompt: result.prompt_block,
+        prompt_type: promptType,
+        original_task: (baseTaskRef || taskInput).trim(),
+      })
+      setLlmReviewText(r.review)
+      setLlmReviewModel(r.judge_model)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setLlmReviewText(`Ошибка: ${msg}`)
+    } finally {
+      setLlmReviewBusy(false)
+    }
+  }
+
   const handleSaveToLibrary = async () => {
     if (!result?.prompt_block) return
     const fb = (baseTaskRef || taskInput).trim()
@@ -1874,6 +1933,7 @@ export default function Home() {
       task_type: result.task_types?.[0] || 'general',
       techniques: result.technique_ids,
       notes: saveNotes,
+      cover_image_path: promptType === 'image' && imageTryCoverPath ? imageTryCoverPath : undefined,
     })
     window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
     setShowSaveDialog(false)
@@ -1914,6 +1974,7 @@ export default function Home() {
       target_model: effectiveTargetModel,
       task_type: result.task_types?.[0] || 'general',
       techniques: result.technique_ids,
+      cover_image_path: promptType === 'image' && imageTryCoverPath ? imageTryCoverPath : undefined,
     })
     window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
     setQuickSaved(true)
@@ -2251,10 +2312,10 @@ export default function Home() {
                     title={promptType === 'skill' ? 'Копировать тело скилла' : 'Копировать промпт'}
                   />
                   <TryInGeminiButton prompt={result.prompt_block} />
-                  {(promptType === 'text' || promptType === 'image') && (
+                  {promptType === 'text' && (
                     <button
                       type="button"
-                      className={styles.quickSaveBtn}
+                      className={styles.toolbarTextBtn}
                       title="Проверить промпт: один раунд с выбранной моделью (POST /playground/run)"
                       disabled={loading}
                       onClick={() => {
@@ -2264,6 +2325,17 @@ export default function Home() {
                       }}
                     >
                       Песочница
+                    </button>
+                  )}
+                  {promptType === 'image' && (
+                    <button
+                      type="button"
+                      className={styles.toolbarTextBtn}
+                      title="Дешёвая пробная генерация (OpenRouter: Nano Banana / gemini-3.1-flash-image-preview). Картинку можно сохранить в библиотеку вместе с промптом."
+                      disabled={loading || imageTryBusy}
+                      onClick={() => void runImageTryNano()}
+                    >
+                      {imageTryBusy ? 'Рисую…' : 'Проба картинки'}
                     </button>
                   )}
                   <button
@@ -2280,11 +2352,16 @@ export default function Home() {
                   {!quickSaved && (
                     <button
                       type="button"
-                      className={styles.quickSaveBtn}
-                      title={promptType === 'skill' ? 'Сохранить в библиотеку скиллов (локально)' : 'Сохранить в библиотеку'}
+                      className={styles.toolbarTextBtn}
+                      title={promptType === 'skill' ? 'Сохранить скилл в локальную библиотеку' : 'Сохранить промпт в библиотеку на сервере'}
                       onClick={handleQuickSave}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                      <span className={styles.toolbarSaveInner}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                        {promptType === 'skill' ? 'В скиллы' : 'В библиотеку'}
+                      </span>
                     </button>
                   )}
                   {quickSaved && (
@@ -2300,58 +2377,43 @@ export default function Home() {
               <div className={styles.resultMarkdownWrap}>
                 <MarkdownOutput>{result.prompt_block}</MarkdownOutput>
               </div>
-              {result.prompt_spec && (
-                <>
-                  <button type="button" className={styles.ideModalBtn} onClick={() => setShowIdeModal(true)}>
-                    Подробнее: спецификация и проверки
-                  </button>
-                  {showIdeModal && (
-                    <div className={styles.modalOverlay} onClick={() => setShowIdeModal(false)}>
-                      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                        <div className={styles.modalHeader}>
-                          <h3>Спецификация промпта</h3>
-                          <button className={styles.modalClose} onClick={() => setShowIdeModal(false)}>×</button>
-                        </div>
-                        <div className={styles.ideGrid}>
-                    <div className={styles.ideSection}>
-                      <h3>Спецификация</h3>
-                      <p><strong>Цель:</strong> {result.prompt_spec.goal || '—'}</p>
-                      <p><strong>Типы задач:</strong> {(result.prompt_spec.task_types || []).join(', ') || '—'}</p>
-                      <p><strong>Сложность:</strong> {result.prompt_spec.complexity || '—'}</p>
-                      <p><strong>Аудитория:</strong> {result.prompt_spec.audience || '—'}</p>
-                      <p><strong>Формат вывода:</strong> {result.prompt_spec.output_format || '—'}</p>
-                      <p><strong>Источник истины:</strong> {(result.prompt_spec.source_of_truth || []).join('; ') || '—'}</p>
-                      <p><strong>Критерии успеха:</strong> {(result.prompt_spec.success_criteria || []).join('; ') || '—'}</p>
-                      <p><strong>Ограничения:</strong> {(result.prompt_spec.constraints || []).join('; ') || '—'}</p>
+              {promptType === 'image' && imageTryDataUrl ? (
+                <div className={styles.imageTryPreview}>
+                  <p className={styles.imageTryPreviewLabel}>
+                    Пробная картинка (Nano Banana). Сохраните промпт в библиотеку — превью прикрепится к записи.
+                  </p>
+                  <img src={imageTryDataUrl} alt="Пробная генерация" className={styles.imageTryPreviewImg} />
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className={styles.ideModalBtn}
+                disabled={llmReviewBusy}
+                onClick={() => void runLlmReview()}
+              >
+                {llmReviewBusy ? 'Оценка…' : 'Оценка модели (LLM-судья)'}
+              </button>
+              {llmReviewOpen && (
+                <div className={styles.modalOverlay} onClick={() => setLlmReviewOpen(false)}>
+                  <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.modalHeader}>
+                      <h3>Оценка промпта (LLM)</h3>
+                      <button type="button" className={styles.modalClose} onClick={() => setLlmReviewOpen(false)}>
+                        ×
+                      </button>
                     </div>
-                    <div className={styles.ideSection}>
-                      <h3>Проверка промпта</h3>
-                      {(result.debug_issues || []).length === 0 ? (
-                        <p className={styles.success}>Критичных замечаний к структуре промпта не найдено.</p>
+                    {llmReviewModel ? (
+                      <p className={styles.mutedSmall}>Модель: {llmReviewModel}</p>
+                    ) : null}
+                    <div className={styles.llmReviewBody}>
+                      {llmReviewBusy ? (
+                        <p>Запрашиваю оценку…</p>
                       ) : (
-                        (result.debug_issues || []).map((issue, idx) => (
-                          <div key={idx} className={styles.issueCard}>
-                            <strong>[{issue.severity.toUpperCase()}] {issue.message}</strong>
-                            <p>{issue.why_it_matters}</p>
-                          </div>
-                        ))
+                        <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
                       )}
                     </div>
-                    <div className={styles.ideSection}>
-                      <h3>Контекст и источники</h3>
-                      {Object.entries(result.evidence || {}).map(([field, meta]) => (
-                        <div key={field} className={styles.evidenceCard}>
-                          <strong>{field}</strong>
-                          <p>{meta.source_type} ({meta.confidence.toFixed(2)})</p>
-                          <p>{meta.reason}</p>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                      </div>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
               {result.target_model_type === 'reasoning' && (
                 <div className={styles.reasoningBadge}>

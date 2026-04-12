@@ -6,6 +6,7 @@ from io import BytesIO
 from PIL import Image, ImageOps
 
 THUMB_SIZE = 256
+COMMUNITY_CARD_SIZE = 512
 
 
 def resize_to_square_png(data: bytes, size: int = THUMB_SIZE) -> bytes:
@@ -28,8 +29,8 @@ def resize_to_square_webp(data: bytes, size: int = THUMB_SIZE, quality: int = 82
     return buf.getvalue()
 
 
-def resize_upload_for_community(data: bytes, size: int = THUMB_SIZE) -> tuple[bytes, str]:
-    """256×256 для экономии памяти; предпочтительно WebP, иначе PNG."""
+def resize_upload_for_community(data: bytes, size: int = COMMUNITY_CARD_SIZE) -> tuple[bytes, str]:
+    """Квадратный превью для карточек сообщества (по умолчанию 512×512); WebP или PNG."""
     try:
         return resize_to_square_webp(data, size=size), ".webp"
     except Exception:

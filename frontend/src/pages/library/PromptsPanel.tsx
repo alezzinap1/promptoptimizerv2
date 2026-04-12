@@ -216,6 +216,16 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
               {item.created_at ? (
                 <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
               ) : null}
+              {item.cover_image_path ? (
+                <div className={styles.libraryCoverWrap}>
+                  <img
+                    className={styles.libraryCoverImg}
+                    src={item.cover_image_path}
+                    alt=""
+                    loading="lazy"
+                  />
+                </div>
+              ) : null}
               <p className={styles.meta}>
                 <span className={styles.taskTypeLabel} title="Тип задачи при сохранении">
                   {item.task_type}

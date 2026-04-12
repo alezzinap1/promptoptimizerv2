@@ -1,12 +1,18 @@
 """Prompt library CRUD + evaluation."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import time
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
+from config.settings import TRIAL_MAX_COMPLETION_PER_M, TRIAL_TOKENS_LIMIT
 from core.quality_metrics import analyze_prompt
 from db.manager import DBManager
+from services.api_key_resolver import resolve_openrouter_api_key
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.openrouter_models import completion_price_per_m, get_model_pricing
 
 router = APIRouter()
 
@@ -44,6 +50,7 @@ class SaveToLibraryRequest(BaseModel):
     task_type: str = "general"
     techniques: list[str] = []
     notes: str = ""
+    cover_image_path: str = ""
 
 
 @router.post("/library")
@@ -61,6 +68,7 @@ def save_to_library(
         techniques=req.techniques,
         notes=req.notes,
         user_id=int(user["id"]),
+        cover_image_path=(req.cover_image_path or "").strip() or None,
     )
     return {"id": id_}
 
@@ -71,6 +79,7 @@ class UpdateLibraryRequest(BaseModel):
     tags: list[str] | None = None
     notes: str | None = None
     rating: int | None = None
+    cover_image_path: str | None = None
 
 
 @router.patch("/library/{item_id}")
@@ -87,9 +96,93 @@ def update_library(
         tags=req.tags,
         notes=req.notes,
         rating=req.rating,
+        cover_image_path=req.cover_image_path,
         user_id=int(user["id"]),
     )
     return {"ok": True}
+
+
+def _or_model_id(provider: str) -> str:
+    if provider in PROVIDER_MODELS:
+        return PROVIDER_MODELS[provider]
+    return provider if "/" in provider else provider
+
+
+class LlmReviewRequest(BaseModel):
+    prompt: str
+    prompt_type: str = "text"
+    original_task: str = ""
+    judge_model: str | None = None
+
+
+class LlmReviewResponse(BaseModel):
+    review: str
+    judge_model: str
+
+
+@router.post("/library/llm-review", response_model=LlmReviewResponse)
+def llm_review_prompt(
+    req: LlmReviewRequest,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+):
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(400, "Пустой prompt.")
+    user_id = int(user["id"])
+    user_key = db.get_user_openrouter_api_key(user_id)
+    api_key = resolve_openrouter_api_key(user_key)
+    if not api_key:
+        raise HTTPException(500, "Нет ключа OpenRouter.")
+    using_host_key = not bool(user_key)
+    if using_host_key:
+        usage = db.get_user_usage(user_id)
+        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+            raise HTTPException(402, "Пробный лимит исчерпан.")
+
+    gen = (req.judge_model or "").strip() or DEFAULT_PROVIDER
+    mid = _or_model_id(gen)
+    if using_host_key and completion_price_per_m(mid) > TRIAL_MAX_COMPLETION_PER_M:
+        gen = "gemini_flash"
+        mid = _or_model_id(gen)
+
+    pt = (req.prompt_type or "text").strip().lower()
+    task = (req.original_task or "").strip()
+    if pt == "image":
+        sys = (
+            "Ты эксперт по промптам для генерации изображений. Кратко (на русском) оцени промпт: "
+            "ясность сцены, свет, композиция, стиль, негативы, соотношение сторон, типичные риски. "
+            "3–8 коротких буллетов + одна строка «Итог». Без вежливых вступлений."
+        )
+    elif pt == "skill":
+        sys = (
+            "Ты ревьюер SKILL-инструкций для LLM. На русском: ROLE/SCOPE/RULES, границы, инструменты, "
+            "противоречия, пробелы. 3–8 буллетов + «Итог»."
+        )
+    else:
+        sys = (
+            "Ты ревьюер текстовых промптов. На русском: цель, аудитория, формат, ограничения, ясность шагов, риски. "
+            "3–8 буллетов + «Итог»."
+        )
+    user_block = f"Исходная задача пользователя (если есть):\n{task}\n\nПромпт:\n{prompt}"
+    llm = LLMClient(api_key, timeout=90.0)
+    started = time.perf_counter()
+    review = llm.generate(sys, user_block, gen, temperature=0.35, max_tokens=1200)
+    review = (review or "").strip()
+    if not review:
+        raise HTTPException(502, "Пустой ответ судьи.")
+    if using_host_key:
+        ptoks = len(sys + user_block) // 4 + 60
+        ctoks = len(review) // 4
+        pp, cp = get_model_pricing(_or_model_id(gen))
+        db.add_user_usage(user_id, ptoks + ctoks, ptoks * pp + ctoks * cp)
+    db.log_event(
+        "library_llm_review",
+        session_id="",
+        payload={"prompt_type": pt, "latency_ms": round((time.perf_counter() - started) * 1000, 1)},
+        user_id=user_id,
+    )
+    return LlmReviewResponse(review=review, judge_model=_or_model_id(gen))
 
 
 @router.delete("/library/{item_id}")

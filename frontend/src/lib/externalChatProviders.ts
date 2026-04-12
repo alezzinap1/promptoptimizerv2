@@ -3,7 +3,16 @@
  * Стратегия: полный промпт в буфер обмена + вкладка с URL; где сайт поддерживает
  * передачу запроса в query — добавляем (часто укороченную) копию в ссылку.
  */
-export type ExternalChatProviderId = 'chatgpt' | 'claude' | 'grok' | 'gemini'
+export type ExternalChatProviderId =
+  | 'chatgpt'
+  | 'claude'
+  | 'grok'
+  | 'gemini'
+  | 'deepseek'
+  | 'mistral'
+  | 'perplexity'
+  | 'copilot'
+  | 'yandexgpt'
 
 export type ExternalChatProvider = {
   id: ExternalChatProviderId
@@ -15,8 +24,13 @@ export type ExternalChatProvider = {
 export const EXTERNAL_CHAT_PROVIDERS: ExternalChatProvider[] = [
   { id: 'chatgpt', label: 'ChatGPT', clipboardPrimary: false },
   { id: 'claude', label: 'Claude', clipboardPrimary: false },
-  { id: 'grok', label: 'Grok', clipboardPrimary: true },
   { id: 'gemini', label: 'Gemini', clipboardPrimary: true },
+  { id: 'deepseek', label: 'DeepSeek', clipboardPrimary: true },
+  { id: 'mistral', label: 'Le Chat (Mistral)', clipboardPrimary: true },
+  { id: 'perplexity', label: 'Perplexity', clipboardPrimary: true },
+  { id: 'copilot', label: 'Microsoft Copilot', clipboardPrimary: true },
+  { id: 'yandexgpt', label: 'Яндекс GPT (Алиса)', clipboardPrimary: true },
+  { id: 'grok', label: 'Grok', clipboardPrimary: true },
 ]
 
 /** Макс. длина текста в query — длинные промпты только из буфера */
@@ -38,6 +52,17 @@ export function buildExternalChatUrl(id: ExternalChatProviderId, fullPrompt: str
     case 'grok':
       return `https://grok.com/chat`
     case 'gemini':
+      return 'https://gemini.google.com/app'
+    case 'deepseek':
+      return 'https://chat.deepseek.com/'
+    case 'mistral':
+      return 'https://chat.mistral.ai/chat'
+    case 'perplexity':
+      return 'https://www.perplexity.ai/'
+    case 'copilot':
+      return 'https://copilot.microsoft.com/'
+    case 'yandexgpt':
+      return 'https://alice.yandex.ru/'
     default:
       return 'https://gemini.google.com/app'
   }

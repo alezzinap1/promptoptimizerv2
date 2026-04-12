@@ -95,7 +95,81 @@ TEXT_QUESTIONS_STRICT = load_prompt("backend/text_questions_strict.txt")
 SKILL_QUESTIONS_STRICT = load_prompt("backend/skill_questions_strict.txt")
 SKILL_PROMPT_MODE_BLOCK = load_prompt("backend/skill_prompt_mode.txt")
 QUESTIONS_CONTRACT_TEMPLATE = load_prompt("backend/questions_contract_system.txt")
+QUESTIONS_CONTRACT_IMAGE_TEMPLATE = load_prompt("backend/questions_contract_image_system.txt")
+QUESTIONS_CONTRACT_SKILL_TEMPLATE = load_prompt("backend/questions_contract_skill_system.txt")
 ITERATION_GUARD_BLOCK = load_prompt("backend/iteration_guard.txt")
+
+
+def _questions_contract_sys_for_prompt_type(prompt_type: str | None, max_q: int) -> str:
+    pt = (prompt_type or "text").strip().lower()
+    if pt == "image":
+        return QUESTIONS_CONTRACT_IMAGE_TEMPLATE.format(max_q=max_q)
+    if pt == "skill":
+        return QUESTIONS_CONTRACT_SKILL_TEMPLATE.format(max_q=max_q)
+    return QUESTIONS_CONTRACT_TEMPLATE.format(max_q=max_q)
+
+
+def _task_primary_language_is_russian(task_input: str | None) -> bool:
+    t = (task_input or "").strip()
+    if not t:
+        return False
+    return any("\u0400" <= c <= "\u04ff" for c in t)
+
+
+def _context_policy_block(
+    *,
+    context_gap: float,
+    questions_policy: dict,
+    prompt_type: str | None,
+    task_input: str | None = None,
+) -> str:
+    pt = (prompt_type or "text").strip().lower()
+    max_q = int(questions_policy.get("max_questions") or 0)
+    mode = questions_policy.get("mode") or "skip"
+    ru = _task_primary_language_is_russian(task_input)
+    if pt == "image":
+        if ru:
+            body = (
+                f"Задавай не больше {max_q} уточняющих вопросов, если визуального брифа мало; "
+                f"режим={mode}. Только про картинку: кадр, стиль (если не задан пресетом), свет, палитра, соотношение сторон, детализация. "
+                "Не спрашивай про цель сюжета, «как решить задачу сценария», аудиторию текстового ответа или формат вывода LLM. "
+                "Все формулировки в ответе — на русском, как у задачи пользователя."
+            )
+        else:
+            body = (
+                f"Prefer at most {max_q} clarifying questions when the visual brief is thin; "
+                f"mode={mode}. Ask only about image parameters (composition, style if no preset, lighting, aspect ratio, detail). "
+                "Do not ask about story goals, plot solutions, morals, audience for text, or text output format. "
+                "Match the user's task language for every question and option."
+            )
+    elif pt == "skill":
+        if ru:
+            body = (
+                f"Не больше {max_q} вопросов, если границы скилла неясны; режим={mode}. "
+                "Среда, инструменты/MCP, память, структура инструкций, ограничения. Ответ на языке задачи пользователя."
+            )
+        else:
+            body = (
+                f"Prefer at most {max_q} clarifying questions when skill scope is unclear; "
+                f"mode={mode}. Focus on environment, tools/MCP, memory, instruction structure, and boundaries. "
+                "Match the user's task language."
+            )
+    else:
+        if ru:
+            body = (
+                f"Не больше {max_q} уточнений при разреженном контексте; режим={mode}. "
+                "Короткая задача или неясные аудитория/формат — сначала вопросы. Язык ответа — как у пользователя."
+            )
+        else:
+            body = (
+                f"Prefer at most {max_q} clarifying questions when context is thin; "
+                f"mode={mode}. Short tasks or missing audience/format usually need questions first."
+            )
+    return (
+        f"\n\n--- CONTEXT POLICY (gap={context_gap:.2f}) ---\n"
+        f"{body}\n"
+        "--- END CONTEXT POLICY ---\n"
+    )
 
 
 def _build_technique_reasons(
@@ -438,11 +512,11 @@ def _estimate_generation_input(
         prompt_type=req.prompt_type or "text",
     )
     if _is_primary_generation_with_unanswered_questions(req) and questions_policy.get("mode") != "skip":
-        system_prompt += (
-            f"\n\n--- CONTEXT POLICY (gap={context_gap:.2f}) ---\n"
-            f"Prefer at most {questions_policy['max_questions']} clarifying questions when context is thin; "
-            f"mode={questions_policy['mode']}. Short tasks or missing audience/format usually need questions first.\n"
-            "--- END CONTEXT POLICY ---\n"
+        system_prompt += _context_policy_block(
+            context_gap=context_gap,
+            questions_policy=questions_policy,
+            prompt_type=req.prompt_type,
+            task_input=req.task_input,
         )
     if req.prompt_type == "image":
         system_prompt += IMAGE_PROMPT_MODE_BLOCK
@@ -753,11 +827,11 @@ def generate_prompt(
         prompt_type=req.prompt_type or "text",
     )
     if _is_primary_generation_with_unanswered_questions(req) and questions_policy.get("mode") != "skip":
-        system_prompt += (
-            f"\n\n--- CONTEXT POLICY (gap={context_gap:.2f}) ---\n"
-            f"Prefer at most {questions_policy['max_questions']} clarifying questions when context is thin; "
-            f"mode={questions_policy['mode']}. Short tasks or missing audience/format usually need questions first.\n"
-            "--- END CONTEXT POLICY ---\n"
+        system_prompt += _context_policy_block(
+            context_gap=context_gap,
+            questions_policy=questions_policy,
+            prompt_type=req.prompt_type,
+            task_input=req.task_input,
         )
     if req.prompt_type == "image":
         system_prompt += IMAGE_PROMPT_MODE_BLOCK
@@ -833,11 +907,56 @@ def generate_prompt(
         max_q = int(questions_policy.get("max_questions") or 2)
         max_q = max(1, min(5, max_q))
         missing = gap_missing_summary(req.task_input, req.prompt_type or "text")
-        contract_sys = QUESTIONS_CONTRACT_TEMPLATE.format(max_q=max_q)
+        contract_sys = _questions_contract_sys_for_prompt_type(req.prompt_type, max_q)
+        pt = (req.prompt_type or "text").strip().lower()
+        ru = _task_primary_language_is_russian(req.task_input)
+        if ru:
+            if pt == "image":
+                gap_label = "Визуальные пробелы (только промпт к изображению)"
+            elif pt == "skill":
+                gap_label = "Пробелы в описании скилла"
+            else:
+                gap_label = "Пробелы контекста"
+            lang_tail = (
+                f"Сформируй до {max_q} точечных вопросов на русском (и варианты «- » тоже на русском). "
+                "Не выводи [PROMPT]."
+            )
+            task_hdr = "Задача пользователя"
+        else:
+            if pt == "image":
+                gap_label = "Identified visual gaps to clarify (image prompt only)"
+            elif pt == "skill":
+                gap_label = "Identified gaps to clarify (skill definition only)"
+            else:
+                gap_label = "Identified gaps to clarify"
+            lang_tail = (
+                f"Ask up to {max_q} targeted questions in the SAME language as the user task. "
+                "Do not output [PROMPT]."
+            )
+            task_hdr = "User task"
+        preset_extra = ""
+        if pt == "image" and image_preset_dict:
+            pname = str(image_preset_dict.get("name") or image_preset_dict.get("id") or "")
+            raw_prev = (str(image_preset_dict.get("raw_text") or "")).strip()
+            if len(raw_prev) > 900:
+                raw_prev = raw_prev[:897] + "…"
+            if ru:
+                preset_extra = (
+                    f"\n\nУже выбран пресет стиля: {pname}. Не проси пользователя выбрать «совсем другой» общий стиль/технику; "
+                    "допустимы только уточнения кадра, света или деталей, если их нет в задаче.\n"
+                    f"Описание пресета:\n{raw_prev}\n"
+                )
+            else:
+                preset_extra = (
+                    f"\n\nStyle preset already selected: {pname}. Do not ask for a wholly different art style/medium; "
+                    "only framing/light/detail if missing.\n"
+                    f"Preset detail:\n{raw_prev}\n"
+                )
         contract_user = (
-            f"User task:\n{req.task_input.strip()}\n\n"
-            f"Identified gaps to clarify:\n{missing}\n\n"
-            f"Ask up to {max_q} targeted questions. Do not output [PROMPT]."
+            f"{task_hdr}:\n{req.task_input.strip()}\n\n"
+            f"{gap_label}:\n{missing}\n"
+            f"{preset_extra}\n"
+            f"{lang_tail}"
         )
         try:
             q_pass = llm.generate(contract_sys, contract_user, q_provider, temperature=0.35)

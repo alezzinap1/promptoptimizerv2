@@ -115,8 +115,8 @@
 
 .cardHero {
   position: relative;
-  min-height: 200px;
-  max-height: 280px;
+  min-height: 360px;
+  max-height: 520px;
   width: 100%;
 }
 

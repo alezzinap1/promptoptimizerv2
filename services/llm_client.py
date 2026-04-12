@@ -37,6 +37,7 @@ PROVIDER_MODELS: dict[str, str] = {
     "mistral":        "mistralai/mistral-nemo",
     "qwen":           "qwen/qwen3-235b-a22b",
     "trinity":        "trinity-labs/trinity-v1-large:free",
+    "nano_banana":    "google/gemini-3.1-flash-image-preview",
 }
 
 PROVIDER_NAMES: dict[str, str] = {
@@ -52,6 +53,7 @@ PROVIDER_NAMES: dict[str, str] = {
     "mistral":        "Mistral Nemo",
     "qwen":           "Qwen3 235B",
     "trinity":        "Trinity Large (free)",
+    "nano_banana":    "Nano Banana2 (image)",
 }
 
 # Target models — what the generated prompt will be used with

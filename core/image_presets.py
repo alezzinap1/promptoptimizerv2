@@ -1,10 +1,47 @@
 """
 Каталог пресетов стиля для image-режима (research: metaprompt_pipeline_research §1.4).
 Используется как «Style inject» в одном проходе генерации — подмешивание в system/user контент.
+
+Встроенные пресеты (IMAGE_STYLE_PRESETS) дополняются записями изfrontend/public/image-styles/manifest.json (label + adaptation как raw_text),
+чтобы id вроде pixel_art совпадали с UI.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
+
+_MANIFEST_BY_ID: dict[str, dict[str, Any]] | None = None
+
+
+def _manifest_style_presets() -> dict[str, dict[str, Any]]:
+    global _MANIFEST_BY_ID
+    if _MANIFEST_BY_ID is not None:
+        return _MANIFEST_BY_ID
+    root = Path(__file__).resolve().parent.parent
+    path = root / "frontend" / "public" / "image-styles" / "manifest.json"
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                pid = str(item.get("id", "")).strip().lower()
+                if not pid:
+                    continue
+                label = str(item.get("label") or item.get("id") or "").strip()
+                adapt = str(item.get("adaptation") or "").strip()
+                out[pid] = {
+                    "id": str(item.get("id") or pid),
+                    "name": label or pid,
+                    "description": "",
+                    "raw_text": adapt,
+                }
+    except (OSError, json.JSONDecodeError, TypeError):
+        pass
+    _MANIFEST_BY_ID = out
+    return out
 
 # Ключевые поля совпадают с документом: medium, technique, color_treatment, …
 IMAGE_STYLE_PRESETS: list[dict[str, Any]] = [
@@ -130,6 +167,9 @@ def get_image_preset(preset_id: str | None) -> dict[str, Any] | None:
     for p in IMAGE_STYLE_PRESETS:
         if p["id"] == pid:
             return p
+    m = _manifest_style_presets().get(pid)
+    if m and (m.get("raw_text") or "").strip():
+        return dict(m)
     return None
 
 

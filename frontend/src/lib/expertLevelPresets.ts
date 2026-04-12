@@ -88,7 +88,7 @@ export const EXPERT_LEVEL_HINTS: Record<ExpertLevel, string> = {
 /** Рекомендуемая модель генерации по профилю (OpenRouter id); при смене уровня подставляется, если не выбрана «своя». */
 export const EXPERT_DEFAULT_GEN_MODEL: Record<ExpertLevel, string> = {
   junior: 'deepseek/deepseek-chat',
-  mid: 'google/gemini-2.0-flash-001',
-  senior: 'anthropic/claude-3-5-haiku',
-  creative: 'x-ai/grok-3-mini-beta',
+  mid: 'google/gemini-2.5-flash-lite',
+  senior: 'google/gemini-2.5-flash',
+  creative: 'openai/gpt-4o-mini',
 }

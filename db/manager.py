@@ -175,6 +175,7 @@ class DBManager:
             self._migrate_phase9_community_and_skills(conn)
             self._migrate_phase10_user_presets(conn)
             self._migrate_phase11_pre_router_and_skill_client_id(conn)
+            self._migrate_phase12_library_cover_image(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -354,6 +355,10 @@ class DBManager:
             )
         except sqlite3.OperationalError:
             pass
+
+    def _migrate_phase12_library_cover_image(self, conn: sqlite3.Connection) -> None:
+        """Превью картинки для записей библиотеки (проба Nano Banana и т.п.)."""
+        self._safe_add_column(conn, "prompt_library", "cover_image_path", "TEXT DEFAULT ''")
 
     def _safe_add_column(
         self,
@@ -1214,13 +1219,14 @@ class DBManager:
         techniques: list[str] | None = None,
         notes: str = "",
         user_id: int | None = None,
+        cover_image_path: str | None = None,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
                 """
                 INSERT INTO prompt_library
-                    (user_id, title, tags, target_model, task_type, techniques, prompt, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (user_id, title, tags, target_model, task_type, techniques, prompt, notes, cover_image_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -1228,7 +1234,9 @@ class DBManager:
                     json.dumps(tags or [], ensure_ascii=False),
                     target_model, task_type,
                     json.dumps(techniques or [], ensure_ascii=False),
-                    prompt, notes,
+                    prompt,
+                    notes,
+                    (cover_image_path or "").strip(),
                 ),
             )
             return cur.lastrowid  # type: ignore[return-value]
@@ -1282,6 +1290,7 @@ class DBManager:
         tags: list[str] | None = None,
         notes: str | None = None,
         rating: int | None = None,
+        cover_image_path: str | None = None,
         user_id: int | None = None,
     ) -> None:
         updates = []
@@ -1295,6 +1304,9 @@ class DBManager:
         if tags is not None:
             updates.append("tags = ?")
             params.append(json.dumps(tags, ensure_ascii=False))
+        if cover_image_path is not None:
+            updates.append("cover_image_path = ?")
+            params.append(cover_image_path.strip())
         if notes is not None:
             updates.append("notes = ?")
             params.append(notes)

@@ -356,6 +356,7 @@ export interface LibraryItem {
   rating: number
   notes: string
   techniques: string[]
+  cover_image_path?: string
   created_at: string
   updated_at: string
 }
@@ -667,10 +668,30 @@ export const api = {
     return fetchApi<{ items: LibraryItem[] }>(`/library${toQueryString(params)}`)
   },
   getLibraryStats: () => fetchApi<{ total: number; models: string[]; task_types: string[] }>('/library/stats'),
-  saveToLibrary: (req: { title: string; prompt: string; tags?: string[]; target_model?: string; task_type?: string; techniques?: string[]; notes?: string }) =>
-    fetchApi<{ id: number }>('/library', { method: 'POST', body: JSON.stringify(req) }),
-  updateLibrary: (id: number, req: { title?: string; prompt?: string; tags?: string[]; notes?: string; rating?: number }) =>
-    fetchApi<{ ok: boolean }>(`/library/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  saveToLibrary: (req: {
+    title: string
+    prompt: string
+    tags?: string[]
+    target_model?: string
+    task_type?: string
+    techniques?: string[]
+    notes?: string
+    cover_image_path?: string
+  }) => fetchApi<{ id: number }>('/library', { method: 'POST', body: JSON.stringify(req) }),
+  updateLibrary: (
+    id: number,
+    req: { title?: string; prompt?: string; tags?: string[]; notes?: string; rating?: number; cover_image_path?: string },
+  ) => fetchApi<{ ok: boolean }>(`/library/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),
+  imageTry: (req: { prompt_text: string; gen_model?: string; aspect_ratio?: string }) =>
+    fetchApi<{ image_url: string; gen_model: string; saved_path: string | null }>('/image/try', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  libraryLlmReview: (req: { prompt: string; prompt_type?: string; original_task?: string; judge_model?: string }) =>
+    fetchApi<{ review: string; judge_model: string }>('/library/llm-review', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
   deleteLibrary: (id: number) =>
     fetchApi<{ ok: boolean }>(`/library/${id}`, { method: 'DELETE' }),
 
