@@ -1254,6 +1254,75 @@
   border: 1px solid var(--stroke);
 }
 
+.chatBubbleClarify {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.routerClarifyReason {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--muted, rgba(255, 255, 255, 0.55));
+}
+
+.routerClarifyContinue {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.12);
+  color: inherit;
+  cursor: pointer;
+}
+
+.routerClarifyContinue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.expertLevelModelHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  font-size: 0.78rem;
+  color: var(--muted, rgba(255, 255, 255, 0.55));
+  max-width: min(200px, 40vw);
+  white-space: nowrap;
+}
+
+.expertLevelModelShort {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expertLevelModelRecBadge {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.expertLevelModelReset {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.expertLevelModelReset:disabled {
+  opacity: 0.5;
+}
+
+.genModelWrap {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
 .chatBubbleUser :global(p),
 .chatBubbleAssistant :global(p) {
   margin: 0 0 0.5em;

@@ -26,6 +26,8 @@ export type StudioChatMessage = {
     newPrompt: string
     diffOps: LineDiffOp[]
   }
+  /** Пре-роутер вернул уточнение; кнопка «без уточнения» шлёт force_task. */
+  routerClarification?: { reason?: string; routerLogId?: number; pendingUserText: string }
 }
 
 export type AgentStudioSnapshot = {
@@ -55,13 +57,13 @@ export type AgentStudioSnapshot = {
 }
 
 const WELCOME_TEXT =
-  'Опишите задачу в чате — при необходимости задам уточнения, затем соберу промпт справа. Модель генерации, целевая модель и рабочую область можно выбрать внизу.'
+  'Чат слева — задача и уточнения; готовый промпт справа. Модель и область — внизу.'
 
 const WELCOME_IMAGE =
-  'Режим фото: опишите сцену или идею для генерации изображения. При включённых уточнениях сначала задам вопросы по стилю, свету и формату. Пресет и движок — в панели ввода.'
+  'Режим фото: опишите сцену. Уточнения по стилю и свету — при необходимости. Пресет и движок — внизу.'
 
 const WELCOME_SKILL =
-  'Режим скилла: опишите, какой навык или инструкцию нужно оформить для ИИ-ассистента. При уточнениях соберу структуру и правила. Пресет скилла — в панели ввода.'
+  'Режим скилла: опишите навык для ассистента. Пресет — внизу.'
 
 export function defaultWelcomeForMode(mode: PromptStudioMode): string {
   if (mode === 'image') return WELCOME_IMAGE

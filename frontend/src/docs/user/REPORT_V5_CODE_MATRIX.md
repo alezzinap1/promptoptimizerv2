@@ -27,7 +27,7 @@
 | Компактный уровень | `SelectDropdown` в `Home.tsx` | done |
 | Лейбл токенов задачи | «задача» + title | partial |
 | Compare: Авто/Вручную | `Compare.tsx` | done |
-| Скиллы локально + сервер | Экспорт/импорт JSON; **«С сервера»** → merge в `localSkillsStore` (`GET /skills`) | partial |
+| Скиллы локально + сервер | Экспорт/импорт JSON; **«С сервера»** + **«☁ Синхронизировать»** (`POST /skills/bulk-upsert`), autosync при сохранении скилла | done (без полного отказа от localStorage) |
 | Подписи моделей `provider/id` | `generationModelLabel.ts` | done |
 
 ## Вкладка «Продукт»
@@ -47,12 +47,23 @@
 | Имена моделей | `shortGenerationModelLabel` |
 | FAQ по уровням | `EXPERT_LEVELS_FAQ.md` + Help |
 
+## Сводка с брифом `metaprompt_programmer_brief` (Desktop HTML)
+
+| Тема брифа | Реализация | Примечание |
+|------------|------------|------------|
+| P0 cheap LLM pre-router | `services/cheap_llm_pre_router.py`, `backend/api/agent_route.py` | Флаг `PRE_PROMPT_LLM_ENABLED` (по умолчанию вкл.), `CHEAP_PRE_ROUTER_PROVIDER`, пороги по уровню, fallback на embeddings при ошибке |
+| clarify + «Продолжить без уточнения» | Ответ `is_clarification`, `router_log_id`, `Home.tsx` | `force_task` + `mark_pre_router_override` в `pre_router_logs` |
+| P1 bulk-upsert скиллов | `POST /skills/bulk-upsert`, `client_local_id`, кнопка «☁ Синхронизировать» | Автосохранение при сохранении скилла из студии: `createSkill` + `client_local_id` |
+| P2 LevelBundle + модель по умолчанию | `EXPERT_DEFAULT_GEN_MODEL`, `useCustomGenModel`, подсказка уровня | «к профилю» сбрасывает к рекомендованной модели |
+| P3 reasoning tooltip | `span` вокруг выбора модели + `modelReasoning.ts` | Паттерн `openai/o3` |
+| Промпты (оптимизация) | `prompts/core/base_system.txt`, `backend/skill_*`, `image_*`, `text_questions_strict`, `iteration_guard` | Согласовано с разделом «Оптимизация промптов» HTML |
+
 ## Всё ещё вне scope / gap
 
 - **Уровень «Авто»** (intent routing как отдельный профиль).
 - **Полная стоимость до клика** из прайсинга OpenRouter (сейчас только ориентир из бандла).
-- **LevelBundle** как отдельный визуальный продукт (не только метаданные + dropdown уровня).
-- **Двунаправленный sync** скиллов (локальные → сервер пакетом) и разрешение дубликатов.
+- **LevelBundle** как отдельный визуальный продукт (не только метаданные + dropdown уровня + рекомендованная модель).
+- **Overlay-онбординг** «до/после» + `POST /users/onboarding-complete` из брифа P4.
 - **Retention / проекты** и т.д. из продуктовой вкладки HTML.
 
 Обновляйте этот файл при закрытии пунктов бэклога.

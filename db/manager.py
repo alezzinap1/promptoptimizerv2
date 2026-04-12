@@ -14,6 +14,7 @@ import logging
 import sqlite3
 import time
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from statistics import mean
 
@@ -173,6 +174,7 @@ class DBManager:
             self._migrate_phase8_ui_color_mode(conn)
             self._migrate_phase9_community_and_skills(conn)
             self._migrate_phase10_user_presets(conn)
+            self._migrate_phase11_pre_router_and_skill_client_id(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -321,6 +323,37 @@ class DBManager:
             CREATE INDEX IF NOT EXISTS idx_user_presets_user_kind
                 ON user_presets(user_id, kind);
         """)
+
+    def _migrate_phase11_pre_router_and_skill_client_id(self, conn: sqlite3.Connection) -> None:
+        """Логи пре-роутера LLM; client_local_id для синхронизации скиллов с клиента."""
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS pre_router_logs (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id         INTEGER NOT NULL,
+                text            TEXT    NOT NULL,
+                prompt_type     TEXT,
+                intent          TEXT,
+                confidence      REAL,
+                reason          TEXT,
+                expert_level    TEXT,
+                user_overrode   INTEGER DEFAULT 0,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_pre_router_logs_user
+                ON pre_router_logs(user_id, created_at DESC);
+        """)
+        self._safe_add_column(conn, "skills", "client_local_id", "TEXT")
+        try:
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_user_client_local
+                ON skills(user_id, client_local_id)
+                WHERE client_local_id IS NOT NULL
+                """
+            )
+        except sqlite3.OperationalError:
+            pass
 
     def _safe_add_column(
         self,
@@ -1527,3 +1560,144 @@ class DBManager:
     def delete_skill(self, skill_id: int, user_id: int) -> None:
         with self._conn() as conn:
             conn.execute("DELETE FROM skills WHERE id = ? AND user_id = ?", (skill_id, user_id))
+
+    def insert_pre_router_log(
+        self,
+        user_id: int,
+        text: str,
+        prompt_type: str | None,
+        intent: str | None,
+        confidence: float | None,
+        reason: str | None,
+        expert_level: str | None,
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO pre_router_logs
+                    (user_id, text, prompt_type, intent, confidence, reason, expert_level)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    text,
+                    prompt_type or "",
+                    intent,
+                    confidence,
+                    reason,
+                    expert_level,
+                ),
+            )
+            return int(cur.lastrowid)  # type: ignore[return-value]
+
+    def mark_pre_router_override(self, user_id: int, log_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE pre_router_logs SET user_overrode = 1 WHERE id = ? AND user_id = ?",
+                (log_id, user_id),
+            )
+
+    def bulk_upsert_skills(
+        self,
+        user_id: int,
+        items: list[dict],
+    ) -> dict[str, int]:
+        """
+        items: local_id, name, body, description?, category?, updated_at (ISO).
+        Если на сервере запись с тем же client_local_id новее клиента — conflict.
+        """
+        inserted = 0
+        updated = 0
+        conflicts = 0
+
+        def _parse_ts(s: str | None) -> float:
+            if not s:
+                return 0.0
+            raw = s.strip()
+            try:
+                if raw.endswith("Z"):
+                    raw = raw[:-1] + "+00:00"
+                if "T" in raw or raw.count("-") >= 3:
+                    return datetime.fromisoformat(raw).timestamp()
+                return datetime.strptime(raw[:19], "%Y-%m-%d %H:%M:%S").timestamp()
+            except Exception:
+                return 0.0
+
+        with self._conn() as conn:
+            for raw in items:
+                if not isinstance(raw, dict):
+                    continue
+                lid = str(raw.get("local_id") or "").strip()
+                name = str(raw.get("name") or "").strip()
+                body = str(raw.get("body") or "").strip()
+                if not lid or not name or not body:
+                    continue
+                description = str(raw.get("description") or "").strip()
+                category = str(raw.get("category") or "general").strip() or "general"
+                ua = raw.get("updated_at")
+                client_ts = _parse_ts(ua) if isinstance(ua, str) else 0.0
+
+                row = conn.execute(
+                    "SELECT id, updated_at FROM skills WHERE user_id = ? AND client_local_id = ?",
+                    (user_id, lid),
+                ).fetchone()
+                if row:
+                    srv_raw = str(row["updated_at"] or "")
+                    srv_ts = _parse_ts(srv_raw) if srv_raw else 0.0
+                    if srv_ts > client_ts + 1e-6:
+                        conflicts += 1
+                        continue
+                    conn.execute(
+                        """
+                        UPDATE skills
+                        SET name = ?, description = ?, body = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND user_id = ?
+                        """,
+                        (name, description, body, category, int(row["id"]), user_id),
+                    )
+                    updated += 1
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO skills (user_id, name, description, body, category, client_local_id)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (user_id, name, description, body, category, lid),
+                    )
+                    inserted += 1
+        return {"inserted": inserted, "updated": updated, "conflicts": conflicts}
+
+    def create_skill_with_client_id(
+        self,
+        user_id: int,
+        name: str,
+        body: str,
+        description: str = "",
+        category: str = "general",
+        client_local_id: str | None = None,
+    ) -> int:
+        lid = (client_local_id or "").strip() or None
+        with self._conn() as conn:
+            if lid:
+                ex = conn.execute(
+                    "SELECT id FROM skills WHERE user_id = ? AND client_local_id = ?",
+                    (user_id, lid),
+                ).fetchone()
+                if ex:
+                    conn.execute(
+                        """
+                        UPDATE skills
+                        SET name = ?, description = ?, body = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND user_id = ?
+                        """,
+                        (name, description, body, category, int(ex["id"]), user_id),
+                    )
+                    return int(ex["id"])
+            cur = conn.execute(
+                """
+                INSERT INTO skills (user_id, name, description, body, category, client_local_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, name, description, body, category, lid),
+            )
+            return int(cur.lastrowid)  # type: ignore[return-value]

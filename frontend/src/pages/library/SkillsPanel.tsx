@@ -54,6 +54,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   const [genDescription, setGenDescription] = useState('')
   const [publishSkill, setPublishSkill] = useState<SkillItem | null>(null)
   const [serverPullBusy, setServerPullBusy] = useState(false)
+  const [serverSyncBusy, setServerSyncBusy] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const handleGenerate = useCallback(async () => {
@@ -199,7 +200,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   return (
     <div className={libStyles.library}>
       <p className={styles.leadCompact}>
-        Локальная библиотека в браузере + опционально скиллы с сервера (кнопка «С сервера»). Резервная копия — экспорт
+        Локальная библиотека в браузере + синхронизация с сервером («С сервера» / «☁ Синхронизировать»). Резервная копия — экспорт
         JSON. Теги в поиске; цвет чипа — по нажатию.
       </p>
 
@@ -251,6 +252,36 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
           }}
         >
           {serverPullBusy ? 'Сервер…' : 'С сервера'}
+        </button>
+        <button
+          type="button"
+          className={`${styles.primary} ${styles.primarySmall}`}
+          title="Залить локальные скиллы на сервер (по local id); при более новой версии на сервере — конфликт"
+          disabled={serverSyncBusy}
+          onClick={() => {
+            setServerSyncBusy(true)
+            const local = loadLocalSkills().filter((x) => !x.id.startsWith('sk_srv_'))
+            void api
+              .bulkUpsertSkills({
+                items: local.map((x) => ({
+                  local_id: x.id,
+                  name: x.title,
+                  body: x.body,
+                  description: x.description,
+                  category: x.tags[0] || 'general',
+                  updated_at: x.createdAt,
+                })),
+              })
+              .then((r) => {
+                window.alert(
+                  `Загружено: ${r.inserted}, обновлено: ${r.updated}, конфликтов: ${r.conflicts}.`,
+                )
+              })
+              .catch(() => window.alert('Не удалось синхронизировать (войдите в аккаунт и проверьте сеть).'))
+              .finally(() => setServerSyncBusy(false))
+          }}
+        >
+          {serverSyncBusy ? '…' : '☁ Синхронизировать'}
         </button>
         <input
           ref={importInputRef}

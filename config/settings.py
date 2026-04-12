@@ -56,3 +56,22 @@ SEMANTIC_ROUTE_MIN_MARGIN = float(os.getenv("SEMANTIC_ROUTE_MIN_MARGIN", "0.025"
 # Пре-промпт: два класса (разговор vs задача); пороги чуть мягче, чем у follow-up.
 PRE_PROMPT_MIN_CONFIDENCE = float(os.getenv("PRE_PROMPT_MIN_CONFIDENCE", "0.30"))
 PRE_PROMPT_MIN_MARGIN = float(os.getenv("PRE_PROMPT_MIN_MARGIN", "0.018"))
+
+# Дешёвый LLM вместо/после embeddings для пре-промпта (гибрид с правилами).
+PRE_PROMPT_LLM_ENABLED = os.getenv("PRE_PROMPT_LLM_ENABLED", "1").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+# Ключ из PROVIDER_MODELS в services/llm_client.py (например gemini_flash, grok).
+CHEAP_PRE_ROUTER_PROVIDER = os.getenv("CHEAP_PRE_ROUTER_PROVIDER", "gemini_flash").strip()
+
+# Лёгкий ответ в чате студии (диалог до генерации); пусто = тот же провайдер, что у пре-роутера.
+AGENT_STUDIO_CHAT_LLM_ENABLED = os.getenv("AGENT_STUDIO_CHAT_LLM_ENABLED", "1").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+AGENT_STUDIO_CHAT_PROVIDER = os.getenv("AGENT_STUDIO_CHAT_PROVIDER", "").strip()

@@ -86,6 +86,20 @@ class CreateSkillRequest(BaseModel):
     body: str
     description: str = ""
     category: str = "general"
+    client_local_id: str | None = Field(default=None, max_length=200)
+
+
+class BulkSkillItem(BaseModel):
+    local_id: str = Field(..., max_length=200)
+    name: str
+    body: str
+    description: str = ""
+    category: str = "general"
+    updated_at: str = ""
+
+
+class BulkUpsertSkillsRequest(BaseModel):
+    items: list[BulkSkillItem] = Field(default_factory=list, max_length=500)
 
 
 @router.get("/skills")
@@ -102,14 +116,35 @@ def create_skill(
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
 ):
-    id_ = db.create_skill(
-        user_id=int(user["id"]),
-        name=req.name,
-        body=req.body,
-        description=req.description,
-        category=req.category,
-    )
+    if req.client_local_id and req.client_local_id.strip():
+        id_ = db.create_skill_with_client_id(
+            user_id=int(user["id"]),
+            name=req.name,
+            body=req.body,
+            description=req.description,
+            category=req.category,
+            client_local_id=req.client_local_id.strip(),
+        )
+    else:
+        id_ = db.create_skill(
+            user_id=int(user["id"]),
+            name=req.name,
+            body=req.body,
+            description=req.description,
+            category=req.category,
+        )
     return {"id": id_}
+
+
+@router.post("/skills/bulk-upsert")
+def bulk_upsert_skills(
+    req: BulkUpsertSkillsRequest,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+):
+    items = [it.model_dump() for it in req.items]
+    out = db.bulk_upsert_skills(int(user["id"]), items)
+    return {"ok": True, **out}
 
 
 @router.get("/skills/{skill_id}")

@@ -9,7 +9,9 @@ Supports streaming for st.write_stream integration.
 """
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Iterator
 
 from openai import OpenAI
@@ -148,6 +150,48 @@ class LLMClient:
             kwargs["max_tokens"] = max_tokens
         response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
+
+    def generate_json(
+        self,
+        system_prompt: str,
+        user_content: str,
+        provider: str = DEFAULT_PROVIDER,
+        max_tokens: int = 500,
+    ) -> dict:
+        """
+        JSON object response (OpenRouter / OpenAI-compatible). Fallback: extract {...} from text.
+        """
+        model = self._get_model(provider)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        kwargs: dict = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.0,
+            "max_tokens": max_tokens,
+            "response_format": {"type": "json_object"},
+        }
+        try:
+            response = self._client.chat.completions.create(**kwargs)
+        except Exception as e:
+            logger.warning("generate_json API error: %s", e)
+            return {}
+        raw = (response.choices[0].message.content or "").strip()
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            m = re.search(r"\{[\s\S]*\}", raw)
+            if m:
+                try:
+                    return json.loads(m.group(0))
+                except json.JSONDecodeError:
+                    pass
+            logger.warning("generate_json parse failed: %s", raw[:200])
+            return {}
 
     def stream(
         self,

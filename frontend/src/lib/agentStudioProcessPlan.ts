@@ -8,6 +8,7 @@ import {
   type AgentProcessResponse,
   type SuggestedStudioAction,
 } from '../api/client'
+import type { ExpertLevel } from './expertLevelPresets'
 import type { FollowUpPlan } from './agentFollowUp'
 import { resolveAgentFollowUpPlan } from './agentPlanResolver'
 
@@ -69,6 +70,7 @@ export async function resolveStudioFollowUpPlan(
     promptType: string
     currentPrompt: string | undefined
     chatMessages: ChatLike[]
+    expertLevel?: ExpertLevel
   },
 ): Promise<{ plan: FollowUpPlan; suggestedActions?: SuggestedStudioAction[] }> {
   try {
@@ -83,6 +85,7 @@ export async function resolveStudioFollowUpPlan(
           prompt_type: ctx.promptType,
           current_prompt: ctx.currentPrompt,
           chat_history: buildAgentChatHistory(ctx.chatMessages),
+          expert_level: ctx.expertLevel,
         },
         { signal: ac.signal },
       )

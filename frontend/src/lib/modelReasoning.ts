@@ -8,6 +8,7 @@ const REASONING_IDS = new Set(
 )
 
 const REASONING_PATTERNS: RegExp[] = [
+  /\bopenai\/o3\b/i,
   /\bo[134]\b/i,
   /\bo\d+-mini\b/i,
   /\bo\d+-preview\b/i,

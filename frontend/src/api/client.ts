@@ -159,6 +159,10 @@ export interface AgentProcessRequest {
   current_prompt?: string
   /** Последние реплики чата студии; без персистентности на сервере (P0). */
   chat_history?: AgentProcessChatTurn[]
+  expert_level?: string
+  /** Пропустить пре-роутер после «Продолжить без уточнения». */
+  force_task?: boolean
+  router_log_id?: number
 }
 
 export interface AgentProcessResponse {
@@ -168,6 +172,9 @@ export interface AgentProcessResponse {
   classification?: Record<string, unknown>
   features?: Record<string, boolean>
   suggested_actions?: SuggestedStudioAction[]
+  is_clarification?: boolean
+  clarify_reason?: string
+  router_log_id?: number
 }
 
 export interface ImagePresetOption {
@@ -792,8 +799,27 @@ export const api = {
     }),
 
   getSkills: () => fetchApi<{ items: SkillRecord[] }>('/skills'),
-  createSkill: (req: { name: string; body: string; description?: string; category?: string }) =>
-    fetchApi<{ id: number }>('/skills', { method: 'POST', body: JSON.stringify(req) }),
+  createSkill: (req: {
+    name: string
+    body: string
+    description?: string
+    category?: string
+    client_local_id?: string
+  }) => fetchApi<{ id: number }>('/skills', { method: 'POST', body: JSON.stringify(req) }),
+  bulkUpsertSkills: (req: {
+    items: {
+      local_id: string
+      name: string
+      body: string
+      description?: string
+      category?: string
+      updated_at?: string
+    }[]
+  }) =>
+    fetchApi<{ ok: boolean; inserted: number; updated: number; conflicts: number }>(
+      '/skills/bulk-upsert',
+      { method: 'POST', body: JSON.stringify(req) },
+    ),
   getSkill: (id: number) => fetchApi<{ item: SkillRecord }>(`/skills/${id}`),
   updateSkill: (id: number, req: { name?: string; description?: string; body?: string; category?: string }) =>
     fetchApi<{ ok: boolean }>(`/skills/${id}`, { method: 'PATCH', body: JSON.stringify(req) }),

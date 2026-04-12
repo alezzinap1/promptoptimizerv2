@@ -35,6 +35,7 @@ import {
 } from '../lib/agentStudioModes'
 import {
   clampExpertGenerationTemperature,
+  EXPERT_DEFAULT_GEN_MODEL,
   EXPERT_GENERATION_TEMPERATURE_CAP,
   EXPERT_LEVEL_HINTS,
   EXPERT_LEVEL_LABELS,
@@ -42,6 +43,7 @@ import {
 } from '../lib/expertLevelPresets'
 import { getLevelBundleForExpertLevel } from '../lib/levelBundle'
 import { filterManualTechsForReasoningModel, isReasoningModelId } from '../lib/modelReasoning'
+import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import { SKILL_TARGET_ENV_OPTIONS } from '../lib/skillTargetEnv'
 import { clearSessionAgentChat, loadSessionAgentChat, saveSessionAgentChat } from '../lib/sessionAgentChat'
 import ImageStylePickerPopover from '../components/ImageStylePickerPopover'
@@ -64,7 +66,6 @@ import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
 import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
 import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
 import { appendLocalSkill, loadLocalSkills } from '../lib/localSkillsStore'
-import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import { buildPromptDoneCard } from '../lib/studioPromptDoneCard'
 import type { PromptDoneCard } from '../lib/studioPromptDoneCard'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
@@ -260,6 +261,7 @@ type ChatMessage = {
   promptDoneCard?: PromptDoneCard
   appliedTip?: StudioAppliedTip
   editPreviewCard?: GenChatMsg['editPreviewCard']
+  routerClarification?: { reason?: string; routerLogId?: number; pendingUserText: string }
 }
 
 type Technique = { id: string; name: string }
@@ -327,6 +329,8 @@ export default function Home() {
   const [skillTargetEnv, setSkillTargetEnv] = useState('generic')
   const [skillBody, setSkillBody] = useState('')
   const [expertLevel, setExpertLevel] = useState<ExpertLevel>('mid')
+  /** Если false — при смене уровня подставляется EXPERT_DEFAULT_GEN_MODEL. */
+  const [useCustomGenModel, setUseCustomGenModel] = useState(false)
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
   const [quickSaved, setQuickSaved] = useState(false)
@@ -464,12 +468,15 @@ export default function Home() {
       if (loading) return
       setExpertLevel(level)
       applyExpertPreset(level, promptType)
+      if (!useCustomGenModel) {
+        setGenModel(EXPERT_DEFAULT_GEN_MODEL[level])
+      }
       studioModesRef.current[promptType] = cloneAgentStudioSnapshot({
         ...studioModesRef.current[promptType],
         expertLevel: level,
       })
     },
-    [promptType, applyExpertPreset, loading],
+    [promptType, applyExpertPreset, loading, useCustomGenModel],
   )
 
   const agentSplitRootRef = useRef<HTMLDivElement>(null)
@@ -1345,6 +1352,56 @@ export default function Home() {
     localStorage.removeItem(ACTIVE_SESSION_KEY)
   }
 
+  const prePromptForceContinue = useCallback(
+    (pendingUserText: string, routerLogId?: number) => {
+      const t = pendingUserText.trim()
+      if (!t || loading) return
+      void (async () => {
+        setLoading(true)
+        setError(null)
+        setAgentThinkingLine(PRE_PROMPT_ROUTING_LINE)
+        const chatHist = buildAgentChatHistory(chatMessages)
+        try {
+          const ac = new AbortController()
+          const tid = window.setTimeout(() => ac.abort(), AGENT_PROCESS_PRE_TIMEOUT_MS)
+          try {
+            const res = await api.agentProcess(
+              {
+                text: t,
+                has_prompt: false,
+                prompt_type: promptType,
+                chat_history: chatHist,
+                expert_level: expertLevel,
+                force_task: true,
+                router_log_id: routerLogId,
+              },
+              { signal: ac.signal },
+            )
+            if (res.action === 'generate' || res.action === 'generate_skill') {
+              setAgentThinkingLine(res.action === 'generate_skill' ? PRE_PROMPT_SKILL_LINE : PRE_PROMPT_TASK_LINE)
+              setBaseTaskRef(t)
+              setTaskInput(t)
+              await handleGenerate(undefined, { taskInputOverride: t, fromPrePromptRouter: true })
+              return
+            }
+            setAgentThinkingLine(PRE_PROMPT_TASK_LINE)
+            setBaseTaskRef(t)
+            setTaskInput(t)
+            await handleGenerate(undefined, { taskInputOverride: t, fromPrePromptRouter: true })
+          } finally {
+            window.clearTimeout(tid)
+          }
+        } catch {
+          setAgentThinkingLine(PRE_PROMPT_TASK_LINE)
+          setBaseTaskRef(t)
+          setTaskInput(t)
+          await handleGenerate(undefined, { taskInputOverride: t, fromPrePromptRouter: true })
+        }
+      })()
+    },
+    [chatMessages, promptType, expertLevel, loading, handleGenerate],
+  )
+
   const handleAgentSend = () => {
     const text = chatInput.trim()
     if (!text || loading) return
@@ -1364,10 +1421,75 @@ export default function Home() {
         ])
         return
       }
-      setChatMessages((m) => [
-        ...m,
-        { id: crypto.randomUUID(), role: 'assistant', content: pickConversationalReply() },
-      ])
+      void (async () => {
+        setLoading(true)
+        setError(null)
+        try {
+          const hist = buildAgentChatHistory([...chatMessages, { role: 'user', content: text }])
+          const ac = new AbortController()
+          const tid = window.setTimeout(() => ac.abort(), AGENT_PROCESS_PRE_TIMEOUT_MS)
+          try {
+            const res = await api.agentProcess(
+              {
+                text,
+                has_prompt: false,
+                prompt_type: promptType,
+                chat_history: hist,
+                expert_level: expertLevel,
+              },
+              { signal: ac.signal },
+            )
+            if (res.action === 'chat') {
+              const msg =
+                String((res.data as { message?: string }).message || '').trim() || pickConversationalReply()
+              const isClar = Boolean(res.is_clarification)
+              const clarifyReason =
+                typeof res.clarify_reason === 'string' ? res.clarify_reason.trim() : ''
+              const routerLogId = typeof res.router_log_id === 'number' ? res.router_log_id : undefined
+              setChatMessages((m) => [
+                ...m,
+                {
+                  id: crypto.randomUUID(),
+                  role: 'assistant',
+                  content: msg,
+                  ...(isClar
+                    ? {
+                        routerClarification: {
+                          reason: clarifyReason || undefined,
+                          routerLogId,
+                          pendingUserText: text,
+                        },
+                      }
+                    : {}),
+                },
+              ])
+              return
+            }
+            if (res.action === 'generate' || res.action === 'generate_skill') {
+              setAgentThinkingLine(
+                res.action === 'generate_skill' ? PRE_PROMPT_SKILL_LINE : PRE_PROMPT_TASK_LINE,
+              )
+              setBaseTaskRef(text)
+              setTaskInput(text)
+              await handleGenerate(undefined, { taskInputOverride: text, fromPrePromptRouter: true })
+              return
+            }
+            setAgentThinkingLine(PRE_PROMPT_TASK_LINE)
+            setBaseTaskRef(text)
+            setTaskInput(text)
+            await handleGenerate(undefined, { taskInputOverride: text, fromPrePromptRouter: true })
+          } finally {
+            window.clearTimeout(tid)
+          }
+        } catch {
+          setChatMessages((m) => [
+            ...m,
+            { id: crypto.randomUUID(), role: 'assistant', content: pickConversationalReply() },
+          ])
+        } finally {
+          setLoading(false)
+        }
+      })()
       return
     }
 
@@ -1429,6 +1551,7 @@ export default function Home() {
           promptType,
           currentPrompt: snapshot.prompt_block,
           chatMessages: [...chatMessages, { role: 'user', content: text }],
+          expertLevel,
         })
         if (agentBar?.length) {
           setSuggestedActions(agentBar)
@@ -1558,6 +1681,7 @@ export default function Home() {
                 has_prompt: false,
                 prompt_type: promptType,
                 chat_history: chatHist,
+                expert_level: expertLevel,
               },
               { signal: ac.signal },
             )
@@ -1565,7 +1689,27 @@ export default function Home() {
               setAgentThinkingLine(null)
               const msg =
                 String((res.data as { message?: string }).message || '').trim() || pickConversationalReply()
-              setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', content: msg }])
+              const isClar = Boolean(res.is_clarification)
+              const clarifyReason =
+                typeof res.clarify_reason === 'string' ? res.clarify_reason.trim() : ''
+              const routerLogId = typeof res.router_log_id === 'number' ? res.router_log_id : undefined
+              setChatMessages((m) => [
+                ...m,
+                {
+                  id: crypto.randomUUID(),
+                  role: 'assistant',
+                  content: msg,
+                  ...(isClar
+                    ? {
+                        routerClarification: {
+                          reason: clarifyReason || undefined,
+                          routerLogId,
+                          pendingUserText: text,
+                        },
+                      }
+                    : {}),
+                },
+              ])
               setLoading(false)
               return
             }
@@ -1673,13 +1817,22 @@ export default function Home() {
     const fb = (baseTaskRef || taskInput).trim()
     const title = saveTitle.trim() || pickPromptTitle(result, fb)
     if (promptType === 'skill') {
-      appendLocalSkill({
+      const sk = appendLocalSkill({
         title,
         body: result.prompt_block,
         description: saveNotes.trim() || fb.slice(0, 500),
         tags: mergeStudioSkillTags(saveTags),
         frameworks: [],
       })
+      void api
+        .createSkill({
+          name: sk.title,
+          body: sk.body,
+          description: sk.description,
+          category: sk.tags[0] || 'general',
+          client_local_id: sk.id,
+        })
+        .catch(() => {})
       window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
       setShowSaveDialog(false)
       setSaveNotes('')
@@ -1708,13 +1861,22 @@ export default function Home() {
     const fb = (baseTaskRef || taskInput).trim()
     const title = pickPromptTitle(result, fb)
     if (promptType === 'skill') {
-      appendLocalSkill({
+      const sk = appendLocalSkill({
         title,
         body: result.prompt_block,
         description: fb.slice(0, 500),
         tags: mergeStudioSkillTags(saveTags),
         frameworks: [],
       })
+      void api
+        .createSkill({
+          name: sk.title,
+          body: sk.body,
+          description: sk.description,
+          category: sk.tags[0] || 'general',
+          client_local_id: sk.id,
+        })
+        .catch(() => {})
       window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
       setQuickSaved(true)
       return
@@ -2365,6 +2527,31 @@ export default function Home() {
                         disabled={loading}
                         footerLink={{ to: '/help', label: 'Справка: уровни' }}
                       />
+                      <span
+                        className={styles.expertLevelModelHint}
+                        title={
+                          useCustomGenModel
+                            ? 'Сбросить к модели, рекомендованной для выбранного уровня'
+                            : `Модель по умолчанию для «${EXPERT_LEVEL_LABELS[expertLevel]}» (смените внизу — будет «своя»)`
+                        }
+                      >
+                        <span className={styles.expertLevelModelShort}>{shortGenerationModelLabel(genModel)}</span>
+                        {useCustomGenModel ? (
+                          <button
+                            type="button"
+                            className={styles.expertLevelModelReset}
+                            disabled={loading}
+                            onClick={() => {
+                              setUseCustomGenModel(false)
+                              setGenModel(EXPERT_DEFAULT_GEN_MODEL[expertLevel])
+                            }}
+                          >
+                            к профилю
+                          </button>
+                        ) : (
+                          <span className={styles.expertLevelModelRecBadge}>рекоменд.</span>
+                        )}
+                      </span>
                     </div>
                   </div>
                   <button
@@ -2730,6 +2917,26 @@ export default function Home() {
                         </div>
                       )
                     }
+                    if (m.role === 'assistant' && m.routerClarification) {
+                      const rc = m.routerClarification
+                      return (
+                        <div
+                          key={m.id}
+                          className={`${styles.chatBubbleAssistant} ${styles.chatBubbleClarify}`}
+                        >
+                          <MarkdownOutput>{m.content}</MarkdownOutput>
+                          {rc.reason ? <p className={styles.routerClarifyReason}>— {rc.reason}</p> : null}
+                          <button
+                            type="button"
+                            className={styles.routerClarifyContinue}
+                            disabled={loading}
+                            onClick={() => prePromptForceContinue(rc.pendingUserText, rc.routerLogId)}
+                          >
+                            Продолжить без уточнения
+                          </button>
+                        </div>
+                      )
+                    }
                     const isThinking = m.role === 'assistant' && m.content.startsWith('__thinking__\n')
                     const displayContent = isThinking ? m.content.slice('__thinking__\n'.length) : m.content
                     if (isThinking) {
@@ -2862,15 +3069,27 @@ export default function Home() {
                       >
                         {activeLevelBundle.estimatedCalls} вызов(ов) · {activeLevelBundle.estimatedCostHint}
                       </span>
-                      <SelectDropdown
-                        value={genModel}
-                        options={genModelSelectOptions}
-                        onChange={setGenModel}
-                        aria-label="Модель генерации"
-                        variant="composer"
-                        disabled={loading}
-                        footerLink={{ to: '/models', label: 'Добавить модель' }}
-                      />
+                      <span
+                        title={
+                          isReasoningModelId(genModel)
+                            ? 'Эта модель думает сама — упрощённый промпт даст лучший результат'
+                            : undefined
+                        }
+                        className={styles.genModelWrap}
+                      >
+                        <SelectDropdown
+                          value={genModel}
+                          options={genModelSelectOptions}
+                          onChange={(v) => {
+                            setUseCustomGenModel(true)
+                            setGenModel(v)
+                          }}
+                          aria-label="Модель генерации"
+                          variant="composer"
+                          disabled={loading}
+                          footerLink={{ to: '/models', label: 'Добавить модель' }}
+                        />
+                      </span>
                       <WorkspacePicker
                         workspaces={workspaces}
                         workspaceId={workspaceId}

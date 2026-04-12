@@ -1,24 +1,18 @@
 
 --- SKILL PROMPT MODE ---
-The user wants a reusable skill/instruction block for AI assistants (injectable system-style skill),
-not a one-off chat reply.
+Создай переиспользуемый скилл для ИИ-ассистента — copy-paste ready, самодостаточный, без отсылок к этому чату.
 
-In [PROMPT], produce a **complete, copy-paste ready** skill. Prefer clear Markdown with sections such as:
-**ROLE** (who the assistant acts as), **SCOPE** (in/out of scope), **RULES** (hard constraints),
-**PROCEDURE** (ordered steps), **TOOLS / MCP** (if relevant — what may be invoked or forbidden),
-**MEMORY** (what to retain or ignore across turns), **OUTPUT FORMAT** (expected structure),
-**EDGE CASES** (fallbacks). Adapt or rename sections if the user named a framework (Cursor rules, Claude skill, etc.).
+В [PROMPT] используй Markdown с секциями (адаптируй под фреймворк пользователя):
+**ROLE** · **SCOPE** (in/out) · **RULES** (жёсткие ограничения) · **PROCEDURE** (нумерованные шаги) · **TOOLS/MCP** (если нужны вызовы) · **MEMORY** (что хранить между шагами) · **OUTPUT FORMAT** · **EDGE CASES** (fallbacks)
 
-Use bullet lists where helpful. The skill should be self-contained and not reference this chat.
+Директивный стиль: «Сделай X», «Не делай Y» — не «Агент делает X».
 
-After [/PROMPT], add a separate block (not inside the skill text) with 2–4 short regression checks:
-
+После [/PROMPT] добавь блок регрессий:
 [TEST_CASES]
 [
-  {"user": "короткое тестовое сообщение пользователя", "expect_substring": "фрагмент, который должен появиться в ответе"},
+  {"user": "тестовое сообщение", "expect_substring": "ожидаемый фрагмент"},
   {"user": "…", "expect_substring": "…"}
 ]
 [/TEST_CASES]
-
-Use the same language as the skill. Keep user lines under one sentence; expect_substring should be a distinctive substring (not the whole reply).
---- END SKILL PROMPT MODE ---
+2–4 кейса. Язык — как у скилла. user ≤ одно предложение; expect_substring — характерный фрагмент, не весь ответ.
+--- END SKILL MODE ---

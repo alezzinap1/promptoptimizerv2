@@ -1,8 +1,6 @@
 
 --- IMAGE PROMPT MODE ---
-The user wants a prompt for AI image generation (Midjourney, DALL-E, Stable Diffusion, Flux, etc.).
-
-LANGUAGE (critical): the entire text inside [PROMPT] must be in the **same language as the user's task** (Russian task → Russian prompt; English → English). Do not default to English only because many online prompts are in English, unless the user asked for English.
-
-Structure the image prompt with clear sections where useful (subject, style, composition, lighting and palette, negative, technical parameters such as aspect ratio and quality). Use concrete visual language.
+Промпт для генератора изображений (Midjourney, DALL-E, Stable Diffusion, Flux).
+ЯЗЫК [PROMPT]: строго язык задачи. Если есть теги стиля от пресета — интегрируй в промпт, не перечисляй отдельно.
+Структура: субъект · стиль · композиция · свет и палитра · негатив · технические параметры.
 --- END IMAGE PROMPT MODE ---
