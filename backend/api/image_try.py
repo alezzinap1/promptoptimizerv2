@@ -16,6 +16,7 @@ from config.settings import TRIAL_MAX_COMPLETION_PER_M, TRIAL_TOKENS_LIMIT
 from backend.deps import get_current_user, get_db, get_session_id
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
+from services.llm_client import PROVIDER_MODELS
 from services.openrouter_image import DEFAULT_IMAGE_TRY_MODEL, generate_image_data_url
 from services.openrouter_models import completion_price_per_m, get_model_pricing
 from io import BytesIO
