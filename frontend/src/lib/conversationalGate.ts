@@ -111,9 +111,35 @@ export function pickAfterPromptChatReply(): string {
   return 'Пожалуйста! Если нужно что-то изменить в промпте справа — напишите, что поправить.'
 }
 
-export function isConversationalOnlyMessage(text: string): boolean {
+export type ConversationalGateOptions = { promptType?: string }
+
+/**
+ * Вкладка «фото»: короткое описание сцены (2+ слова / длинная фраза) не считаем «только болтовнёй»,
+ * чтобы совпадать с серверным `pre_prompt_image_tab_scene_warrants_task`.
+ */
+function isImageSceneLikelyTask(t: string): boolean {
+  if (looksLikeApplyTipDirective(t)) return false
+  if (hasLikelyPromptTask(t)) return false
+  if (MINIMAL_RE.test(t)) return false
+  if (startsWithGreeting(t)) {
+    const w = t.split(/\s+/).filter(Boolean)
+    if (w.length <= 12) return false
+  }
+  for (const re of CHAT_OPENERS) {
+    if (re.test(t)) return false
+  }
+  const words = t.split(/\s+/).filter(Boolean)
+  if (words.length >= 2 && t.length >= 6) return true
+  if (words.length >= 1 && t.length >= 10) return true
+  return false
+}
+
+export function isConversationalOnlyMessage(text: string, opts?: ConversationalGateOptions): boolean {
   const t = text.replace(/\s+/g, ' ').trim()
   if (!t) return true
+  if (opts?.promptType === 'image' && isImageSceneLikelyTask(t)) {
+    return false
+  }
   if (looksLikeApplyTipDirective(t)) return false
   if (hasLikelyPromptTask(t)) return false
   if (t.length > 240) return false

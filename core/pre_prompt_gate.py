@@ -84,6 +84,34 @@ def _has_task_marker(text: str) -> bool:
     return any(m in low for m in _TASK_INTENT_MARKERS)
 
 
+def pre_prompt_image_tab_scene_warrants_task(text: str) -> bool:
+    """
+    Вкладка «фото»: осмысленное описание сцены должно идти в генерацию промпта,
+    а не в meta-чат (иначе LLM может «обещать» генерацию при action=chat).
+
+    Вызывать до pre_prompt_rules_meta_chat, чтобы короткие описания (2 слова)
+    не попадали под эвристику «≤2 слов = болтовня».
+    """
+    t = re.sub(r"[\s\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]+", " ", (text or "").strip())
+    if not t:
+        return False
+    if _MINIMAL_RE.match(t):
+        return False
+    if _starts_with_greeting(t):
+        words_g = t.split()
+        if len(words_g) <= 12:
+            return False
+    for cre in _CHAT_OPENERS:
+        if cre.search(t):
+            return False
+    words = t.split()
+    if len(words) >= 2 and len(t) >= 6:
+        return True
+    if len(words) >= 1 and len(t) >= 10:
+        return True
+    return False
+
+
 def pre_prompt_rules_meta_chat(text: str) -> bool:
     """
     True — ответить в чате без /generate (жёсткий zero-cost путь).

@@ -19,6 +19,7 @@ from config.settings import (
 )
 from core.agent_followup_rules import resolve_has_prompt_action
 from core.pre_prompt_gate import (
+    pre_prompt_image_tab_scene_warrants_task,
     pre_prompt_rules_force_task,
     pre_prompt_rules_meta_chat,
     substantive_skill_request,
@@ -244,6 +245,18 @@ def agent_process(
             prompt_type,
             {"backend": "force_task", "expert_level": expert_level},
             force_skill_tab=prompt_type == "skill",
+        )
+
+    if prompt_type == "image" and pre_prompt_image_tab_scene_warrants_task(text):
+        return _pre_prompt_task_branch(
+            text,
+            prompt_type,
+            {
+                "backend": "image_tab_scene",
+                "intent": "pre_task",
+                "expert_level": expert_level,
+            },
+            force_skill_tab=False,
         )
 
     if pre_prompt_rules_meta_chat(text):

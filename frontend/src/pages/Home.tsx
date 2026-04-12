@@ -1439,7 +1439,7 @@ export default function Home() {
     setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: text }])
     setError(null)
 
-    if (isConversationalOnlyMessage(text)) {
+    if (isConversationalOnlyMessage(text, { promptType })) {
       if (result?.has_prompt) {
         setChatMessages((m) => [
           ...m,
