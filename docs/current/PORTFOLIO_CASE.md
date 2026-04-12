@@ -25,8 +25,7 @@
 
 ## Evolution (актуально)
 
-- **Streamlit** (`app/`) — быстрый demo-shell и архивный UI.
-- **FastAPI + React** — **основной** продукт: auth, rate limits, workspaces, compare, библиотека, метрики на User Info, Docker-сборка.
+- Ранний прототип UI (исторически) сменён на **SPA**; **FastAPI + React** — **основной** продукт: auth, rate limits, workspaces, compare, библиотека, метрики на User Info, Docker-сборка.
 
 Ранний **Telegram**-эксперимент в этом репозитории не поддерживается.
 
@@ -36,7 +35,7 @@
 
 - зачем выделен `core/`;
 - почему техники в YAML;
-- зачем был Streamlit и как перешли на SPA;
+- как эволюционировал UI до SPA на FastAPI + React;
 - чем полезны эвристики качества промпта и чем они **не** являются;
 - как устроены spec / evidence / debugger.
 
@@ -44,4 +43,4 @@
 
 - что это уже enterprise SaaS «из коробки»;
 - что `completeness score` гарантирует лучший бизнес-результат;
-- что Streamlit и React-поверхности равны по зрелости (основной контур — React).
+- что зрелый продуктовый контур — **React SPA**, а не экспериментальные старые клиенты.

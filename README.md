@@ -2,7 +2,7 @@
 
 **Prompt Optimizer** — веб-приложение для осмысленного проектирования промптов: оно не просто пересылает текст в LLM, а структурирует задачу, подбирает техники из базы знаний, учитывает целевую модель и помогает итерировать результат до сохранения в библиотеку.
 
-**Актуальный продукт:** **FastAPI + React** (SPA). **Streamlit** (`app/`) оставлен как архивный вариант.
+**Актуальный продукт:** **FastAPI + React** (SPA).
 
 ---
 
@@ -109,8 +109,7 @@ prompt-engineer-agent/
 ├── services/          # LLM, auth, шифрование ключей, workflow
 ├── techniques/        # YAML-база техник
 ├── scripts/           # backup / миграции
-├── docs/              # current/ — актуальные планы и гайды; archive/ — история; analytics/; screenshots/
-└── app/               # Streamlit (архив)
+└── docs/              # current/ — актуальные планы и гайды; archive/ — история; analytics/; screenshots/
 ```
 
 ---
@@ -256,7 +255,7 @@ why_it_works: "Объяснение..."
 ## Документация в `docs/`
 
 - **Актуально:** [`docs/current/README.md`](docs/current/README.md) — индекс планов, продуктового видения, production checklist, demo script и т.д.
-- **Архив (история, не источник истины о продукте):** [`docs/archive/README.md`](docs/archive/README.md) — Streamlit-аудиты, старый план миграции, сжатый брейнсторм идей.
+- **Архив (история, не источник истины о продукте):** [`docs/archive/README.md`](docs/archive/README.md) — снимки прошлых решений и планов, сжатый брейнсторм идей.
 - **Аналитика:** [`docs/analytics/`](docs/analytics/).
 - **Скриншоты для README:** [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
@@ -265,18 +264,6 @@ why_it_works: "Объяснение..."
 Рекомендуется добавить в **корень** репозитория `.cursorignore` со строкой `docs/archive/`, чтобы Cursor не индексировал архив (если создание файла не блокируется средой).
 
 **Длинный developer-обзор** (маршруты, API, пайплайны): [`docs/user/PROJECT_FULL_REPORT.md`](docs/user/PROJECT_FULL_REPORT.md).
-
----
-
-## Streamlit (архив)
-
-```bash
-streamlit run app/main.py
-```
-
-Подробности — в [`docs/archive/STREAMLIT_ARCHIVE.md`](docs/archive/STREAMLIT_ARCHIVE.md).
-
-Опциональный health-сервер Streamlit: `uvicorn app.health_server:app --host 0.0.0.0 --port 8502`.
 
 ---
 
