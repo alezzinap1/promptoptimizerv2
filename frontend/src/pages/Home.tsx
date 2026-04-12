@@ -223,19 +223,22 @@ function clampSplit(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n))
 }
 
-/** Ротация фраз в студии во время генерации */
+/** Ротация фраз в студии во время генерации (нейтральные, без внутренних терминов) */
 const AGENT_THINKING_PHASES = [
-  'Разбираю формулировку задачи…',
-  'Сопоставляю с типом задачи и контекстом…',
-  'Подбираю техники и структуру ответа…',
-  'Продумываю уточнения и ограничения…',
-  'Собираю формулировку промпта…',
-  'Проверяю согласованность и полноту…',
+  'Разбираю формулировку…',
+  'Сопоставляю с контекстом…',
+  'Подбираю техники и структуру…',
+  'Продумываю уточнения…',
+  'Собираю текст промпта…',
+  'Проверяю согласованность…',
 ]
 
-const PRE_PROMPT_ROUTING_LINE = 'Определяю намерение реплики (лёгкий семантический разбор, без LLM)…'
-const PRE_PROMPT_TASK_LINE = 'Намерение: задача на промпт — подключаю генерацию…'
-const PRE_PROMPT_SKILL_LINE = 'Намерение: оформление скилла — подключаю генерацию…'
+const THINKING_PHASE_ROTATION_MS = 4800
+const THINKING_TYPEWRITER_MS = 18
+
+const PRE_PROMPT_ROUTING_LINE = 'Слушаю реплику и подбираю ответ…'
+const PRE_PROMPT_TASK_LINE = 'Понял задачу — собираю промпт…'
+const PRE_PROMPT_SKILL_LINE = 'Понял — оформляю скилл…'
 
 const AGENT_PROCESS_PRE_TIMEOUT_MS = 15_000
 
@@ -490,6 +493,8 @@ export default function Home() {
   const [agentThinkingIdx, setAgentThinkingIdx] = useState(0)
   /** Фиксированная строка «думает» (роутинг / этап); если null — ротация AGENT_THINKING_PHASES */
   const [agentThinkingLine, setAgentThinkingLine] = useState<string | null>(null)
+  /** Псевдо-стриминг текста в плашке «думает» */
+  const [thinkingStreamText, setThinkingStreamText] = useState('')
   const [publishCommunityOpen, setPublishCommunityOpen] = useState(false)
   const [skillSandboxOpen, setSkillSandboxOpen] = useState(false)
   const [skillSandboxInput, setSkillSandboxInput] = useState('')
@@ -894,9 +899,30 @@ export default function Home() {
     setAgentThinkingIdx(Math.floor(Math.random() * AGENT_THINKING_PHASES.length))
     const id = window.setInterval(() => {
       setAgentThinkingIdx((i) => (i + 1) % AGENT_THINKING_PHASES.length)
-    }, 2600)
+    }, THINKING_PHASE_ROTATION_MS)
     return () => window.clearInterval(id)
   }, [loading, agentThinkingLine])
+
+  useEffect(() => {
+    if (!loading) {
+      setThinkingStreamText('')
+      return
+    }
+    const full =
+      agentThinkingLine ?? AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]
+    let i = 0
+    setThinkingStreamText('')
+    const id = window.setInterval(() => {
+      i += 1
+      if (i > full.length) {
+        window.clearInterval(id)
+        setThinkingStreamText(full)
+        return
+      }
+      setThinkingStreamText(full.slice(0, i))
+    }, THINKING_TYPEWRITER_MS + Math.floor(Math.random() * 10))
+    return () => window.clearInterval(id)
+  }, [loading, agentThinkingLine, agentThinkingIdx])
 
   useEffect(() => {
     setQuestionCarouselIdx(0)
@@ -2985,9 +3011,13 @@ export default function Home() {
                   })}
                   {loading && (
                     <div className={styles.agentThinking} aria-live="polite">
-                      <span className={styles.agentThinkingInner}>
-                        {agentThinkingLine ??
-                          AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]}
+                      <span className={styles.agentThinkingDots} aria-hidden="true">
+                        {Array.from({ length: 6 }, (_, i) => (
+                          <span key={i} className={styles.agentThinkingDot} />
+                        ))}
+                      </span>
+                      <span className={styles.agentThinkingText}>
+                        {thinkingStreamText || '\u2026'}
                       </span>
                     </div>
                   )}

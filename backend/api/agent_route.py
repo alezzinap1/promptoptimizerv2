@@ -27,7 +27,7 @@ from core.suggested_actions import build_suggested_actions
 from core.task_classifier import classify_task, detect_prompt_type
 from core.technique_synergy import extract_input_features
 from db.manager import DBManager
-from services.agent_studio_chat_reply import light_studio_chat_reply
+from services.agent_studio_chat_reply import light_studio_chat_reply, strip_agent_meta_phrases
 from services.api_key_resolver import resolve_openrouter_api_key
 from services.cheap_llm_pre_router import cheap_llm_pre_router
 from services.llm_client import LLMClient
@@ -267,12 +267,12 @@ def agent_process(
         if api_key:
             try:
                 client = LLMClient(api_key)
-                hist = [{"role": h.role, "content": h.content} for h in (req.chat_history or [])[-3:]]
+                hist = [{"role": h.role, "content": h.content} for h in (req.chat_history or [])[-8:]]
                 llm_out = cheap_llm_pre_router(
                     client,
                     text=text,
                     prompt_type=prompt_type,
-                    history_last_3=hist,
+                    chat_history=hist,
                     provider=CHEAP_PRE_ROUTER_PROVIDER,
                     expert_level=expert_level,
                 )
@@ -290,9 +290,10 @@ def agent_process(
                 reason = str(llm_out.get("reason") or "").strip()
 
                 if intent == "clarify":
+                    msg_c = strip_agent_meta_phrases(reply) if reply else ""
                     return {
                         "action": "chat",
-                        "data": {"message": reply or "Уточните детали задачи."},
+                        "data": {"message": msg_c or "Уточните детали задачи."},
                         "is_clarification": True,
                         "clarify_reason": reason,
                         "router_log_id": log_id,
@@ -300,16 +301,25 @@ def agent_process(
                         "router_trace": {**llm_out, "backend": "cheap_llm"},
                     }
                 if intent == "chat":
-                    out = _pre_prompt_dialog_response(
-                        uid=uid,
-                        db=db,
-                        text=text,
-                        prompt_type=prompt_type,
-                        chat_history=req.chat_history,
-                        reasoning="pre_prompt:cheap_llm_chat",
-                    )
+                    msg_ch = strip_agent_meta_phrases(reply) if reply else ""
+                    if not msg_ch:
+                        out = _pre_prompt_dialog_response(
+                            uid=uid,
+                            db=db,
+                            text=text,
+                            prompt_type=prompt_type,
+                            chat_history=req.chat_history,
+                            reasoning="pre_prompt:cheap_llm_chat_fallback",
+                        )
+                        return {
+                            **out,
+                            "router_trace": {**llm_out, "backend": "cheap_llm"},
+                        }
                     return {
-                        **out,
+                        "action": "chat",
+                        "data": {"message": msg_ch},
+                        "is_clarification": False,
+                        "reasoning": "pre_prompt:cheap_llm_chat",
                         "router_trace": {**llm_out, "backend": "cheap_llm"},
                     }
 

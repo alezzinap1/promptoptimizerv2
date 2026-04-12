@@ -37,13 +37,15 @@ def _history_block(history: list[dict[str, str]] | None) -> str:
     return "\n".join(lines) if lines else "(начало диалога)"
 
 
-def _strip_meta_phrases(text: str) -> str:
-    """На случай если модель всё же вернула служебные формулировки."""
+def strip_agent_meta_phrases(text: str) -> str:
+    """Убрать служебные формулировки из ответа ассистента (роутер / классификатор)."""
     t = (text or "").strip()
     for pat in (
         r"определил[ао]?\s+намерение\s+как\s+диалог[^\n.]*[.\n]",
         r"генераци[юя]\s+пока\s+не\s+запускаю[^\n.]*[.\n]",
         r"я\s+не\s+буду\s+запускать[^\n.]*[.\n]",
+        r"семантическ\w*\s+разбор[^\n.]*[.\n]?",
+        r"лёгк\w*\s+семантическ[^\n.]*[.\n]?",
     ):
         t = re.sub(pat, "", t, flags=re.I)
     return t.strip()
@@ -78,5 +80,5 @@ def light_studio_chat_reply(
     except Exception as e:
         logger.warning("light_studio_chat_reply generate failed: %s", e)
         return ""
-    out = _strip_meta_phrases(raw)
+    out = strip_agent_meta_phrases(raw)
     return out.strip()

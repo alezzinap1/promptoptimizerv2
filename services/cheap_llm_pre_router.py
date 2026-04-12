@@ -1,5 +1,6 @@
 """
 Дешёвый LLM-классификатор намерения до первого промпта (гибрид с правилами + embeddings).
+Один вызов: intent + готовый reply для chat/clarify (без второго LLM).
 См. бриф: intent generate_skill | generate_prompt | clarify | chat.
 """
 from __future__ import annotations
@@ -7,6 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from services.agent_studio_chat_reply import strip_agent_meta_phrases
 from services.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -25,11 +27,11 @@ def confidence_threshold_for_level(expert_level: str | None) -> float:
     return LEVEL_GENERATE_CONFIDENCE.get(k, 0.65)
 
 
-def _history_block(history_last_3: list[dict[str, str]] | None) -> str:
-    if not history_last_3:
+def _history_block(chat_history: list[dict[str, str]] | None) -> str:
+    if not chat_history:
         return "(нет)"
     lines: list[str] = []
-    for h in history_last_3[-3:]:
+    for h in chat_history[-8:]:
         role = h.get("role") or "user"
         content = (h.get("content") or "").strip()
         if not content:
@@ -43,7 +45,7 @@ def cheap_llm_pre_router(
     *,
     text: str,
     prompt_type: str,
-    history_last_3: list[dict[str, str]] | None,
+    chat_history: list[dict[str, str]] | None,
     provider: str,
     expert_level: str | None = None,
 ) -> dict[str, Any]:
@@ -51,30 +53,36 @@ def cheap_llm_pre_router(
     Возвращает:
       intent: generate_skill | generate_prompt | clarify | chat
       confidence: float
-      reply: str (для clarify/chat)
+      reply: str (для clarify/chat — сразу текст для пользователя)
       reason: str
     """
     tab = (prompt_type or "text").strip().lower()
     if tab not in ("text", "image", "skill"):
         tab = "text"
-    hist = _history_block(history_last_3)
-    system = """Ты — пре-роутер чата Студии Агента. Отвечай ТОЛЬКО одним JSON-объектом без markdown.
+    hist = _history_block(chat_history)
+    system = """Ты — пре-роутер чата Студии Агента (MetaPrompt). Отвечай ТОЛКО одним JSON-объектом без markdown.
 
 Поля JSON (все обязательны):
 - "intent": одно из "generate_skill" | "generate_prompt" | "clarify" | "chat"
-- "confidence": число от 0 до 1 (насколько уверен в классификации)
-- "reply": строка — только если intent "clarify" или "chat": короткий ответ пользователю на русском или языке запроса; иначе пустая строка ""
-- "reason": кратко на русском: почему такой intent
+- "confidence": число от 0 до 1
+- "reply": для intent "clarify" или "chat" — готовый ответ пользователю (см. ниже); для generate_* — ""
+- "reason": кратко на русском: почему такой intent (внутренняя пометка, не для показа пользователю)
 
 Смысл intent:
-- generate_skill — пользователь хочет оформить навык/инструкцию для ИИ-ассистента (скилл), даже если описание короткое но осмысленное.
-- generate_prompt — нужен обычный промпт под задачу (текст, картинка по описанию и т.д.), не обязательно «скилл».
-- clarify — нужен ровно один уточняющий вопрос; в "reply" сформулируй его.
-- chat — приветствие, small-talk, мета, нет задачи.
+- generate_skill — навык/инструкция для ИИ-ассистента.
+- generate_prompt — обычный промпт (текст, картинка и т.д.).
+- clarify — один уточняющий вопрос в "reply".
+- chat — приветствие, болтовня, вопрос как протестировать помощника, без конкретной задачи на промпт.
 
-Правило для вкладки skill: если пользователь описывает поведение, роль или инструкцию для ассистента — почти всегда generate_skill (confidence высокая).
+Контекст для "reply" (chat/clarify): слева чат, справа собирается промпт для другой модели; вкладки текст / фото / скилл. Ты не запускаешь генерацию — только текст ответа человеку.
 
-Правило: не относись к коротким но содержательным описаниям скилла как к «разговору без задачи»."""
+Требования к "reply" при chat или clarify:
+- Язык как у пользователя; 2–4 коротких предложения; по делу.
+- Нельзя: «определил намерение», «генерацию не запускаю», «семантический разбор», технические детали пайплайна.
+- Если спрашивают пример промпта для проверки — 1–2 конкретные идеи формулировки.
+
+Вкладка skill: содержательное описание поведения/роли — почти всегда generate_skill.
+Короткое но осмысленное описание скилла не считай болтовнёй."""
     user = f"""Вкладка студии: {tab}
 Последние реплики (контекст):
 {hist}
@@ -84,7 +92,7 @@ def cheap_llm_pre_router(
 
 Верни JSON с полями intent, confidence, reply, reason."""
 
-    data = client.generate_json(system, user, provider=provider, max_tokens=450)
+    data = client.generate_json(system, user, provider=provider, max_tokens=560)
     if not data:
         return {
             "intent": "clarify",
@@ -103,7 +111,7 @@ def cheap_llm_pre_router(
         conf = 0.5
     conf = max(0.0, min(1.0, conf))
 
-    reply = str(data.get("reply") or "").strip()
+    reply = strip_agent_meta_phrases(str(data.get("reply") or "").strip())
     reason = str(data.get("reason") or "").strip()
 
     # Порог по уровню: при generate_* с низкой уверенностью — уточнение
@@ -113,6 +121,7 @@ def cheap_llm_pre_router(
         if not reply:
             reply = "Нужно чуть больше деталей, чтобы собрать промпт. Опишите цель и формат ответа одним-двумя предложениями."
         reason = (reason + " " if reason else "") + f"confidence {conf:.2f} < threshold {thr:.2f}"
+        reply = strip_agent_meta_phrases(reply)
 
     return {
         "intent": intent_raw,

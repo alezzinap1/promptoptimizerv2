@@ -889,32 +889,70 @@
 
 .agentThinking {
   align-self: flex-start;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px dashed rgba(56, 189, 248, 0.35);
-  background: rgba(56, 189, 248, 0.06);
-  max-width: 95%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 10px;
+  max-width: 100%;
+  color: var(--muted);
 }
 
-.agentThinkingInner {
-  display: inline-block;
-  font-size: 0.88rem;
-  font-weight: 500;
-  background: linear-gradient(90deg, var(--muted) 0%, var(--text) 45%, var(--primary) 55%, var(--muted) 100%);
-  background-size: 220% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: agentThinkShimmer 2.4s ease-in-out infinite;
+.agentThinkingDots {
+  display: grid;
+  grid-template-columns: 3px 3px;
+  grid-template-rows: repeat(3, 3px);
+  gap: 2px 3px;
+  flex-shrink: 0;
+  opacity: 0.5;
+  color: inherit;
 }
 
-@keyframes agentThinkShimmer {
-  0% {
-    background-position: 0% center;
-  }
+.agentThinkingDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: agentThinkingDotPulse 1.35s ease-in-out infinite;
+}
+
+.agentThinkingDot:nth-child(1) {
+  animation-delay: 0s;
+}
+.agentThinkingDot:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.agentThinkingDot:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.agentThinkingDot:nth-child(4) {
+  animation-delay: 0.05s;
+}
+.agentThinkingDot:nth-child(5) {
+  animation-delay: 0.15s;
+}
+.agentThinkingDot:nth-child(6) {
+  animation-delay: 0.25s;
+}
+
+@keyframes agentThinkingDotPulse {
+  0%,
   100% {
-    background-position: 100% center;
+    opacity: 0.2;
+    transform: scale(0.92);
   }
+  50% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+}
+
+.agentThinkingText {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--muted);
+  opacity: 0.88;
+  letter-spacing: 0.01em;
 }
 
 .agentNewChatBtn {
@@ -1336,19 +1374,19 @@
 .chatBubbleThinking {
   align-self: flex-start;
   max-width: 95%;
-  border-radius: 12px;
+  border-radius: 0;
   font-size: 0.85rem;
   line-height: 1.45;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(56, 189, 248, 0.04) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.15);
-  overflow: clip;
+  background: transparent;
+  border: none;
+  overflow: visible;
 }
 
 .thinkingSummary {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 2px 0 6px;
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -1360,8 +1398,9 @@
 
 .thinkingSummary::before {
   content: '▸';
-  font-size: 10px;
-  color: rgba(139, 92, 246, 0.5);
+  font-size: 9px;
+  color: var(--muted);
+  opacity: 0.45;
   flex-shrink: 0;
   transition: transform 0.15s ease;
 }
@@ -1376,16 +1415,18 @@ details[open].chatBubbleThinking .thinkingSummary::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   color: var(--muted);
+  opacity: 0.88;
 }
 
 .thinkingLabel {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(139, 92, 246, 0.55);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  opacity: 0.72;
   flex-shrink: 0;
 }
 
@@ -1572,20 +1613,14 @@ details[open].chatBubbleThinking .thinkingSummary::before {
 }
 
 .thinkingBody {
-  padding: 0 12px 10px;
+  padding: 0 0 8px 14px;
   position: relative;
   max-height: 400px;
   overflow-y: auto;
 }
 
 .thinkingBody::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 12px;
-  right: 12px;
-  height: 1px;
-  background: rgba(139, 92, 246, 0.1);
+  display: none;
 }
 
 .thinkingBody :global(p) {
@@ -1597,16 +1632,18 @@ details[open].chatBubbleThinking .thinkingSummary::before {
 }
 
 .thinkingBody :global(strong) {
-  color: rgb(167, 139, 250);
+  color: var(--text);
+  opacity: 0.92;
 }
 
 [data-theme='light'] .chatBubbleThinking {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.04) 0%, rgba(56, 189, 248, 0.03) 100%);
-  border-color: rgba(139, 92, 246, 0.12);
+  background: transparent;
+  border: none;
 }
 
 [data-theme='light'] .thinkingBody :global(strong) {
-  color: rgb(109, 40, 217);
+  color: var(--text);
+  opacity: 0.92;
 }
 
 .promptDoneWrap {
