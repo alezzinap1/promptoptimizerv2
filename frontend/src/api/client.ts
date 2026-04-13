@@ -316,6 +316,8 @@ export interface Settings {
   task_classification_mode?: string
   /** OpenRouter id или короткий ключ для LLM-классификатора */
   task_classifier_model?: string
+  /** Модель для кнопки «Проба картинки»: полный id OpenRouter или короткий ключ */
+  image_try_model?: string
 }
 
 export interface SimpleImproveResponse {
@@ -566,6 +568,7 @@ export const api = {
     simple_improve_meta?: string
     task_classification_mode?: string
     task_classifier_model?: string
+    image_try_model?: string
   }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
 

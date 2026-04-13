@@ -1855,7 +1855,6 @@ export default function Home() {
     try {
       const r = await api.imageTry({
         prompt_text: result.prompt_block,
-        gen_model: 'nano_banana',
         aspect_ratio: '1:1',
       })
       setImageTryDataUrl(r.image_url)
@@ -1867,7 +1866,7 @@ export default function Home() {
         {
           id: `imgtry-err-${Date.now()}`,
           role: 'assistant',
-          content: `Не удалось сделать пробную картинку (Nano Banana): ${msg}`,
+          content: `Не удалось сделать пробную картинку: ${msg}`,
         },
       ])
     } finally {
@@ -2331,7 +2330,7 @@ export default function Home() {
                     <button
                       type="button"
                       className={styles.toolbarTextBtn}
-                      title="Дешёвая пробная генерация (OpenRouter: Nano Banana / gemini-3.1-flash-image-preview). Картинку можно сохранить в библиотеку вместе с промптом."
+                      title="Пробная генерация (OpenRouter image-модель из настроек или gemini-2.5-flash-image). Картинку можно сохранить в библиотеку вместе с промптом."
                       disabled={loading || imageTryBusy}
                       onClick={() => void runImageTryNano()}
                     >

@@ -176,6 +176,7 @@ class DBManager:
             self._migrate_phase10_user_presets(conn)
             self._migrate_phase11_pre_router_and_skill_client_id(conn)
             self._migrate_phase12_library_cover_image(conn)
+            self._migrate_phase13_image_try_model(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -360,6 +361,10 @@ class DBManager:
         """Превью картинки для записей библиотеки (проба Nano Banana и т.п.)."""
         self._safe_add_column(conn, "prompt_library", "cover_image_path", "TEXT DEFAULT ''")
 
+    def _migrate_phase13_image_try_model(self, conn: sqlite3.Connection) -> None:
+        """Модель OpenRouter для кнопки «Проба картинки» (полный id или короткий ключ)."""
+        self._safe_add_column(conn, "user_preferences", "image_try_model", "TEXT DEFAULT ''")
+
     def _safe_add_column(
         self,
         conn: sqlite3.Connection,
@@ -488,6 +493,7 @@ class DBManager:
                 "simple_improve_meta": "",
                 "task_classification_mode": "heuristic",
                 "task_classifier_model": "",
+                "image_try_model": "",
             }
         data = dict(row)
         for source, target in (
@@ -503,6 +509,7 @@ class DBManager:
         data.setdefault("simple_improve_meta", "")
         data.setdefault("task_classification_mode", "heuristic")
         data.setdefault("task_classifier_model", "")
+        data.setdefault("image_try_model", "")
         data.setdefault("color_mode", "dark")
         return data
 
@@ -518,6 +525,7 @@ class DBManager:
         task_classification_mode: str | None = None,
         task_classifier_model: str | None = None,
         color_mode: str | None = None,
+        image_try_model: str | None = None,
     ) -> dict:
         current = self.get_user_preferences(user_id)
         next_theme = theme if theme is not None else str(current.get("theme") or "amber")
@@ -561,14 +569,19 @@ class DBManager:
         )
         if next_color_mode not in ("dark", "light"):
             next_color_mode = "dark"
+        next_image_try = (
+            image_try_model
+            if image_try_model is not None
+            else str(current.get("image_try_model") or "")
+        )
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO user_preferences
                     (user_id, theme, font, color_mode, gen_models_json, target_models_json,
                      simple_improve_preset, simple_improve_meta,
-                     task_classification_mode, task_classifier_model, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     task_classification_mode, task_classifier_model, image_try_model, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id) DO UPDATE SET
                     theme = excluded.theme,
                     font = excluded.font,
@@ -579,6 +592,7 @@ class DBManager:
                     simple_improve_meta = excluded.simple_improve_meta,
                     task_classification_mode = excluded.task_classification_mode,
                     task_classifier_model = excluded.task_classifier_model,
+                    image_try_model = excluded.image_try_model,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -592,6 +606,7 @@ class DBManager:
                     next_simple_meta,
                     next_cls_mode,
                     next_cls_model.strip()[:500],
+                    str(next_image_try).strip()[:500],
                 ),
             )
         return self.get_user_preferences(user_id)

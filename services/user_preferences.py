@@ -117,6 +117,7 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         "simple_improve_meta": str(prefs.get("simple_improve_meta") or "")[:MAX_INPUT_CHARS],
         "task_classification_mode": cls_mode,
         "task_classifier_model": str(prefs.get("task_classifier_model") or "").strip()[:500],
+        "image_try_model": str(prefs.get("image_try_model") or "").strip()[:500],
         "openrouter_api_key_set": bool(user_key),
         "openrouter_api_key_masked": (user_key[:7] + "****") if len(user_key) > 7 else ("****" if user_key else ""),
     }
@@ -135,6 +136,7 @@ def update_user_preferences_payload(
     simple_improve_meta: str | None = None,
     task_classification_mode: str | None = None,
     task_classifier_model: str | None = None,
+    image_try_model: str | None = None,
 ) -> dict:
     gen_models = None
     if preferred_generation_models is not None:
@@ -157,6 +159,9 @@ def update_user_preferences_payload(
     tmod = None
     if task_classifier_model is not None:
         tmod = str(task_classifier_model).strip()[:500]
+    itm = None
+    if image_try_model is not None:
+        itm = str(image_try_model).strip()[:500]
     cm = None
     if color_mode is not None:
         cm = _normalize_color_mode(color_mode)
@@ -173,5 +178,6 @@ def update_user_preferences_payload(
         simple_improve_meta=sm,
         task_classification_mode=tcm,
         task_classifier_model=tmod,
+        image_try_model=itm,
     )
     return get_user_preferences_payload(db, user_id)

@@ -189,7 +189,7 @@ curl http://localhost:8000/api/health
 
 **Ответ:** `image_url` (data URL), `gen_model` (фактический id), `saved_path` — относительный URL сохранённого WebP-превью под `data/uploads/library_previews/` или `null`, если сохранение не удалось.
 
-**Переменная окружения:** `IMAGE_TRY_MODEL` — полный OpenRouter id по умолчанию, если в запросе не передан подходящий `gen_model` (в коде дефолт — `google/gemini-3.1-flash-image-preview`).
+**Переменная окружения:** `IMAGE_TRY_MODEL` — полный OpenRouter id по умолчанию, если в запросе не передан подходящий `gen_model` (в коде дефолт — `google/gemini-2.5-flash-image`; при ответе 404 о несовместимых modalities запрос повторяется с `["image"]` вместо `["image","text"]`).
 
 ### `POST /api/library/llm-review`
 

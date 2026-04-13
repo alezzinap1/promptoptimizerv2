@@ -47,6 +47,9 @@ const HINT_APPEARANCE = 'Палитра — оттенки UI. Светлая/т
 
 const HINT_MODELS = 'Список моделей в выпадающих списках на главной и в сравнении.'
 
+const HINT_IMAGE_TRY =
+  'Модель OpenRouter для кнопки «Проба картинки» в режиме изображения. Полный id (например google/gemini-2.5-flash-image) или короткий ключ из каталога. Пусто — как на сервере (IMAGE_TRY_MODEL или дефолт).'
+
 export default function Settings() {
   const { palette, font, setPalette, setFont } = useTheme()
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -58,6 +61,7 @@ export default function Settings() {
   const [simpleMeta, setSimpleMeta] = useState('')
   const [clsMode, setClsMode] = useState<'heuristic' | 'llm'>('heuristic')
   const [clsModel, setClsModel] = useState('')
+  const [imageTryModel, setImageTryModel] = useState('')
 
   useEffect(() => {
     api
@@ -74,6 +78,7 @@ export default function Settings() {
     setSimpleMeta(settings.simple_improve_meta ?? '')
     setClsMode(settings.task_classification_mode === 'llm' ? 'llm' : 'heuristic')
     setClsModel(settings.task_classifier_model ?? '')
+    setImageTryModel(settings.image_try_model ?? '')
   }, [settings])
 
   const handleSaveApiKey = async () => {
@@ -101,6 +106,22 @@ export default function Settings() {
       })
       setSettings(updated)
       setMessage({ type: 'ok', text: 'Простой режим: сохранено' })
+    } catch (e) {
+      setMessage({ type: 'err', text: (e as Error).message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveImageTryModel = async () => {
+    setSaving(true)
+    setMessage(null)
+    try {
+      const updated = await api.updateSettings({
+        image_try_model: imageTryModel.trim(),
+      })
+      setSettings(updated)
+      setMessage({ type: 'ok', text: 'Проба картинки: модель сохранена' })
     } catch (e) {
       setMessage({ type: 'err', text: (e as Error).message })
     } finally {
@@ -291,6 +312,30 @@ export default function Settings() {
               />
             </div>
             <p className={styles.mutedTiny}>Моноширинный шрифт блоков промпта не меняется.</p>
+          </LabelWithHint>
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Проба картинки</h2>
+          <LabelWithHint label="Модель генерации" hint={HINT_IMAGE_TRY}>
+            <label className={styles.fieldStack}>
+              <span className={styles.labelText}>OpenRouter id или ключ</span>
+              <input
+                className={styles.input}
+                value={imageTryModel}
+                onChange={(e) => setImageTryModel(e.target.value)}
+                placeholder="google/gemini-2.5-flash-image"
+                autoComplete="off"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleSaveImageTryModel}
+              disabled={saving || loading}
+              className={`${styles.btnPrimary} btn-primary`}
+            >
+              Сохранить
+            </button>
           </LabelWithHint>
         </section>
 

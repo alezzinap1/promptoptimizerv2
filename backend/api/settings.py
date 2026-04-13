@@ -31,6 +31,7 @@ class SettingsUpdate(BaseModel):
     simple_improve_meta: str | None = None
     task_classification_mode: str | None = None  # heuristic | llm
     task_classifier_model: str | None = None  # OpenRouter id or short key
+    image_try_model: str | None = None  # OpenRouter id (e.g. google/gemini-2.5-flash-image) or short key
 
 
 @router.patch("/settings")
@@ -54,5 +55,6 @@ def update_settings(
         simple_improve_meta=req.simple_improve_meta,
         task_classification_mode=req.task_classification_mode,
         task_classifier_model=req.task_classifier_model,
+        image_try_model=req.image_try_model,
     )
     return prefs

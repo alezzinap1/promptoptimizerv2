@@ -10,8 +10,9 @@ from services.llm_client import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
 
-# Дефолт: дешёвая image-модель (Nano Banana 2 на OpenRouter). Переопределение: env IMAGE_TRY_MODEL.
-DEFAULT_IMAGE_TRY_MODEL = "google/gemini-3.1-flash-image-preview"
+# Дефолт: image-модель из каталога OpenRouter. Переопределение: env IMAGE_TRY_MODEL.
+# gemini-2.5-flash-image стабильнее маршрутизируется, чем *-preview варианты.
+DEFAULT_IMAGE_TRY_MODEL = "google/gemini-2.5-flash-image"
 
 
 def extract_first_image_data_url(completion: Any) -> str | None:
@@ -41,6 +42,15 @@ def extract_first_image_data_url(completion: Any) -> str | None:
     return None
 
 
+def _is_openrouter_modalities_routing_404(exc: BaseException) -> bool:
+    """OpenRouter: нет провайдера под запрошенный набор output modalities (часто для image-only моделей)."""
+    s = str(exc).lower()
+    code = getattr(exc, "status_code", None)
+    if code != 404 and "error code: 404" not in s:
+        return False
+    return "no endpoints found" in s or "modalities" in s or "output modalities" in s
+
+
 def generate_image_data_url(
     api_key: str,
     *,
@@ -58,22 +68,50 @@ def generate_image_data_url(
 
     mid = (model or os.environ.get("IMAGE_TRY_MODEL") or DEFAULT_IMAGE_TRY_MODEL).strip()
     client = OpenAI(api_key=api_key, base_url=OPENROUTER_BASE_URL, timeout=timeout)
-    extra: dict[str, Any] = {"modalities": ["image", "text"]}
-    if aspect_ratio:
-        extra["image_config"] = {
-            "aspect_ratio": aspect_ratio,
-            "image_size": image_size or "1K",
+
+    def _extra_body(modalities: list[str]) -> dict[str, Any]:
+        body: dict[str, Any] = {"modalities": modalities}
+        if aspect_ratio:
+            body["image_config"] = {
+                "aspect_ratio": aspect_ratio,
+                "image_size": image_size or "1K",
+            }
+        return body
+
+    completion: Any = None
+    last_exc: BaseException | None = None
+    modality_sets: tuple[list[str], ...] = (["image", "text"], ["image"])
+    for mods in modality_sets:
+        kwargs: dict[str, Any] = {
+            "model": mid,
+            "messages": [{"role": "user", "content": prompt.strip()}],
+            "extra_body": _extra_body(mods),
         }
-    kwargs: dict[str, Any] = {
-        "model": mid,
-        "messages": [{"role": "user", "content": prompt.strip()}],
-        "extra_body": extra,
-    }
-    try:
-        completion = client.chat.completions.create(**kwargs)
-    except TypeError:
-        kwargs.pop("extra_body", None)
-        completion = client.chat.completions.create(**kwargs)
+        try:
+            completion = client.chat.completions.create(**kwargs)
+            last_exc = None
+            break
+        except TypeError:
+            kwargs.pop("extra_body", None)
+            try:
+                completion = client.chat.completions.create(**kwargs)
+                last_exc = None
+                break
+            except BaseException as e:
+                last_exc = e
+                raise
+        except BaseException as e:
+            last_exc = e
+            if mods == modality_sets[-1] or not _is_openrouter_modalities_routing_404(e):
+                raise
+            logger.info(
+                "openrouter image: model %s rejected modalities %s; retrying with [image] only (%s)",
+                mid,
+                mods,
+                e,
+            )
+    if completion is None and last_exc is not None:
+        raise last_exc
     data_url = extract_first_image_data_url(completion)
     if not data_url:
         raise RuntimeError("Модель не вернула изображение (проверьте modalities и id модели на OpenRouter).")

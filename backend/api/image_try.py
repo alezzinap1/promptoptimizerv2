@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 import re
 import time
 import uuid
@@ -41,6 +42,27 @@ class ImageTryResponse(BaseModel):
     image_url: str
     gen_model: str
     saved_path: str | None = None
+
+
+def _resolve_image_try_model(
+    req_raw: str | None,
+    *,
+    user_saved: str,
+) -> str:
+    """Порядок: тело запроса → настройка пользователя → IMAGE_TRY_MODEL → DEFAULT_IMAGE_TRY_MODEL."""
+    fallback = (
+        (user_saved or "").strip()
+        or os.environ.get("IMAGE_TRY_MODEL", "").strip()
+        or DEFAULT_IMAGE_TRY_MODEL
+    )
+    raw_m = (req_raw or "").strip()
+    if not raw_m:
+        return fallback
+    if raw_m in PROVIDER_MODELS:
+        return PROVIDER_MODELS[raw_m]
+    if "/" in raw_m:
+        return raw_m
+    return fallback
 
 
 def _data_url_to_bytes(data_url: str) -> bytes:
@@ -84,15 +106,9 @@ def image_try(
                 f"Пробный лимит токенов исчерпан. Введите свой API ключ OpenRouter в Настройках.",
             )
 
-    raw_m = (req.gen_model or "").strip()
-    if not raw_m:
-        mid = DEFAULT_IMAGE_TRY_MODEL
-    elif raw_m in PROVIDER_MODELS:
-        mid = PROVIDER_MODELS[raw_m]
-    elif "/" in raw_m:
-        mid = raw_m
-    else:
-        mid = DEFAULT_IMAGE_TRY_MODEL
+    prefs = db.get_user_preferences(user_id)
+    saved_try = str(prefs.get("image_try_model") or "")
+    mid = _resolve_image_try_model(req.gen_model, user_saved=saved_try)
     if using_host_key and completion_price_per_m(mid) > TRIAL_MAX_COMPLETION_PER_M:
         raise HTTPException(
             403,

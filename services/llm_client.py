@@ -37,7 +37,7 @@ PROVIDER_MODELS: dict[str, str] = {
     "mistral":        "mistralai/mistral-nemo",
     "qwen":           "qwen/qwen3-235b-a22b",
     "trinity":        "trinity-labs/trinity-v1-large:free",
-    "nano_banana":    "google/gemini-3.1-flash-image-preview",
+    "nano_banana":    "google/gemini-2.5-flash-image",
 }
 
 PROVIDER_NAMES: dict[str, str] = {
