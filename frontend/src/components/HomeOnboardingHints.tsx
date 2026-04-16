@@ -13,7 +13,10 @@ export default function HomeOnboardingHints() {
 
   useEffect(() => {
     if (typeof localStorage === 'undefined') return
-    if (localStorage.getItem(DISMISS_KEY) === '1') return
+    if (localStorage.getItem(DISMISS_KEY) === '1') {
+      setDismissed(true)
+      return
+    }
     const raw = localStorage.getItem(STORAGE_KEY)
     const prev = raw ? parseInt(raw, 10) : 0
     const n = Number.isFinite(prev) ? prev : 0
