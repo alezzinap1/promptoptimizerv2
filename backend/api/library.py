@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.deps import get_current_user, get_db
-from config.settings import TRIAL_MAX_COMPLETION_PER_M, TRIAL_TOKENS_LIMIT
+from config.settings import TRIAL_MAX_COMPLETION_PER_M
+from services.trial_budget import effective_trial_tokens_limit
 from core.quality_metrics import analyze_prompt
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -137,7 +138,8 @@ def llm_review_prompt(
     using_host_key = not bool(user_key)
     if using_host_key:
         usage = db.get_user_usage(user_id)
-        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+        lim = effective_trial_tokens_limit(usage)
+        if usage["tokens_used"] >= lim:
             raise HTTPException(402, "Пробный лимит исчерпан.")
 
     gen = (req.judge_model or "").strip() or DEFAULT_PROVIDER

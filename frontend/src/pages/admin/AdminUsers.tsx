@@ -64,6 +64,8 @@ export default function AdminUsers() {
             <th style={{ padding: '8px 4px' }}>Логин</th>
             <th style={{ padding: '8px 4px' }}>Email</th>
             <th style={{ padding: '8px 4px' }}>Активность</th>
+            <th style={{ padding: '8px 4px' }}>Токены</th>
+            <th style={{ padding: '8px 4px' }}>$ (оценка)</th>
             <th style={{ padding: '8px 4px' }}>Флаги</th>
             <th style={{ padding: '8px 4px' }} />
           </tr>
@@ -75,6 +77,10 @@ export default function AdminUsers() {
               <td style={{ padding: '8px 4px' }}>{row.username}</td>
               <td style={{ padding: '8px 4px' }}>{row.email || '—'}</td>
               <td style={{ padding: '8px 4px' }}>{row.last_active_at || '—'}</td>
+              <td style={{ padding: '8px 4px' }}>{row.tokens_used ?? 0}</td>
+              <td style={{ padding: '8px 4px' }}>
+                {row.dollars_used != null ? Number(row.dollars_used).toFixed(4) : '0'}
+              </td>
               <td style={{ padding: '8px 4px' }}>
                 {row.is_blocked ? <span style={{ color: '#f87171' }}>blocked</span> : 'ok'}
                 {row.is_admin ? <span style={{ marginLeft: 8, color: '#93c5fd' }}>admin</span> : null}

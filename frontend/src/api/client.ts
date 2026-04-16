@@ -22,6 +22,11 @@ export type AdminUserRow = {
   is_admin: number
   is_blocked: number
   last_active_at?: string | null
+  tokens_used?: number
+  dollars_used?: number
+  trial_tokens_limit?: number | null
+  rate_limit_rpm?: number | null
+  session_generation_budget?: number | null
 }
 
 export type AdminUserEvent = {
@@ -593,6 +598,18 @@ export const api = {
   adminUnblockUser: (id: number) => fetchApi<{ ok: boolean }>(`/admin/users/${id}/unblock`, { method: 'POST' }),
   adminResetTrialUsage: (id: number) =>
     fetchApi<{ ok: boolean }>(`/admin/users/${id}/reset-trial-usage`, { method: 'POST' }),
+  adminPatchUserLimits: (
+    id: number,
+    body: {
+      trial_tokens_limit?: number | null
+      rate_limit_rpm?: number | null
+      session_generation_budget?: number | null
+    },
+  ) =>
+    fetchApi<{ ok: boolean; usage: Record<string, unknown> }>(`/admin/users/${id}/limits`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
   adminUserEvents: (id: number, limit = 50) =>
     fetchApi<{ events: AdminUserEvent[] }>(`/admin/users/${id}/events?limit=${limit}`),
 

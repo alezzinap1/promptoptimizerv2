@@ -50,6 +50,8 @@ def test_admin_list_and_block_and_events() -> None:
             assert r.status_code == 200
             data = r.json()
             assert data["total"] >= 2
+            victim_row = next(x for x in data["items"] if x["id"] == uid)
+            assert victim_row.get("tokens_used") == 50
 
             r2 = client.get(f"/api/admin/users/{uid}", headers={"X-Session-Id": admin_sid})
             assert r2.status_code == 200
@@ -74,6 +76,25 @@ def test_admin_list_and_block_and_events() -> None:
             r6 = client.post(f"/api/admin/users/{uid}/unblock", headers={"X-Session-Id": admin_sid})
             assert r6.status_code == 200
             assert int(db.get_user_by_id(uid).get("is_blocked") or 0) == 0
+
+            r7 = client.patch(
+                f"/api/admin/users/{uid}/limits",
+                headers={"X-Session-Id": admin_sid},
+                json={"trial_tokens_limit": 999_000, "rate_limit_rpm": 12, "session_generation_budget": 7},
+            )
+            assert r7.status_code == 200
+            uu = db.get_user_usage(uid)
+            assert uu.get("trial_tokens_limit") == 999_000
+            assert uu.get("rate_limit_rpm") == 12
+            assert uu.get("session_generation_budget") == 7
+
+            r8 = client.patch(
+                f"/api/admin/users/{uid}/limits",
+                headers={"X-Session-Id": admin_sid},
+                json={"trial_tokens_limit": None},
+            )
+            assert r8.status_code == 200
+            assert db.get_user_usage(uid).get("trial_tokens_limit") is None
 
 
 def test_me_includes_is_admin() -> None:

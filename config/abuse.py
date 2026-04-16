@@ -60,6 +60,8 @@ class RateLimiter:
 
 
 _rate_limiter = RateLimiter()
+# Per (session_key, max_requests) when max_requests differs from default
+_rate_limiter_custom: dict[tuple[str, int], RateLimiter] = {}
 
 _auth_register_limiter = RateLimiter(
     max_requests=AUTH_REGISTER_RATE_LIMIT_REQUESTS,
@@ -97,9 +99,18 @@ def check_admin_api_rate_limit(admin_user_id: int) -> tuple[bool, str]:
     return _admin_api_limiter.allow(f"admin_api:{admin_user_id}")
 
 
-def check_rate_limit(session_id: str) -> tuple[bool, str]:
-    """Check if session is within rate limit."""
-    return _rate_limiter.allow(session_id or "anonymous")
+def check_rate_limit(session_id: str, max_requests_override: int | None = None) -> tuple[bool, str]:
+    """Check if session is within rate limit. Optional per-user cap (req/min in same window as default)."""
+    key = session_id or "anonymous"
+    mr = int(max_requests_override) if max_requests_override is not None and int(max_requests_override) > 0 else None
+    if mr is None or mr == RATE_LIMIT_REQUESTS:
+        return _rate_limiter.allow(key)
+    cache_key = (key, mr)
+    lim = _rate_limiter_custom.get(cache_key)
+    if lim is None:
+        lim = RateLimiter(max_requests=mr, window_sec=float(RATE_LIMIT_WINDOW_SEC))
+        _rate_limiter_custom[cache_key] = lim
+    return lim.allow(key)
 
 
 def check_session_budget(generation_count: int, additional: int = 1) -> tuple[bool, str]:

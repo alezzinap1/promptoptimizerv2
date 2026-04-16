@@ -6,9 +6,10 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config.abuse import check_input_size, check_rate_limit
-from config.settings import TRIAL_MAX_COMPLETION_PER_M, TRIAL_TOKENS_LIMIT
-from backend.deps import get_current_user, get_db, get_session_id
+from config.abuse import check_input_size
+from config.settings import TRIAL_MAX_COMPLETION_PER_M
+from backend.deps import check_user_rate_limit, get_current_user, get_db, get_session_id
+from services.trial_budget import effective_trial_tokens_limit
 from core.simple_improve import (
     build_simple_improve_system_prompt,
     build_simple_improve_user_message,
@@ -57,7 +58,7 @@ def simple_improve(
     ok, err = check_input_size(text)
     if not ok:
         raise HTTPException(400, err)
-    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    ok, err = check_user_rate_limit(db, int(user["id"]), auth_session_id)
     if not ok:
         raise HTTPException(429, err)
 
@@ -78,10 +79,11 @@ def simple_improve(
 
     if using_host_key:
         usage = db.get_user_usage(user_id)
-        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+        lim = effective_trial_tokens_limit(usage)
+        if usage["tokens_used"] >= lim:
             raise HTTPException(
                 402,
-                f"Пробный лимит ({TRIAL_TOKENS_LIMIT:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках.",
+                f"Пробный лимит ({lim:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках.",
             )
         model_id = _get_openrouter_model_id(gen_model)
         if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:

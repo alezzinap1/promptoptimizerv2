@@ -178,6 +178,7 @@ class DBManager:
             self._migrate_phase12_library_cover_image(conn)
             self._migrate_phase13_image_try_model(conn)
             self._migrate_phase14_admin_flags(conn)
+            self._migrate_phase15_user_usage_limits(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -382,6 +383,12 @@ class DBManager:
                 FOREIGN KEY (target_user_id) REFERENCES users(id)
             )
         """)
+
+    def _migrate_phase15_user_usage_limits(self, conn: sqlite3.Connection) -> None:
+        """Per-user trial token cap, RPM override, session generation budget (NULL = global default)."""
+        self._safe_add_column(conn, "user_usage", "trial_tokens_limit", "INTEGER")
+        self._safe_add_column(conn, "user_usage", "rate_limit_rpm", "INTEGER")
+        self._safe_add_column(conn, "user_usage", "session_generation_budget", "INTEGER")
 
     def _safe_add_column(
         self,
@@ -661,20 +668,57 @@ class DBManager:
                 )
 
     def get_user_usage(self, user_id: int) -> dict:
-        """Get user's token and dollar usage."""
+        """Get user's token and dollar usage plus optional per-user limit overrides."""
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT tokens_used, dollars_used, updated_at FROM user_usage WHERE user_id = ?",
+                """
+                SELECT tokens_used, dollars_used, updated_at,
+                       trial_tokens_limit, rate_limit_rpm, session_generation_budget
+                FROM user_usage WHERE user_id = ?
+                """,
                 (user_id,),
             ).fetchone()
         if not row:
-            return {"tokens_used": 0, "dollars_used": 0.0, "updated_at": None}
+            return {
+                "tokens_used": 0,
+                "dollars_used": 0.0,
+                "updated_at": None,
+                "trial_tokens_limit": None,
+                "rate_limit_rpm": None,
+                "session_generation_budget": None,
+            }
         data = dict(row)
         return {
             "tokens_used": int(data.get("tokens_used") or 0),
             "dollars_used": float(data.get("dollars_used") or 0),
             "updated_at": data.get("updated_at"),
+            "trial_tokens_limit": data.get("trial_tokens_limit"),
+            "rate_limit_rpm": data.get("rate_limit_rpm"),
+            "session_generation_budget": data.get("session_generation_budget"),
         }
+
+    def update_user_usage_limits(self, user_id: int, updates: dict) -> None:
+        """Set nullable limit columns on user_usage (caller validates). Ensures row exists."""
+        allowed = {"trial_tokens_limit", "rate_limit_rpm", "session_generation_budget"}
+        cols = [k for k in updates if k in allowed]
+        if not cols:
+            return
+        with self._conn() as conn:
+            cur = conn.execute("SELECT 1 FROM user_usage WHERE user_id = ?", (user_id,))
+            if not cur.fetchone():
+                conn.execute(
+                    """
+                    INSERT INTO user_usage (user_id, tokens_used, dollars_used, updated_at)
+                    VALUES (?, 0, 0, CURRENT_TIMESTAMP)
+                    """,
+                    (user_id,),
+                )
+            sets = ", ".join(f"{c} = ?" for c in cols)
+            values = [updates[c] for c in cols]
+            conn.execute(
+                f"UPDATE user_usage SET {sets}, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                [*values, user_id],
+            )
 
     def add_user_usage(
         self, user_id: int, tokens_delta: int, dollars_delta: float
@@ -749,8 +793,14 @@ class DBManager:
                 COALESCE(u.is_blocked, 0) AS is_blocked,
                 (
                     SELECT MAX(s.updated_at) FROM user_sessions s WHERE s.user_id = u.id
-                ) AS last_active_at
+                ) AS last_active_at,
+                COALESCE(uu.tokens_used, 0) AS tokens_used,
+                COALESCE(uu.dollars_used, 0.0) AS dollars_used,
+                uu.trial_tokens_limit AS trial_tokens_limit,
+                uu.rate_limit_rpm AS rate_limit_rpm,
+                uu.session_generation_budget AS session_generation_budget
             FROM users u
+            LEFT JOIN user_usage uu ON uu.user_id = u.id
             WHERE {where}
             ORDER BY datetime(
                 COALESCE(

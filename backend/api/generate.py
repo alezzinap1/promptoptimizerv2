@@ -11,9 +11,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from config.abuse import check_input_size, check_rate_limit
-from config.settings import BUDGET_GENERATIONS_PER_SESSION, TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
-from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
+from config.abuse import check_input_size
+from config.settings import TRIAL_MAX_COMPLETION_PER_M
+from backend.deps import (
+    check_user_rate_limit,
+    get_current_user,
+    get_db,
+    get_registry_for_user,
+    get_session_id,
+)
+from services.trial_budget import effective_session_generation_budget, effective_trial_tokens_limit
 from core.context_builder import CLARIFICATION_ANSWERS_PROVIDED, ContextBuilder
 from core.domain_templates import get_domain_techniques
 from core.parsing import diagnose_generation_response, parse_questions, parse_reply
@@ -385,6 +392,8 @@ def _resolve_skill_preset_hint(preset_id: str | None, user_id: int, db: DBManage
 def _check_session_budget(db: DBManager, user_id: int, auth_session_id: str | None) -> None:
     if not auth_session_id:
         return
+    usage = db.get_user_usage(user_id)
+    cap = effective_session_generation_budget(usage)
     events = db.get_recent_events(limit=1000, user_id=user_id)
     used = sum(
         1
@@ -392,10 +401,10 @@ def _check_session_budget(db: DBManager, user_id: int, auth_session_id: str | No
         if event.get("session_id") == auth_session_id
         and event.get("event_name") in {"generate_requested", "compare_run"}
     )
-    if used >= BUDGET_GENERATIONS_PER_SESSION:
+    if used >= cap:
         raise HTTPException(
             429,
-            f"Session generation budget ({BUDGET_GENERATIONS_PER_SESSION}) exhausted. Start a new session.",
+            f"Session generation budget ({cap}) exhausted. Start a new session.",
         )
 
 
@@ -596,7 +605,7 @@ def estimate_generate_input(
     ok, err = check_input_size(req.task_input)
     if not ok:
         raise HTTPException(400, err)
-    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    ok, err = check_user_rate_limit(db, int(user["id"]), auth_session_id)
     if not ok:
         raise HTTPException(429, err)
     user_id = int(user["id"])
@@ -618,7 +627,7 @@ def generate_prompt(
     ok, err = check_input_size(req.task_input)
     if not ok:
         raise HTTPException(400, err)
-    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    ok, err = check_user_rate_limit(db, int(user["id"]), auth_session_id)
     if not ok:
         raise HTTPException(429, err)
     _check_session_budget(db, int(user["id"]), auth_session_id)
@@ -635,10 +644,11 @@ def generate_prompt(
     using_host_key = not bool(user_key)
     if using_host_key:
         usage = db.get_user_usage(user_id)
-        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+        lim = effective_trial_tokens_limit(usage)
+        if usage["tokens_used"] >= lim:
             raise HTTPException(
                 402,
-                f"Пробный лимит ({TRIAL_TOKENS_LIMIT:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках для продолжения.",
+                f"Пробный лимит ({lim:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках для продолжения.",
             )
         model_id = _get_openrouter_model_id(req.gen_model)
         comp_per_m = completion_price_per_m(model_id)

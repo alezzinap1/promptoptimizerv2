@@ -4,9 +4,16 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config.abuse import check_input_size, check_rate_limit
-from config.settings import TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
-from backend.deps import get_current_user, get_db, get_registry_for_user, get_session_id
+from config.abuse import check_input_size
+from config.settings import TRIAL_MAX_COMPLETION_PER_M
+from backend.deps import (
+    check_user_rate_limit,
+    get_current_user,
+    get_db,
+    get_registry_for_user,
+    get_session_id,
+)
+from services.trial_budget import effective_trial_tokens_limit
 from core.compare_judge import run_compare_judge
 from core.context_builder import ContextBuilder
 from core.parsing import parse_reply
@@ -57,7 +64,7 @@ def compare_prompts(
     ok, err = check_input_size(req.task_input)
     if not ok:
         raise HTTPException(400, err)
-    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    ok, err = check_user_rate_limit(db, int(user["id"]), auth_session_id)
     if not ok:
         raise HTTPException(429, err)
 
@@ -69,8 +76,9 @@ def compare_prompts(
     using_host_key = not bool(user_key)
     if using_host_key:
         usage = db.get_user_usage(user_id)
-        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
-            raise HTTPException(402, f"Пробный лимит ({TRIAL_TOKENS_LIMIT:,} токенов) исчерпан. Введите свой API ключ в Настройках.")
+        lim = effective_trial_tokens_limit(usage)
+        if usage["tokens_used"] >= lim:
+            raise HTTPException(402, f"Пробный лимит ({lim:,} токенов) исчерпан. Введите свой API ключ в Настройках.")
         model_id = _get_openrouter_model_id(req.gen_model)
         if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(403, f"Модель недоступна в пробном режиме. Введите свой API ключ в Настройках.")
@@ -203,7 +211,7 @@ def compare_llm_judge(
     ok, err = check_input_size(req.task_input)
     if not ok:
         raise HTTPException(400, err)
-    ok, err = check_rate_limit(auth_session_id or str(user["id"]))
+    ok, err = check_user_rate_limit(db, int(user["id"]), auth_session_id)
     if not ok:
         raise HTTPException(429, err)
 
@@ -217,7 +225,8 @@ def compare_llm_judge(
     judge = (req.judge_model or "gemini_flash").strip()
     if using_host_key:
         usage = db.get_user_usage(user_id)
-        if usage["tokens_used"] >= TRIAL_TOKENS_LIMIT:
+        lim = effective_trial_tokens_limit(usage)
+        if usage["tokens_used"] >= lim:
             raise HTTPException(402, "Пробный лимит токенов исчерпан. Введите свой API ключ.")
         mid = _get_openrouter_model_id(judge)
         if completion_price_per_m(mid) > TRIAL_MAX_COMPLETION_PER_M:

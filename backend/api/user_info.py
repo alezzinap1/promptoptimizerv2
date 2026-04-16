@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from config.settings import TRIAL_TOKENS_LIMIT, TRIAL_MAX_COMPLETION_PER_M
+from config.settings import TRIAL_MAX_COMPLETION_PER_M
 from backend.deps import get_current_user, get_db
 from db.manager import DBManager
+from services.trial_budget import effective_trial_tokens_limit
 
 router = APIRouter()
 
@@ -20,13 +21,14 @@ def get_user_info(
     usage = db.get_user_usage(user_id)
     user_key = db.get_user_openrouter_api_key(user_id)
     has_own_key = bool(user_key)
-    trial_remaining = max(0, TRIAL_TOKENS_LIMIT - usage["tokens_used"]) if not has_own_key else None
+    eff_limit = effective_trial_tokens_limit(usage)
+    trial_remaining = max(0, eff_limit - usage["tokens_used"]) if not has_own_key else None
 
     return {
         "tokens_used": usage["tokens_used"],
         "dollars_used": round(usage["dollars_used"], 6),
         "has_own_api_key": has_own_key,
-        "trial_tokens_limit": TRIAL_TOKENS_LIMIT,
+        "trial_tokens_limit": eff_limit,
         "trial_tokens_remaining": trial_remaining,
         "trial_max_completion_per_m": TRIAL_MAX_COMPLETION_PER_M,
         "service_info": {
