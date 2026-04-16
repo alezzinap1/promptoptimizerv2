@@ -177,6 +177,7 @@ class DBManager:
             self._migrate_phase11_pre_router_and_skill_client_id(conn)
             self._migrate_phase12_library_cover_image(conn)
             self._migrate_phase13_image_try_model(conn)
+            self._migrate_phase14_admin_flags(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -364,6 +365,23 @@ class DBManager:
     def _migrate_phase13_image_try_model(self, conn: sqlite3.Connection) -> None:
         """Модель OpenRouter для кнопки «Проба картинки» (полный id или короткий ключ)."""
         self._safe_add_column(conn, "user_preferences", "image_try_model", "TEXT DEFAULT ''")
+
+    def _migrate_phase14_admin_flags(self, conn: sqlite3.Connection) -> None:
+        """Admin / abuse: flags on users + append-only admin audit log."""
+        self._safe_add_column(conn, "users", "is_admin", "INTEGER NOT NULL DEFAULT 0")
+        self._safe_add_column(conn, "users", "is_blocked", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_user_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                target_user_id INTEGER,
+                meta_json TEXT NOT NULL DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (admin_user_id) REFERENCES users(id),
+                FOREIGN KEY (target_user_id) REFERENCES users(id)
+            )
+        """)
 
     def _safe_add_column(
         self,
@@ -674,6 +692,111 @@ class DBManager:
                 """,
                 (user_id, tokens_delta, dollars_delta),
             )
+
+    def log_admin_audit(
+        self,
+        admin_user_id: int,
+        action: str,
+        target_user_id: int | None,
+        meta: dict | None = None,
+    ) -> int:
+        """Record an admin action (no prompt/user content)."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO admin_audit_log (admin_user_id, action, target_user_id, meta_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    admin_user_id,
+                    action,
+                    target_user_id,
+                    json.dumps(meta or {}, ensure_ascii=False),
+                ),
+            )
+            return int(cur.lastrowid)  # type: ignore[return-value]
+
+    def list_users_admin(
+        self,
+        *,
+        q: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[dict], int]:
+        """Paginated user list for admin UI (no password_hash)."""
+        limit = max(1, min(100, int(limit)))
+        offset = max(0, int(offset))
+        qn = (q or "").strip()
+        params: list = []
+        if qn:
+            like = f"%{qn.lower()}%"
+            where = """(
+                LOWER(u.username) LIKE ? OR LOWER(COALESCE(u.email, '')) LIKE ?
+                OR CAST(u.id AS TEXT) = ?
+            )"""
+            params.extend([like, like, qn])
+        else:
+            where = "1=1"
+
+        count_sql = f"SELECT COUNT(*) FROM users u WHERE {where}"
+        list_sql = f"""
+            SELECT
+                u.id,
+                u.username,
+                u.email,
+                u.created_at,
+                COALESCE(u.is_admin, 0) AS is_admin,
+                COALESCE(u.is_blocked, 0) AS is_blocked,
+                (
+                    SELECT MAX(s.updated_at) FROM user_sessions s WHERE s.user_id = u.id
+                ) AS last_active_at
+            FROM users u
+            WHERE {where}
+            ORDER BY datetime(
+                COALESCE(
+                    (SELECT MAX(s2.updated_at) FROM user_sessions s2 WHERE s2.user_id = u.id),
+                    u.created_at
+                )
+            ) DESC, u.id DESC
+            LIMIT ? OFFSET ?
+        """
+        with self._conn() as conn:
+            total = int(conn.execute(count_sql, params).fetchone()[0])
+            rows = conn.execute(list_sql, [*params, limit, offset]).fetchall()
+        out: list[dict] = []
+        for row in rows:
+            d = dict(row)
+            d["is_admin"] = int(d.get("is_admin") or 0)
+            d["is_blocked"] = int(d.get("is_blocked") or 0)
+            out.append(d)
+        return out, total
+
+    def set_user_blocked(self, user_id: int, blocked: bool) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE users SET is_blocked = ? WHERE id = ?",
+                (1 if blocked else 0, user_id),
+            )
+
+    def reset_user_trial_usage(self, user_id: int) -> None:
+        """Zero trial counters in user_usage (insert row if missing)."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                UPDATE user_usage
+                SET tokens_used = 0, dollars_used = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            )
+            if cur.rowcount == 0:
+                conn.execute(
+                    """
+                    INSERT INTO user_usage (user_id, tokens_used, dollars_used, updated_at)
+                    VALUES (?, 0, 0, CURRENT_TIMESTAMP)
+                    """,
+                    (user_id,),
+                )
 
     def list_user_techniques(self, user_id: int) -> list[dict]:
         with self._conn() as conn:
