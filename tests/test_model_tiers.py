@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from core.model_catalog import CATALOG, MAX_COMPLETION_PER_M, all_catalog_model_ids, candidates
@@ -182,6 +183,19 @@ def test_translator_protects_code_blocks_and_placeholders():
     assert "{user_name}" in out
     assert "[SLOT_A]" in out
     assert out.startswith("TR:")
+
+
+def test_mymemory_invalid_email_response_raises_for_fallback(monkeypatch):
+    """Раньше MyMemory возвращал INVALID EMAIL PROVIDED в translatedText при невалидном de=."""
+    from services import translator
+
+    monkeypatch.setattr(
+        translator,
+        "_http_get_json",
+        lambda url: {"responseData": {"translatedText": "INVALID EMAIL PROVIDED"}},
+    )
+    with pytest.raises(RuntimeError, match="MyMemory rejected"):
+        translator._mymemory_translate_chunk("hello", "ru->en")
 
 
 def test_library_translate_endpoint(monkeypatch):

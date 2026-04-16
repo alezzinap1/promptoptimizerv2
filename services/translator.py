@@ -145,9 +145,26 @@ def _http_get_json(url: str) -> dict:
     return _json.loads(raw.decode("utf-8", errors="replace"))
 
 
+def _mymemory_reject_as_error(translated: str) -> bool:
+    """MyMemory иногда кладёт сообщения об ошибках в translatedText вместо HTTP 4xx."""
+    u = translated.upper().strip()
+    if not u:
+        return True
+    if u.startswith("PLEASE SELECT TWO DISTINCT LANGUAGES"):
+        return True
+    if "MYMEMORY WARNING" in u:
+        return True
+    if "INVALID EMAIL PROVIDED" in u:
+        return True
+    if u in ("QUERY TOO LONG", "INVALID QUERY"):
+        return True
+    return False
+
+
 def _mymemory_translate_chunk(chunk: str, direction: Direction) -> str:
     pair = "ru|en" if direction == "ru->en" else "en|ru"
-    qs = urlencode({"q": chunk, "langpair": pair, "de": "metaprompt@local"})
+    # Не передаём `de`: фиктивный email (раньше metaprompt@local) давал INVALID EMAIL PROVIDED в теле ответа.
+    qs = urlencode({"q": chunk, "langpair": pair})
     url = f"https://api.mymemory.translated.net/get?{qs}"
     try:
         data = _http_get_json(url)
@@ -157,10 +174,8 @@ def _mymemory_translate_chunk(chunk: str, direction: Direction) -> str:
     translated = str(translated).strip()
     if not translated:
         raise RuntimeError("MyMemory returned empty translation")
-    if translated.upper().startswith("PLEASE SELECT TWO DISTINCT LANGUAGES"):
-        raise RuntimeError("MyMemory rejected language pair")
-    if "MYMEMORY WARNING" in translated.upper():
-        raise RuntimeError("MyMemory quota warning")
+    if _mymemory_reject_as_error(translated):
+        raise RuntimeError(f"MyMemory rejected response: {translated[:120]}")
     return translated
 
 
