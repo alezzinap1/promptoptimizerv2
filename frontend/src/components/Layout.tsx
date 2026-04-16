@@ -3,8 +3,10 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { api, type Workspace } from '../api/client'
 import { getRecentSessions, type RecentSession } from '../lib/recentSessions'
 import { useAuth } from '../context/AuthContext'
+import { useT } from '../i18n'
 import AppSidebar from './AppSidebar'
 import UserMenu from './UserMenu'
+import LanguageSwitcher from './LanguageSwitcher'
 import styles from './Layout.module.css'
 
 const COLLAPSED_KEY = 'metaprompt-sidebar-collapsed'
@@ -26,16 +28,23 @@ function loadSkillCount(): number {
   }
 }
 
-function pickWorkspaceName(items: Workspace[], id: number, listReady: boolean): string | null {
+function pickWorkspaceName(
+  items: Workspace[],
+  id: number,
+  listReady: boolean,
+  loadingLabel: string,
+  fallbackTemplate: string,
+): string | null {
   if (!id) return null
   const w = items.find((x) => Number(x.id ?? 0) === id)
   if (w?.name?.trim()) return w.name.trim()
-  if (!listReady) return 'Загрузка…'
-  return `Пространство #${id}`
+  if (!listReady) return loadingLabel
+  return fallbackTemplate.replace('{id}', String(id))
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
+  const { t } = useT()
   const location = useLocation()
   const isWelcomePublic = location.pathname === '/welcome'
 
@@ -137,7 +146,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const workspaceLabel = showSidebar ? pickWorkspaceName(workspaces, activeWorkspaceId, workspacesListReady) : null
+  const workspaceLabel = showSidebar
+    ? pickWorkspaceName(
+        workspaces,
+        activeWorkspaceId,
+        workspacesListReady,
+        t.header.workspaceLoading,
+        t.header.workspaceFallback,
+      )
+    : null
   const isDemoUser = user?.username === 'demo_user'
 
   const logoWordmark = (
@@ -155,9 +172,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className={styles.logoGlyph} aria-hidden />
             {logoWordmark}
           </NavLink>
-          <NavLink to="/login" className={styles.loginBtn}>
-            Войти
-          </NavLink>
+          <div className={styles.publicHeaderRight}>
+            <LanguageSwitcher />
+            <NavLink to="/login" className={styles.loginBtn}>
+              {t.common.login}
+            </NavLink>
+          </div>
         </header>
         <main className={styles.publicMain}>{children}</main>
       </div>
@@ -179,38 +199,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className={styles.shell}>
         {isDemoUser ? (
           <div className={styles.demoBanner} role="status">
-            Демо без входа: запросы к серверу недоступны.{' '}
+            {t.header.demoBanner}{' '}
             <NavLink to="/login" className={styles.demoBannerLink}>
-              Войти
+              {t.header.demoBannerLogin}
             </NavLink>
-            , чтобы работать с данными.
+            {t.header.demoBannerTail}
           </div>
         ) : null}
         <div className={styles.headerWrap}>
           <header className={styles.header}>
             <div className={styles.headerLeft}>
-              <NavLink to="/home" className={styles.logo} aria-label="На главную">
+              <NavLink to="/home" className={styles.logo} aria-label={t.header.logoAriaHome}>
                 <span className={styles.logoGlyph} aria-hidden />
                 {logoWordmark}
               </NavLink>
               {user ? (
-                <div className={styles.modeSwitch} role="group" aria-label="Режим работы">
+                <div className={styles.modeSwitch} role="group" aria-label={t.header.modeStudio}>
                   <NavLink
                     to="/home"
                     className={({ isActive }) => `${styles.modeBtn} ${isActive ? styles.modeBtnActive : ''}`}
                   >
-                    Студия
+                    {t.header.modeStudio}
                   </NavLink>
                   <NavLink
                     to="/simple"
                     className={({ isActive }) => `${styles.modeBtn} ${isActive ? styles.modeBtnActive : ''}`}
                   >
-                    Улучшить
+                    {t.header.modeSimple}
                   </NavLink>
                 </div>
               ) : null}
             </div>
             <div className={styles.controls}>
+              <LanguageSwitcher />
               {user ? (
                 <div className={styles.userBox}>
                   <div className={styles.userAvatar} aria-hidden>
@@ -221,7 +242,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               ) : (
                 <NavLink to="/login" className={styles.loginBtn}>
-                  Войти
+                  {t.common.login}
                 </NavLink>
               )}
             </div>

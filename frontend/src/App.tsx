@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { LanguageProvider, useT } from './i18n'
 import Layout from './components/Layout'
 import PrivateOnlyMessage from './components/PrivateOnlyMessage'
 import AuthPage from './pages/Auth'
@@ -25,7 +26,8 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
-  if (loading) return <div style={{ padding: 24 }}>Загрузка…</div>
+  const { t } = useT()
+  if (loading) return <div style={{ padding: 24 }}>{t.common.loading}</div>
   if (!user) return <PrivateOnlyMessage />
   return <>{children}</>
 }
@@ -34,6 +36,7 @@ const MARKETING_PATHS = new Set<string>(['/welcome', '/login', '/onboarding'])
 
 function AppShell() {
   const { user, loading } = useAuth()
+  const { t } = useT()
   const location = useLocation()
 
   // Register switch: marketing (cream editorial) for public/onboarding surfaces,
@@ -47,7 +50,7 @@ function AppShell() {
     }
   }, [location.pathname])
 
-  if (loading) return <div style={{ padding: 24 }}>Загрузка…</div>
+  if (loading) return <div style={{ padding: 24 }}>{t.common.loading}</div>
 
   // Auth page (login) — no Layout wrapper
   if (location.pathname === '/login') {
@@ -94,11 +97,13 @@ function AppShell() {
 export default function App() {
   return (
     <div className="appRoot">
-      <AuthProvider>
-        <ThemeProvider>
-          <AppShell />
-        </ThemeProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <AppShell />
+          </ThemeProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </div>
   )
 }

@@ -1,10 +1,11 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useT } from '../i18n'
 import styles from './PrivateOnlyMessage.module.css'
 
 export default function PrivateOnlyMessage() {
   const { enterDemoMode } = useAuth()
+  const { t } = useT()
   const navigate = useNavigate()
 
   const handleDemo = () => {
@@ -20,14 +21,12 @@ export default function PrivateOnlyMessage() {
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       </div>
-      <h3 className={styles.title}>Требуется вход</h3>
-      <p className={styles.text}>
-        Войдите в аккаунт, чтобы открыть этот раздел.
-      </p>
+      <h3 className={styles.title}>{t.privateOnly.title}</h3>
+      <p className={styles.text}>{t.privateOnly.body}</p>
       <div className={styles.actions}>
-        <Link to="/login" className={styles.primaryBtn}>Войти</Link>
+        <Link to="/login" className={styles.primaryBtn}>{t.common.login}</Link>
         <button className={styles.secondaryBtn} onClick={handleDemo}>
-          Попробовать без регистрации
+          {t.privateOnly.tryDemo}
         </button>
       </div>
     </div>

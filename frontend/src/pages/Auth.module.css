@@ -1,11 +1,21 @@
 /* Auth Page - Full Redesign */
 
 .authPage {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+/* Top-right language switcher, absolutely positioned so it doesn't
+ * disrupt the centred card layout. */
+.authTopBar {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 2;
 }
 
 /* Container */

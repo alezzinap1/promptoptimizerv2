@@ -272,6 +272,12 @@
   background: transparent;
 }
 
+.publicHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .publicHeader::before {
   content: '';
   position: absolute;

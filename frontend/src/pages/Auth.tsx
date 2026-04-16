@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { setAuthSessionId } from '../api/client'
+import { useT } from '../i18n'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 import styles from './Auth.module.css'
 
 // Icons as inline SVGs for simplicity
@@ -51,6 +53,7 @@ const GitHubIcon = () => (
 
 export default function AuthPage() {
   const { user: currentUser, login, register, enterDemoMode, refresh } = useAuth()
+  const { t } = useT()
   const navigate = useNavigate()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
@@ -85,30 +88,31 @@ export default function AuthPage() {
         .then(() => navigate('/home', { replace: true }))
         .catch(() => {
           setAuthSessionId(null)
-          setError('Не удалось войти через GitHub. Попробуйте ещё раз.')
+          setError(t.auth.errors.github)
         })
         .finally(() => setLoading(false))
-      // Clean URL
       window.history.replaceState({}, '', '/login')
     } else if (githubError) {
       if (githubError === 'account_disabled') {
-        setError('Аккаунт отключён. Обратитесь к администратору.')
+        setError(t.auth.errors.githubDisabled)
       } else {
-        setError('Не удалось войти через GitHub. Попробуйте ещё раз.')
+        setError(t.auth.errors.github)
       }
       window.history.replaceState({}, '', '/login')
     }
+    // Intentionally empty deps: only react to initial query string.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const submit = async () => {
     setError(null)
     if (mode === 'register') {
       if (password !== password2) {
-        setError('Пароли не совпадают')
+        setError(t.auth.errors.passwordMismatch)
         return
       }
       if (!email.trim()) {
-        setError('Укажите email')
+        setError(t.auth.errors.emailRequired)
         return
       }
     }
@@ -122,7 +126,7 @@ export default function AuthPage() {
         navigate('/onboarding', { replace: true })
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка авторизации')
+      setError(e instanceof Error ? e.message : t.auth.errors.generic)
     } finally {
       setLoading(false)
     }
@@ -136,6 +140,9 @@ export default function AuthPage() {
 
   return (
     <div className={styles.authPage}>
+      <div className={styles.authTopBar}>
+        <LanguageSwitcher />
+      </div>
       <div className={styles.container}>
         {/* Left Side - Branding */}
         <div className={styles.brandingSide}>
@@ -145,11 +152,9 @@ export default function AuthPage() {
                 <span className={styles.brandLogoGlyph} aria-hidden />
               </div>
             </div>
-            <h1 className={styles.brandTitle}>MetaPrompt</h1>
-            <p className={styles.brandSubtitle}>
-              Оптимизируй промпты с помощью AI. Создавай, тестируй и улучшай свои промпты в одном месте.
-            </p>
-            
+            <h1 className={styles.brandTitle}>{t.auth.brand.title}</h1>
+            <p className={styles.brandSubtitle}>{t.auth.brand.subtitle}</p>
+
             <div className={styles.features}>
               <div className={styles.feature}>
                 <div className={styles.featureIcon}>
@@ -157,7 +162,7 @@ export default function AuthPage() {
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
                 </div>
-                <span>Библиотека промптов</span>
+                <span>{t.auth.brand.features.library}</span>
               </div>
               <div className={styles.feature}>
                 <div className={styles.featureIcon}>
@@ -166,7 +171,7 @@ export default function AuthPage() {
                     <path d="m19 9-5 5-4-4-3 3" />
                   </svg>
                 </div>
-                <span>Аналитика и метрики</span>
+                <span>{t.auth.brand.features.analytics}</span>
               </div>
               <div className={styles.feature}>
                 <div className={styles.featureIcon}>
@@ -175,7 +180,7 @@ export default function AuthPage() {
                     <path d="M12 6v6l4 2" />
                   </svg>
                 </div>
-                <span>История версий</span>
+                <span>{t.auth.brand.features.history}</span>
               </div>
             </div>
           </div>
@@ -185,29 +190,27 @@ export default function AuthPage() {
         <div className={styles.formSide}>
           <div className={styles.card}>
             <div className={styles.cardHeader}>
-              <h2>{mode === 'login' ? 'Добро пожаловать' : 'Создать аккаунт'}</h2>
+              <h2>{mode === 'login' ? t.auth.login.title : t.auth.register.title}</h2>
               <p className={styles.cardCaption}>
-                {mode === 'login' 
-                  ? 'Войдите, чтобы продолжить работу' 
-                  : 'Зарегистрируйтесь для начала работы'}
+                {mode === 'login' ? t.auth.login.caption : t.auth.register.caption}
               </p>
             </div>
 
             <div className={styles.tabs}>
-              <button 
-                className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`} 
+              <button
+                className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`}
                 onClick={() => setMode('login')}
               >
-                Вход
+                {t.auth.login.tab}
               </button>
-              <button 
-                className={`${styles.tab} ${mode === 'register' ? styles.tabActive : ''}`} 
+              <button
+                className={`${styles.tab} ${mode === 'register' ? styles.tabActive : ''}`}
                 onClick={() => setMode('register')}
               >
-                Регистрация
+                {t.auth.register.tab}
               </button>
-              <div 
-                className={styles.tabIndicator} 
+              <div
+                className={styles.tabIndicator}
                 style={{ transform: mode === 'register' ? 'translateX(100%)' : 'translateX(0)' }}
               />
             </div>
@@ -217,13 +220,13 @@ export default function AuthPage() {
                 <div className={styles.inputIcon}>
                   <UserIcon />
                 </div>
-                <input 
+                <input
                   type="text"
-                  value={username} 
-                  onChange={(e) => setUsername(e.target.value)} 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="Имя пользователя"
+                  placeholder={t.auth.placeholder.username}
                   autoComplete="username"
                 />
               </div>
@@ -239,7 +242,7 @@ export default function AuthPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField(null)}
-                    placeholder="Email"
+                    placeholder={t.auth.placeholder.email}
                     autoComplete="email"
                   />
                 </div>
@@ -249,13 +252,13 @@ export default function AuthPage() {
                 <div className={styles.inputIcon}>
                   <LockIcon />
                 </div>
-                <input 
-                  type="password" 
-                  value={password} 
+                <input
+                  type="password"
+                  value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="Пароль"
+                  placeholder={t.auth.placeholder.password}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 />
               </div>
@@ -265,13 +268,13 @@ export default function AuthPage() {
                   <div className={styles.inputIcon}>
                     <LockIcon />
                   </div>
-                  <input 
-                    type="password" 
-                    value={password2} 
+                  <input
+                    type="password"
+                    value={password2}
                     onChange={(e) => setPassword2(e.target.value)}
                     onFocus={() => setFocusedField('password2')}
                     onBlur={() => setFocusedField(null)}
-                    placeholder="Повторите пароль"
+                    placeholder={t.auth.placeholder.password2}
                     autoComplete="new-password"
                   />
                 </div>
@@ -288,35 +291,38 @@ export default function AuthPage() {
                 </div>
               )}
 
-              <button 
-                className={styles.primaryButton} 
-                onClick={submit} 
+              <button
+                className={styles.primaryButton}
+                onClick={submit}
                 disabled={loading || !username || !password || (mode === 'register' && !email)}
               >
-                <span>{loading ? 'Подождите...' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}</span>
+                <span>
+                  {loading
+                    ? t.auth.submitting
+                    : mode === 'login'
+                      ? t.auth.login.submit
+                      : t.auth.register.submit}
+                </span>
                 {!loading && <ArrowRightIcon />}
                 {loading && <div className={styles.spinner} />}
               </button>
-              
+
               <div className={styles.divider}>
-                <span>или</span>
+                <span>{t.auth.divider}</span>
               </div>
 
-              <a
-                href="/api/auth/github"
-                className={styles.githubButton}
-              >
+              <a href="/api/auth/github" className={styles.githubButton}>
                 <GitHubIcon />
-                <span>{mode === 'login' ? 'Войти через GitHub' : 'Зарегистрироваться через GitHub'}</span>
+                <span>{mode === 'login' ? t.auth.github.login : t.auth.github.register}</span>
               </a>
 
-              <button 
-                className={styles.secondaryButton} 
+              <button
+                className={styles.secondaryButton}
                 onClick={enterDemoMode}
                 type="button"
               >
                 <SparklesIcon />
-                <span>Войти как гость (Demo)</span>
+                <span>{t.auth.demo}</span>
               </button>
             </div>
           </div>
