@@ -352,3 +352,76 @@ def admin_model_health_run(
     summary = run_health_check(db)
     db.log_admin_audit(int(admin["id"]), "model_health.run", None, {"summary": summary})
     return {"ok": True, "summary": summary}
+
+
+_VALID_MODES = {"text", "image", "skill"}
+_VALID_TIERS_FOR_OVERRIDE = {"fast", "mid", "advanced", "helper"}
+
+
+@router.get("/tier-overrides")
+def admin_list_tier_overrides(
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+):
+    """
+    Текущие ручные оверрайды + кандидаты из каталога и здоровье моделей —
+    всё нужное, чтобы админ одним экраном выбрал модель под (mode, tier).
+    """
+    _admin_rate_guard(admin)
+    overrides = db.get_tier_overrides()
+    health = {row["model_id"]: row for row in db.list_model_health()}
+    catalog = catalog_summary()
+    override_map = {(o["mode"], o["tier"]): o["model_id"] for o in overrides}
+    rows: list[dict] = []
+    for mode, tiers in catalog.items():
+        for tier, ids in tiers.items():
+            candidates = [
+                {
+                    "id": mid,
+                    "available": bool((health.get(mid) or {}).get("available", 1)),
+                    "reason": (health.get(mid) or {}).get("reason") or "",
+                    "price_completion_per_m": (
+                        float((health.get(mid) or {}).get("last_pricing_completion") or 0.0) * 1_000_000.0
+                    ),
+                }
+                for mid in ids
+            ]
+            rows.append(
+                {
+                    "mode": mode,
+                    "tier": tier,
+                    "override": override_map.get((mode, tier), ""),
+                    "candidates": candidates,
+                }
+            )
+    return {"rows": rows}
+
+
+@router.put("/tier-overrides")
+def admin_set_tier_override(
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+    mode: str = Body(..., embed=True),
+    tier: str = Body(..., embed=True),
+    model_id: str | None = Body(None, embed=True),
+):
+    """Задать или сбросить (mode, tier) → model_id. `model_id=null` → авто (каталог+health)."""
+    _admin_rate_guard(admin)
+    if mode not in _VALID_MODES:
+        raise HTTPException(400, f"mode must be one of {sorted(_VALID_MODES)}")
+    if tier not in _VALID_TIERS_FOR_OVERRIDE:
+        raise HTTPException(400, f"tier must be one of {sorted(_VALID_TIERS_FOR_OVERRIDE)}")
+    cleaned = (model_id or "").strip() or None
+    if cleaned:
+        catalog = catalog_summary()
+        valid_ids = set(catalog.get(mode, {}).get(tier, []))
+        if cleaned not in valid_ids:
+            raise HTTPException(400, f"model_id must be one of catalog candidates for {mode}/{tier}")
+    db.set_tier_override(mode, tier, cleaned)
+    db.log_admin_audit(
+        int(admin["id"]),
+        "tier_override.set",
+        None,
+        {"mode": mode, "tier": tier, "model_id": cleaned or ""},
+    )
+    return {"ok": True, "mode": mode, "tier": tier, "model_id": cleaned or ""}

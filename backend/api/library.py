@@ -11,6 +11,7 @@ from config.settings import TRIAL_MAX_COMPLETION_PER_M
 from services.trial_budget import effective_trial_tokens_limit
 from core.quality_metrics import analyze_prompt
 from db.manager import DBManager
+from services import translator
 from services.api_key_resolver import resolve_openrouter_api_key
 from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
 from services.openrouter_models import completion_price_per_m, get_model_pricing
@@ -185,6 +186,71 @@ def llm_review_prompt(
         user_id=user_id,
     )
     return LlmReviewResponse(review=review, judge_model=_or_model_id(gen))
+
+
+class LibraryTranslateResponse(BaseModel):
+    id: int
+    prompt: str
+    prompt_lang: str
+    prompt_alt: str
+    prompt_alt_lang: str
+    provider: str
+
+
+@router.post("/library/{item_id}/translate", response_model=LibraryTranslateResponse)
+def translate_library_item(
+    item_id: int,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+):
+    """
+    Перевести сохранённый промпт (RU↔EN, авто-направление) и сохранить альт-версию
+    рядом с оригиналом. Использует бесплатный `services.translator` (без LLM).
+    """
+    user_id = int(user["id"])
+    item = db.get_library_item(item_id, user_id=user_id)
+    if not item:
+        raise HTTPException(404, "Промпт не найден.")
+    source = str(item.get("prompt") or "").strip()
+    if not source:
+        raise HTTPException(400, "В промпте нет текста.")
+
+    try:
+        result = translator.translate(source, "auto")
+    except RuntimeError as exc:
+        raise HTTPException(503, f"Перевод временно недоступен: {exc}") from exc
+
+    direction = str(result["direction"])  # ru->en | en->ru
+    src_lang = "ru" if direction == "ru->en" else "en"
+    tgt_lang = "en" if direction == "ru->en" else "ru"
+
+    db.set_prompt_library_translation(
+        item_id,
+        prompt_lang=src_lang,
+        prompt_alt=str(result["translated"] or ""),
+        prompt_alt_lang=tgt_lang,
+        user_id=user_id,
+    )
+    db.log_event(
+        "library_translate",
+        session_id="",
+        payload={
+            "item_id": item_id,
+            "direction": direction,
+            "provider": result.get("provider"),
+            "chars_in": len(source),
+            "chars_out": len(str(result["translated"] or "")),
+        },
+        user_id=user_id,
+    )
+    return LibraryTranslateResponse(
+        id=item_id,
+        prompt=source,
+        prompt_lang=src_lang,
+        prompt_alt=str(result["translated"] or ""),
+        prompt_alt_lang=tgt_lang,
+        provider=str(result.get("provider") or "unknown"),
+    )
 
 
 @router.delete("/library/{item_id}")

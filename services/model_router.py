@@ -42,6 +42,23 @@ def _pricing_per_m(db: DBManager, model_id: str) -> float:
         return 0.0
 
 
+def _resolve_override(db: DBManager, mode: Mode, tier: Tier) -> str | None:
+    """
+    Админский ручной оверрайд (mode, tier) → model_id. Учитываем override, только если
+    модель проходит health-check; иначе падаем на каталог (оверрайд не должен блокировать
+    пользователя, если админ забыл обновить выбор).
+    """
+    try:
+        override = db.get_tier_override(mode, tier)
+    except Exception:  # noqa: BLE001
+        return None
+    if not override:
+        return None
+    if not is_available(db, override):
+        return None
+    return override
+
+
 def resolve(
     db: DBManager,
     tier: Tier,
@@ -51,6 +68,15 @@ def resolve(
 ) -> tuple[str, str]:
     """Вернуть (model_id, reasoning). Никогда не бросает; если каталог пуст — пустая строка."""
     reasoning_parts: list[str] = [f"tier={tier} mode={mode} trial={trial}"]
+    # Приоритет: ручной оверрайд для запрошенного тира (если доступен и в бюджете).
+    effective_tier_for_override: Tier = "mid" if tier == "auto" else tier
+    override = _resolve_override(db, mode, effective_tier_for_override)
+    if override:
+        if trial and _pricing_per_m(db, override) > TRIAL_MAX_COMPLETION_PER_M:
+            reasoning_parts.append(f"override_skip({override}:trial_over_budget)")
+        else:
+            reasoning_parts.append(f"override_picked={override}")
+            return override, " | ".join(reasoning_parts)
     for try_tier in _fallback_order(tier, trial):
         picked = pick_first_available(db, mode, try_tier)
         if not picked:
@@ -69,6 +95,9 @@ def resolve(
 
 def helper_for(db: DBManager, mode: Mode = "text") -> str:
     """Helper-модель для промежуточных шагов advanced-режима (классификация, критика, перевод)."""
+    override = _resolve_override(db, mode, "helper")  # type: ignore[arg-type]
+    if override:
+        return override
     picked = pick_first_available(db, mode, "helper")
     if picked:
         return picked

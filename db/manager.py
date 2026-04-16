@@ -180,6 +180,7 @@ class DBManager:
             self._migrate_phase14_admin_flags(conn)
             self._migrate_phase15_user_usage_limits(conn)
             self._migrate_phase16_model_health(conn)
+            self._migrate_phase17_prompt_alt_and_tier_overrides(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -416,6 +417,26 @@ class DBManager:
                 event           TEXT NOT NULL,
                 detail          TEXT NOT NULL DEFAULT '',
                 created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    def _migrate_phase17_prompt_alt_and_tier_overrides(self, conn: sqlite3.Connection) -> None:
+        """
+        Бесплатный перевод без LLM: альтернативная языковая версия промпта
+        хранится рядом с оригиналом. Админские оверрайды модели под (mode, tier).
+        """
+        self._safe_add_column(conn, "prompt_library", "prompt_alt", "TEXT DEFAULT ''")
+        self._safe_add_column(conn, "prompt_library", "prompt_lang", "TEXT DEFAULT ''")
+        self._safe_add_column(conn, "prompt_library", "prompt_alt_lang", "TEXT DEFAULT ''")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_tier_overrides (
+                mode        TEXT NOT NULL,
+                tier        TEXT NOT NULL,
+                model_id    TEXT NOT NULL,
+                updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (mode, tier)
             )
             """
         )
@@ -1384,6 +1405,95 @@ class DBManager:
                 (max(1, int(limit)),),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # ─── Tier overrides (Phase 17) ─────────────────────────────────────────────
+
+    def get_tier_overrides(self) -> list[dict]:
+        """Все активные оверрайды (mode, tier) → model_id."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT mode, tier, model_id, updated_at FROM model_tier_overrides"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_tier_override(self, mode: str, tier: str) -> str | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT model_id FROM model_tier_overrides WHERE mode = ? AND tier = ?",
+                (mode, tier),
+            ).fetchone()
+        return str(row["model_id"]) if row else None
+
+    def set_tier_override(self, mode: str, tier: str, model_id: str | None) -> None:
+        """`model_id=None` сбрасывает оверрайд (авто-режим)."""
+        with self._conn() as conn:
+            if not model_id:
+                conn.execute(
+                    "DELETE FROM model_tier_overrides WHERE mode = ? AND tier = ?",
+                    (mode, tier),
+                )
+                return
+            conn.execute(
+                """
+                INSERT INTO model_tier_overrides (mode, tier, model_id, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(mode, tier) DO UPDATE SET
+                    model_id = excluded.model_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (mode, tier, model_id),
+            )
+
+    # ─── Prompt library translation (Phase 17) ─────────────────────────────────
+
+    def set_prompt_library_translation(
+        self,
+        item_id: int,
+        *,
+        prompt_lang: str,
+        prompt_alt: str,
+        prompt_alt_lang: str,
+        user_id: int | None = None,
+    ) -> bool:
+        with self._conn() as conn:
+            if user_id is None:
+                cur = conn.execute(
+                    """
+                    UPDATE prompt_library
+                    SET prompt_lang = ?, prompt_alt = ?, prompt_alt_lang = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (prompt_lang, prompt_alt, prompt_alt_lang, item_id),
+                )
+            else:
+                cur = conn.execute(
+                    """
+                    UPDATE prompt_library
+                    SET prompt_lang = ?, prompt_alt = ?, prompt_alt_lang = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND user_id = ?
+                    """,
+                    (prompt_lang, prompt_alt, prompt_alt_lang, item_id, user_id),
+                )
+        return cur.rowcount > 0
+
+    def get_library_item(self, item_id: int, user_id: int | None = None) -> dict | None:
+        with self._conn() as conn:
+            if user_id is None:
+                row = conn.execute("SELECT * FROM prompt_library WHERE id = ?", (item_id,)).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM prompt_library WHERE id = ? AND user_id = ?",
+                    (item_id, user_id),
+                ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        for field in ("tags", "techniques"):
+            try:
+                d[field] = json.loads(d[field]) if d[field] else []
+            except Exception:
+                d[field] = []
+        return d
 
     # ─── Product events / metrics ──────────────────────────────────────────────
 

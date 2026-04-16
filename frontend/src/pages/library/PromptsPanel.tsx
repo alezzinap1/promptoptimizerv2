@@ -44,6 +44,9 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
   const [evalLoading, setEvalLoading] = useState(false)
   const [tagPaintTick, setTagPaintTick] = useState(0)
   const [publishItem, setPublishItem] = useState<LibraryItem | null>(null)
+  const [langView, setLangView] = useState<Record<number, 'primary' | 'alt'>>({})
+  const [translating, setTranslating] = useState<Record<number, boolean>>({})
+  const [translateErr, setTranslateErr] = useState<Record<number, string>>({})
 
   useEffect(() => {
     const onPaint = () => setTagPaintTick((t) => t + 1)
@@ -150,6 +153,50 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
 
   const gridClass = gridCols === 4 ? styles.grid4 : styles.grid3
 
+  const displayPromptFor = (item: LibraryItem): { text: string; lang: string } => {
+    const view = langView[item.id] || 'primary'
+    if (view === 'alt' && item.prompt_alt) {
+      return { text: item.prompt_alt, lang: (item.prompt_alt_lang || '').toUpperCase() || 'ALT' }
+    }
+    return { text: item.prompt, lang: (item.prompt_lang || '').toUpperCase() || '' }
+  }
+
+  const handleTranslate = async (item: LibraryItem) => {
+    setTranslating((prev) => ({ ...prev, [item.id]: true }))
+    setTranslateErr((prev) => {
+      const next = { ...prev }
+      delete next[item.id]
+      return next
+    })
+    try {
+      const res = await api.translateLibraryItem(item.id)
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === item.id
+            ? {
+                ...x,
+                prompt_alt: res.prompt_alt,
+                prompt_alt_lang: res.prompt_alt_lang,
+                prompt_lang: res.prompt_lang,
+              }
+            : x,
+        ),
+      )
+      setLangView((prev) => ({ ...prev, [item.id]: 'alt' }))
+    } catch (e) {
+      setTranslateErr((prev) => ({
+        ...prev,
+        [item.id]: e instanceof Error ? e.message : 'Ошибка перевода',
+      }))
+    } finally {
+      setTranslating((prev) => {
+        const next = { ...prev }
+        delete next[item.id]
+        return next
+      })
+    }
+  }
+
   return (
     <div className={styles.library}>
       <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
@@ -201,14 +248,22 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
         <p className={styles.empty}>Нет сохранённых промптов</p>
       ) : (
         <div key={tagPaintTick} className={`${styles.grid} ${gridClass}`}>
-          {sorted.map((item) => (
+          {sorted.map((item) => {
+            const { text: promptText, lang: promptLang } = displayPromptFor(item)
+            const hasAlt = Boolean((item.prompt_alt || '').trim())
+            const currentView = langView[item.id] || 'primary'
+            const otherLang =
+              currentView === 'primary'
+                ? (item.prompt_alt_lang || '').toUpperCase()
+                : (item.prompt_lang || '').toUpperCase()
+            return (
             <div key={item.id} className={styles.card}>
               <button
                 type="button"
                 className={styles.cardTitleBtn}
                 title="Открыть на Студии с этим промптом"
                 onClick={() =>
-                  navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${item.prompt}`, clearResult: true } })
+                  navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true } })
                 }
               >
                 {item.title}
@@ -244,14 +299,66 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   {ratingLabel(item.rating)}
                 </span>
                 <span className={styles.tokenBadgeMini} title="Приблизительное количество токенов">
-                  ≈{Math.max(1, Math.round(item.prompt.length / 3.5)).toLocaleString()} tok
+                  ≈{Math.max(1, Math.round(promptText.length / 3.5)).toLocaleString()} tok
                 </span>
+                {hasAlt ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLangView((prev) => ({
+                        ...prev,
+                        [item.id]: currentView === 'primary' ? 'alt' : 'primary',
+                      }))
+                    }
+                    title={`Показать ${otherLang || 'другую'} версию`}
+                    style={{
+                      fontSize: 10,
+                      padding: '1px 7px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      background: 'rgba(255,255,255,0.04)',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      lineHeight: '16px',
+                    }}
+                  >
+                    {promptLang || (currentView === 'primary' ? 'A' : 'B')} ⇄ {otherLang || '?'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleTranslate(item)}
+                    disabled={Boolean(translating[item.id])}
+                    title="Перевести RU↔EN (бесплатно, без LLM)"
+                    style={{
+                      fontSize: 10,
+                      padding: '1px 7px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      background: 'rgba(255,255,255,0.04)',
+                      color: 'inherit',
+                      cursor: translating[item.id] ? 'wait' : 'pointer',
+                      lineHeight: '16px',
+                      opacity: translating[item.id] ? 0.6 : 1,
+                    }}
+                  >
+                    {translating[item.id] ? '…' : '🌐 RU↔EN'}
+                  </button>
+                )}
+                {translateErr[item.id] ? (
+                  <span
+                    title={translateErr[item.id]}
+                    style={{ fontSize: 10, color: '#f87171' }}
+                  >
+                    ошибка
+                  </span>
+                ) : null}
               </p>
               {item.tags.length > 0 ? <LibraryTagChips tags={item.tags} className={styles.tagChipsMargin} /> : null}
               <div className={styles.promptBlock}>
                 <pre className={styles.preview}>
-                  {item.prompt.slice(0, 200)}
-                  {item.prompt.length > 200 ? '…' : ''}
+                  {promptText.slice(0, 200)}
+                  {promptText.length > 200 ? '…' : ''}
                 </pre>
               </div>
               <div className={styles.cardActions}>
@@ -260,7 +367,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   className={`${styles.openBtn} ${styles.openBtnAccent} btn-primary`}
                   title="Открыть на Студии с этим промптом"
                   onClick={() =>
-                    navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${item.prompt}`, clearResult: true } })
+                    navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true } })
                   }
                 >
                   <svg className={styles.openBtnIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -271,14 +378,14 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   Открыть
                 </button>
                 <TryInGeminiButton
-                  prompt={item.prompt}
+                  prompt={promptText}
                   title={
                     isImagePrompt(item)
                       ? 'Скопировать и открыть чат ИИ (для изображений часто выбирают Gemini)'
                       : 'Скопировать промпт и открыть чат ИИ'
                   }
                 />
-                <CopyIconButton text={item.prompt} title="Копировать текст промпта в буфер обмена" />
+                <CopyIconButton text={promptText} title="Копировать текст промпта в буфер обмена" />
                 <details className={styles.cardMore}>
                   <summary className={styles.cardMoreSummary} title="Другие действия">
                     Ещё
@@ -394,7 +501,8 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                 </div>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

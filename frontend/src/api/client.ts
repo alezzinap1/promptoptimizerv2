@@ -446,6 +446,10 @@ export interface LibraryItem {
   cover_image_path?: string
   created_at: string
   updated_at: string
+  /** Альтернативная языковая версия промпта (свободный перевод MyMemory/Lingva, без LLM). */
+  prompt_alt?: string
+  prompt_lang?: string
+  prompt_alt_lang?: string
 }
 
 export interface CommunityPrompt {
@@ -663,11 +667,39 @@ export const api = {
   adminModelHealth: () => fetchApi<AdminModelHealth>(`/admin/model-health`),
   adminRunModelHealth: () =>
     fetchApi<{ ok: boolean; summary: Record<string, unknown> }>(`/admin/model-health/run`, { method: 'POST' }),
+  demoGenerate: (task: string) =>
+    fetchApi<{ prompt_block: string; tier_used: string; model_category: string }>(`/demo/generate`, {
+      method: 'POST',
+      body: JSON.stringify({ task }),
+    }),
   translate: (req: { text: string; direction?: 'ru->en' | 'en->ru' | 'auto'; kind?: 'prompt' | 'skill' | 'plain' }) =>
-    fetchApi<{ translated: string; direction: string; detected_language: string | null; model_used: string }>(
+    fetchApi<{ translated: string; direction: string; detected_language: string | null; provider: string }>(
       '/translate',
       { method: 'POST', body: JSON.stringify(req) },
     ),
+  translateLibraryItem: (id: number) =>
+    fetchApi<{
+      id: number
+      prompt: string
+      prompt_lang: string
+      prompt_alt: string
+      prompt_alt_lang: string
+      provider: string
+    }>(`/library/${id}/translate`, { method: 'POST' }),
+  adminListTierOverrides: () =>
+    fetchApi<{
+      rows: {
+        mode: string
+        tier: string
+        override: string
+        candidates: { id: string; available: boolean; reason: string; price_completion_per_m: number }[]
+      }[]
+    }>(`/admin/tier-overrides`),
+  adminSetTierOverride: (req: { mode: string; tier: string; model_id: string | null }) =>
+    fetchApi<{ ok: boolean; mode: string; tier: string; model_id: string }>(`/admin/tier-overrides`, {
+      method: 'PUT',
+      body: JSON.stringify(req),
+    }),
   adminPatchUserLimits: (
     id: number,
     body: {

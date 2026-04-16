@@ -75,6 +75,9 @@ _admin_api_limiter = RateLimiter(
     max_requests=ADMIN_API_RATE_LIMIT_REQUESTS,
     window_sec=float(ADMIN_API_RATE_WINDOW_SEC),
 )
+# Публичный демо-эндпоинт: 5 запросов за 5 минут с одного IP.
+_demo_ip_limiter = RateLimiter(max_requests=5, window_sec=300.0)
+_demo_ip_day_limiter = RateLimiter(max_requests=20, window_sec=86400.0)
 
 
 def client_ip(request: Request) -> str:
@@ -97,6 +100,14 @@ def check_auth_login_rate_limit(request: Request) -> tuple[bool, str]:
 
 def check_admin_api_rate_limit(admin_user_id: int) -> tuple[bool, str]:
     return _admin_api_limiter.allow(f"admin_api:{admin_user_id}")
+
+
+def check_demo_rate_limit(request: Request) -> tuple[bool, str]:
+    ip = client_ip(request)
+    ok, err = _demo_ip_day_limiter.allow(f"demo_day:{ip}")
+    if not ok:
+        return False, "Демо-квота на сутки исчерпана. Войдите, чтобы продолжить бесплатно."
+    return _demo_ip_limiter.allow(f"demo_5m:{ip}")
 
 
 def check_rate_limit(session_id: str, max_requests_override: int | None = None) -> tuple[bool, str]:

@@ -3,6 +3,110 @@ import { Link, Navigate } from 'react-router-dom'
 import { api, type AdminMetrics, type AdminModelHealth } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 
+type TierOverrideRow = {
+  mode: string
+  tier: string
+  override: string
+  candidates: { id: string; available: boolean; reason: string; price_completion_per_m: number }[]
+}
+
+function TierOverridesPanel() {
+  const [rows, setRows] = useState<TierOverrideRow[]>([])
+  const [err, setErr] = useState<string | null>(null)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+
+  const load = () => {
+    setErr(null)
+    api
+      .adminListTierOverrides()
+      .then((r) => setRows(r.rows))
+      .catch((e) => setErr(e instanceof Error ? e.message : 'Ошибка'))
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const save = async (mode: string, tier: string, model_id: string) => {
+    const key = `${mode}/${tier}`
+    setSavingKey(key)
+    setErr(null)
+    try {
+      await api.adminSetTierOverride({ mode, tier, model_id: model_id || null })
+      setRows((prev) =>
+        prev.map((r) => (r.mode === mode && r.tier === tier ? { ...r, override: model_id } : r)),
+      )
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, opacity: 0.75, margin: '0 0 8px' }}>
+        Ручной выбор модели для каждой (mode × tier). «Авто» = выбирает каталог по healthcheck.
+        Оверрайд игнорируется, если выбранная модель стала недоступна (тогда работает авто-каталог).
+      </p>
+      {err ? <p style={{ color: '#f87171', fontSize: 12 }}>{err}</p> : null}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.12)', textAlign: 'left' }}>
+            <th style={{ padding: '6px 8px' }}>Режим</th>
+            <th style={{ padding: '6px 8px' }}>Тир</th>
+            <th style={{ padding: '6px 8px' }}>Выбор</th>
+            <th style={{ padding: '6px 8px' }}>Кандидаты</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const key = `${r.mode}/${r.tier}`
+            const isSaving = savingKey === key
+            return (
+              <tr key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <td style={{ padding: '4px 8px' }}>{r.mode}</td>
+                <td style={{ padding: '4px 8px' }}>{r.tier}</td>
+                <td style={{ padding: '4px 8px' }}>
+                  <select
+                    value={r.override}
+                    disabled={isSaving}
+                    onChange={(e) => void save(r.mode, r.tier, e.target.value)}
+                    style={{
+                      fontSize: 11,
+                      padding: '3px 6px',
+                      background: 'rgba(255,255,255,0.03)',
+                      color: 'inherit',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 6,
+                      minWidth: 220,
+                    }}
+                  >
+                    <option value="">Авто (каталог)</option>
+                    {r.candidates.map((c) => (
+                      <option key={c.id} value={c.id} disabled={!c.available}>
+                        {c.id} {c.available ? '' : '— недоступна'}
+                        {c.price_completion_per_m > 0 ? ` · $${c.price_completion_per_m.toFixed(2)}/1M` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td style={{ padding: '4px 8px', opacity: 0.75 }}>
+                  {r.candidates
+                    .slice(0, 3)
+                    .map((c) => c.id)
+                    .join(', ')}
+                  {r.candidates.length > 3 ? ` +${r.candidates.length - 3}` : ''}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function formatNum(n: number): string {
   return n.toLocaleString('ru-RU')
 }
@@ -202,7 +306,10 @@ export default function AdminDashboard() {
               })}
             </tbody>
           </table>
-          <h2 style={{ fontSize: '1rem', margin: '12px 0 6px', opacity: 0.9 }}>События health-check (50)</h2>
+          <h2 style={{ fontSize: '1rem', margin: '20px 0 6px', opacity: 0.9 }}>Ручной выбор моделей (override)</h2>
+          <TierOverridesPanel />
+
+          <h2 style={{ fontSize: '1rem', margin: '20px 0 6px', opacity: 0.9 }}>События health-check (50)</h2>
           <ul style={{ listStyle: 'none', padding: 0, fontSize: 12 }}>
             {health.events.length === 0 ? (
               <li style={{ opacity: 0.7 }}>Событий нет.</li>

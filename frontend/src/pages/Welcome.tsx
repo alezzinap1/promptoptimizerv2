@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { api } from '../api/client'
 import styles from './Landing.module.css'
 
 const SparklesIcon = () => (
@@ -59,12 +61,35 @@ const features = [
 export default function Welcome() {
   const { user, enterDemoMode } = useAuth()
   const navigate = useNavigate()
+  const [demoTask, setDemoTask] = useState('')
+  const [demoBusy, setDemoBusy] = useState(false)
+  const [demoResult, setDemoResult] = useState<string>('')
+  const [demoError, setDemoError] = useState<string | null>(null)
 
   if (user) return <Navigate to="/home" replace />
 
   const handleDemo = () => {
     enterDemoMode()
     navigate('/home')
+  }
+
+  const runQuickDemo = async () => {
+    const task = demoTask.trim()
+    if (task.length < 3) {
+      setDemoError('Опишите задачу хотя бы одним предложением.')
+      return
+    }
+    setDemoBusy(true)
+    setDemoError(null)
+    setDemoResult('')
+    try {
+      const r = await api.demoGenerate(task)
+      setDemoResult(r.prompt_block)
+    } catch (e) {
+      setDemoError(e instanceof Error ? e.message : 'Демо временно недоступно.')
+    } finally {
+      setDemoBusy(false)
+    }
   }
 
   return (
@@ -96,6 +121,73 @@ export default function Welcome() {
               <SparklesIcon />
               Попробовать без регистрации
             </button>
+          </div>
+
+          <div
+            style={{
+              marginTop: 28,
+              padding: 16,
+              border: '1px solid rgba(255,255,255,0.09)',
+              borderRadius: 14,
+              background: 'rgba(255,255,255,0.03)',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              Быстрое демо — одна генерация прямо здесь
+            </div>
+            <p style={{ fontSize: 12, opacity: 0.75, margin: '0 0 10px' }}>
+              Введите задачу одним предложением. Мы соберём для неё готовый структурированный промпт.
+              Без входа и ключей. Лимит: 5 запросов в 5 минут с одного IP.
+            </p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+              <textarea
+                rows={2}
+                value={demoTask}
+                onChange={(e) => setDemoTask(e.target.value)}
+                placeholder="Например: напиши промпт для генерации описания товара в интернет-магазине."
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  fontSize: 13,
+                  background: 'rgba(0,0,0,0.25)',
+                  color: 'inherit',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 8,
+                  resize: 'vertical',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void runQuickDemo()}
+                disabled={demoBusy}
+                className={styles.primaryBtn}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                {demoBusy ? 'Генерирую…' : 'Сгенерировать'}
+              </button>
+            </div>
+            {demoError ? (
+              <p style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{demoError}</p>
+            ) : null}
+            {demoResult ? (
+              <pre
+                style={{
+                  marginTop: 10,
+                  padding: 12,
+                  background: 'rgba(0,0,0,0.35)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10,
+                  whiteSpace: 'pre-wrap',
+                  fontSize: 12.5,
+                  lineHeight: 1.5,
+                  maxHeight: 360,
+                  overflow: 'auto',
+                }}
+              >
+                {demoResult}
+              </pre>
+            ) : null}
           </div>
         </div>
 
