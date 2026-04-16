@@ -193,6 +193,91 @@ def compare_prompts(
     }
 
 
+class RunOnTargetRequest(BaseModel):
+    """Execute an already-built prompt on a specific target model.
+
+    Used by Compare v2 to attach concrete outputs to prompts A and B, and
+    by "Prompts" mode where the user pastes two prompts directly and wants
+    to see both run on the same target before picking a winner.
+    """
+    prompt: str
+    target_model: str
+    task_input: str = ""
+    temperature: float = 0.7
+    top_p: float | None = 1.0
+
+
+@router.post("/compare/run-on-target")
+def compare_run_on_target(
+    req: RunOnTargetRequest,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+    auth_session_id: str | None = Depends(get_session_id),
+):
+    ok, err = check_input_size(req.prompt)
+    if not ok:
+        raise HTTPException(400, err)
+    ok, err = check_user_rate_limit(db, int(user["id"]), auth_session_id)
+    if not ok:
+        raise HTTPException(429, err)
+
+    target = (req.target_model or "").strip()
+    if not target or target == "unknown":
+        raise HTTPException(400, "target_model is required for run-on-target.")
+
+    user_id = int(user["id"])
+    user_key = db.get_user_openrouter_api_key(user_id)
+    api_key = resolve_openrouter_api_key(user_key)
+    if not api_key:
+        raise HTTPException(500, "OpenRouter API key not set. Введите свой ключ в Настройках.")
+
+    using_host_key = not bool(user_key)
+    model_id = _get_openrouter_model_id(target)
+    if using_host_key:
+        usage = db.get_user_usage(user_id)
+        lim = effective_trial_tokens_limit(usage)
+        if usage["tokens_used"] >= lim:
+            raise HTTPException(402, f"Пробный лимит ({lim:,} токенов) исчерпан.")
+        if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
+            raise HTTPException(403, "Целевая модель недоступна в пробном режиме. Введите свой API ключ.")
+
+    llm = LLMClient(api_key)
+    eff_temp = min(float(req.temperature), _GENERATION_TEMPERATURE_CAP)
+
+    # The "prompt" is already the full instruction, so we send it as the
+    # system message. When the user also provides a task_input it becomes
+    # the user turn; otherwise we nudge the model to act on the prompt.
+    system = req.prompt
+    user_content = (req.task_input or "").strip() or "Выполни инструкцию выше."
+
+    output = ""
+    for chunk in llm.stream(system, user_content, target, eff_temp, top_p=req.top_p):
+        output += chunk
+
+    prompt_price, comp_price = get_model_pricing(model_id)
+    input_len = len(system) + len(user_content)
+    output_len = len(output)
+    tokens_used = (input_len + output_len) // 4
+    cost = (input_len // 4) * prompt_price + (output_len // 4) * comp_price
+
+    if using_host_key:
+        db.add_user_usage(user_id, tokens_used, cost)
+
+    db.log_event(
+        event_name="compare_run_on_target",
+        session_id=auth_session_id or "",
+        payload={"target_model": target, "tokens": tokens_used},
+        user_id=user_id,
+    )
+
+    return {
+        "output": output,
+        "target_model": target,
+        "tokens_used": tokens_used,
+        "cost_usd": cost,
+    }
+
+
 class CompareJudgeRequest(BaseModel):
     task_input: str
     prompt_a: str

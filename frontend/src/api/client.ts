@@ -828,6 +828,18 @@ export const api = {
   compareJudge: (req: { task_input: string; prompt_a: string; prompt_b: string; judge_model?: string }) =>
     fetchApi<CompareJudgeResponse>('/compare/judge', { method: 'POST', body: JSON.stringify(req) }),
 
+  compareRunOnTarget: (req: {
+    prompt: string
+    target_model: string
+    task_input?: string
+    temperature?: number
+    top_p?: number
+  }) =>
+    fetchApi<{ output: string; target_model: string; tokens_used: number; cost_usd: number }>(
+      '/compare/run-on-target',
+      { method: 'POST', body: JSON.stringify(req) },
+    ),
+
   getLibrary: (params?: { target_model?: string; task_type?: string; search?: string }) => {
     return fetchApi<{ items: LibraryItem[] }>(`/library${toQueryString(params)}`)
   },

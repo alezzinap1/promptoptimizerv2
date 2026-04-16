@@ -495,8 +495,320 @@
   opacity: 0.95;
 }
 
+/* ---- Compare v2 additions (Phase 8) -------------------------------- */
+
+/* Mode tabs at the top of the page. */
+.modeTabs {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 14px;
+  flex-wrap: wrap;
+}
+
+.modeTab,
+.modeTabActive {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: var(--r-card, 12px);
+  border: 1px solid color-mix(in srgb, var(--muted) 25%, transparent);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast, 120ms) ease,
+    border-color var(--duration-fast, 120ms) ease,
+    background var(--duration-fast, 120ms) ease;
+  min-width: 160px;
+  text-align: left;
+}
+
+.modeTab:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.modeTab:hover:not(:disabled) {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.modeTabActive {
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+.modeTabLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.modeTabHint {
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+
+/* Prompts mode — paste-two-prompts workspace. */
+.pastedBlock {
+  margin: 0 0 16px;
+}
+
+.pastedGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pastedTextarea {
+  width: 100%;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: var(--r-control, 10px);
+  border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.pastedToolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* Coming-soon stub for Models mode. */
+.comingSoonCard {
+  padding: 22px;
+  border-radius: var(--r-card, 14px);
+  border: 1px dashed color-mix(in srgb, var(--muted) 40%, transparent);
+  background: color-mix(in srgb, var(--panel) 50%, transparent);
+  color: var(--muted);
+  max-width: 640px;
+}
+
+.comingSoonEyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.comingSoonTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.comingSoonBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Diff block (prompts & outputs). */
+.diffBlock {
+  margin: 12px 0 4px;
+  padding: 8px 12px;
+  border-radius: var(--r-control, 10px);
+  border: 1px solid color-mix(in srgb, var(--muted) 20%, transparent);
+  background: color-mix(in srgb, var(--panel) 40%, transparent);
+}
+
+.diffSummary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.diffSummary:hover {
+  color: var(--text);
+}
+
+/* Run-on-target bar. */
+.runOnTargetBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 6px;
+  padding: 10px 12px;
+  border-radius: var(--r-card, 12px);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.runOnTargetTitle {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
+  flex: 1 1 auto;
+}
+
+/* Outputs header strip. */
+.outputsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin: 14px 0 6px;
+  flex-wrap: wrap;
+}
+
+.outputsTitle {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.outputsCost {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Judge toggle — pick whether to judge prompts or outputs. */
+.judgeToggle {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  overflow: hidden;
+}
+
+.judgeToggleBtn,
+.judgeToggleActive {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+  transition: background var(--duration-fast, 120ms) ease, color var(--duration-fast, 120ms) ease;
+}
+
+.judgeToggleBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.judgeToggleBtn:hover:not(:disabled):not(.judgeToggleActive) {
+  color: var(--text);
+}
+
+.judgeToggleActive {
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* Structured judge card (replaces the old JSON-stringify dump). */
+.judgeCard {
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border-radius: var(--r-card, 14px);
+  border: 1px solid color-mix(in srgb, var(--muted) 25%, transparent);
+  background: var(--panel);
+}
+
+.judgeCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.judgeWinnerA,
+.judgeWinnerB,
+.judgeWinnerTie {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.judgeWinnerA {
+  background: color-mix(in srgb, #4f8cff 18%, transparent);
+  color: color-mix(in srgb, #4f8cff 85%, var(--text));
+  border: 1px solid color-mix(in srgb, #4f8cff 40%, transparent);
+}
+
+.judgeWinnerB {
+  background: color-mix(in srgb, #ff8c4f 18%, transparent);
+  color: color-mix(in srgb, #ff8c4f 85%, var(--text));
+  border: 1px solid color-mix(in srgb, #ff8c4f 40%, transparent);
+}
+
+.judgeWinnerTie {
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+}
+
+.judgeMeta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.judgeScoreGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.judgeScoreItem {
+  padding: 8px 10px;
+  border-radius: var(--r-control, 10px);
+  background: color-mix(in srgb, var(--panel-strong, var(--bg)) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--muted) 20%, transparent);
+}
+
+.judgeScoreKey {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.judgeScoreVal {
+  font-size: 14px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* Winner actions row. */
+.winnerActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.winnerBtn {
+  min-width: 220px;
+}
+
 @media (max-width: 800px) {
   .results {
     grid-template-columns: 1fr;
+  }
+  .pastedGrid {
+    grid-template-columns: 1fr;
+  }
+  .modeTab,
+  .modeTabActive {
+    min-width: 0;
+    flex: 1 1 auto;
   }
 }
