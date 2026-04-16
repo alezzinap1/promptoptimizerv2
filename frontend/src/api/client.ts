@@ -403,6 +403,10 @@ export interface Settings {
   task_classifier_model?: string
   /** Модель для кнопки «Проба картинки»: полный id OpenRouter или короткий ключ */
   image_try_model?: string
+  /** Цель, выбранная в 3-шаговом онбординге. Пусто — не задано. */
+  user_goal?: '' | 'work' | 'study' | 'own'
+  /** Тир по умолчанию для Studio/Simple Improve. Пусто — авто-логика по платформе. */
+  default_tier?: '' | 'auto' | 'fast' | 'mid' | 'advanced'
 }
 
 export interface SimpleImproveResponse {
@@ -727,6 +731,8 @@ export const api = {
     task_classification_mode?: string
     task_classifier_model?: string
     image_try_model?: string
+    user_goal?: '' | 'work' | 'study' | 'own'
+    default_tier?: '' | 'auto' | 'fast' | 'mid' | 'advanced'
   }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
 

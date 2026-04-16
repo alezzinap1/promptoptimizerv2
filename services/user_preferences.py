@@ -41,6 +41,9 @@ LEGACY_PALETTE_MAP = {
     "ocean": "aurora",
     "mono": "obsidian",
 }
+VALID_USER_GOALS = frozenset({"", "work", "study", "own"})
+VALID_DEFAULT_TIERS = frozenset({"", "auto", "fast", "mid", "advanced"})
+
 VALID_UI_FONTS = frozenset({"plusjakarta", "inter", "dmsans", "geist"})
 LEGACY_FONT_MAP = {
     "jetbrains": "plusjakarta",
@@ -67,6 +70,16 @@ def _normalize_ui_font(raw: str | None) -> str:
 def _normalize_color_mode(raw: str | None) -> str:
     v = str(raw or "dark").strip().lower()
     return v if v in ("dark", "light") else "dark"
+
+
+def _normalize_user_goal(raw: str | None) -> str:
+    v = str(raw or "").strip().lower()
+    return v if v in VALID_USER_GOALS else ""
+
+
+def _normalize_default_tier(raw: str | None) -> str:
+    v = str(raw or "").strip().lower()
+    return v if v in VALID_DEFAULT_TIERS else ""
 
 
 def _normalize_models(values: list[str] | None, *, allow_unknown: bool = False) -> list[str]:
@@ -118,6 +131,8 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         "task_classification_mode": cls_mode,
         "task_classifier_model": str(prefs.get("task_classifier_model") or "").strip()[:500],
         "image_try_model": str(prefs.get("image_try_model") or "").strip()[:500],
+        "user_goal": _normalize_user_goal(str(prefs.get("user_goal") or "")),
+        "default_tier": _normalize_default_tier(str(prefs.get("default_tier") or "")),
         "openrouter_api_key_set": bool(user_key),
         "openrouter_api_key_masked": (user_key[:7] + "****") if len(user_key) > 7 else ("****" if user_key else ""),
     }
@@ -137,6 +152,8 @@ def update_user_preferences_payload(
     task_classification_mode: str | None = None,
     task_classifier_model: str | None = None,
     image_try_model: str | None = None,
+    user_goal: str | None = None,
+    default_tier: str | None = None,
 ) -> dict:
     gen_models = None
     if preferred_generation_models is not None:
@@ -165,6 +182,12 @@ def update_user_preferences_payload(
     cm = None
     if color_mode is not None:
         cm = _normalize_color_mode(color_mode)
+    ug = None
+    if user_goal is not None:
+        ug = _normalize_user_goal(user_goal)
+    dt = None
+    if default_tier is not None:
+        dt = _normalize_default_tier(default_tier)
     next_theme = _normalize_palette(theme) if theme is not None else None
     next_font = _normalize_ui_font(font) if font is not None else None
     db.upsert_user_preferences(
@@ -179,5 +202,7 @@ def update_user_preferences_payload(
         task_classification_mode=tcm,
         task_classifier_model=tmod,
         image_try_model=itm,
+        user_goal=ug,
+        default_tier=dt,
     )
     return get_user_preferences_payload(db, user_id)

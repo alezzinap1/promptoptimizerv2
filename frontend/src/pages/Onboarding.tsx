@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useT } from '../i18n'
@@ -9,20 +9,24 @@ import styles from './Onboarding.module.css'
 /*
  * Three-step onboarding.
  *   1. Goal: work / study / own (used to seed step-3 suggestions and
- *      stored locally for future use).
- *   2. Default tier: auto / fast / mid / advanced.
+ *      stored on the account so empty-state starters in the Library
+ *      work across devices).
+ *   2. Default tier: auto / fast / mid / advanced. Saved to
+ *      preferences.default_tier so Studio / Simple Improve can pick it
+ *      up as the user's personal default.
  *   3. First task: real generation through /api/generate with the
  *      chosen tier. Result is pushed to recentSessions so /home picks
  *      it up in the sidebar immediately.
  *
+ * Persistence (Phase 9):
+ *   - Mount: /api/settings returns `user_goal` and `default_tier`. If
+ *     non-empty, they seed local state (beats localStorage).
+ *   - persistGoal / persistTier write to localStorage (for offline /
+ *     anonymous flow) and fire-and-forget PATCH /api/settings.
+ *
  * Runs inside the marketing register (body.register-marketing — see
  * App.tsx MARKETING_PATHS), so cream palette + serif-italic accent
- * match the landing. Progressive disclosure: user can always Skip and
- * go straight to /home.
- *
- * Goal + tier are persisted to localStorage only for now; Phase 9's
- * migration will add matching backend columns and the values will be
- * pushed via api.updateSettings() once the fields exist.
+ * match the landing. Progressive disclosure: user can always Skip.
  */
 
 const LS_GOAL = 'metaprompt-onboarding-goal'
@@ -65,6 +69,27 @@ export default function Onboarding() {
   const [goal, setGoal] = useState<GoalId | null>(() => loadGoal())
   const [tier, setTier] = useState<TierId>(() => loadTier())
 
+  // On mount, let server-side preferences beat localStorage — they are
+  // the cross-device source of truth once set.
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getSettings()
+      .then((s) => {
+        if (cancelled) return
+        const serverGoal = (s.user_goal || '').trim()
+        if (serverGoal === 'work' || serverGoal === 'study' || serverGoal === 'own') {
+          setGoal(serverGoal)
+        }
+        const serverTier = (s.default_tier || '').trim()
+        if (serverTier === 'auto' || serverTier === 'fast' || serverTier === 'mid' || serverTier === 'advanced') {
+          setTier(serverTier)
+        }
+      })
+      .catch(() => { /* non-fatal: fall back to localStorage */ })
+    return () => { cancelled = true }
+  }, [])
+
   // Step 3 state
   const [task, setTask] = useState('')
   const [busy, setBusy] = useState(false)
@@ -91,10 +116,12 @@ export default function Onboarding() {
   const persistGoal = (g: GoalId) => {
     setGoal(g)
     try { localStorage.setItem(LS_GOAL, g) } catch { /* non-fatal */ }
+    api.updateSettings({ user_goal: g }).catch(() => { /* non-fatal: localStorage is still the fallback */ })
   }
   const persistTier = (tr: TierId) => {
     setTier(tr)
     try { localStorage.setItem(LS_TIER, tr) } catch { /* non-fatal */ }
+    api.updateSettings({ default_tier: tr }).catch(() => { /* non-fatal: localStorage fallback */ })
   }
 
   const skip = () => navigate('/home', { replace: true })

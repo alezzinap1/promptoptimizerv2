@@ -93,6 +93,22 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
   const [langView, setLangView] = useState<Record<number, 'primary' | 'alt'>>({})
   const [translating, setTranslating] = useState<Record<number, boolean>>({})
   const [translateErr, setTranslateErr] = useState<Record<number, string>>({})
+  // Server-side onboarding goal wins over localStorage once available so
+  // the empty-state starters work across devices (Phase 9).
+  const [serverGoal, setServerGoal] = useState<StarterGoal | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getSettings()
+      .then((s) => {
+        if (cancelled) return
+        const g = (s.user_goal || '').trim()
+        if (g === 'work' || g === 'study' || g === 'own') setServerGoal(g)
+      })
+      .catch(() => { /* non-fatal — localStorage fallback still works */ })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const onPaint = () => setTagPaintTick((t) => t + 1)
@@ -365,7 +381,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
           </div>
           <div className={styles.starterGrid}>
             {(() => {
-              const goal = readGoal()
+              const goal = serverGoal || readGoal()
               const starters = getStartersForGoal(goal)
               const goalTag =
                 goal === 'study'

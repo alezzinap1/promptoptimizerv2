@@ -32,6 +32,8 @@ class SettingsUpdate(BaseModel):
     task_classification_mode: str | None = None  # heuristic | llm
     task_classifier_model: str | None = None  # OpenRouter id or short key
     image_try_model: str | None = None  # OpenRouter id (e.g. google/gemini-2.5-flash-image) or short key
+    user_goal: str | None = None  # work | study | own | '' (from 3-step onboarding)
+    default_tier: str | None = None  # auto | fast | mid | advanced | ''
 
 
 @router.patch("/settings")
@@ -56,5 +58,7 @@ def update_settings(
         task_classification_mode=req.task_classification_mode,
         task_classifier_model=req.task_classifier_model,
         image_try_model=req.image_try_model,
+        user_goal=req.user_goal,
+        default_tier=req.default_tier,
     )
     return prefs

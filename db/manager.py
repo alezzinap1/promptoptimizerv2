@@ -181,6 +181,7 @@ class DBManager:
             self._migrate_phase15_user_usage_limits(conn)
             self._migrate_phase16_model_health(conn)
             self._migrate_phase17_prompt_alt_and_tier_overrides(conn)
+            self._migrate_phase18_onboarding_profile(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -441,6 +442,21 @@ class DBManager:
             """
         )
 
+    def _migrate_phase18_onboarding_profile(self, conn: sqlite3.Connection) -> None:
+        """
+        Onboarding profile persistence: what the user told us during the 3-step
+        onboarding flow (goal + default tier) becomes part of their account
+        instead of living only in localStorage. Lets the library's empty-state
+        starter prompts work across devices and seeds Studio/Simple Improve
+        with the user's picked tier.
+
+        Also adds a per-user Compare v2 daily rounds cap so admins can loosen
+        or tighten the default without changing global config.
+        """
+        self._safe_add_column(conn, "user_preferences", "user_goal", "TEXT DEFAULT ''")
+        self._safe_add_column(conn, "user_preferences", "default_tier", "TEXT DEFAULT ''")
+        self._safe_add_column(conn, "user_usage", "compare_rounds_per_day", "INTEGER")
+
     def _safe_add_column(
         self,
         conn: sqlite3.Connection,
@@ -570,6 +586,8 @@ class DBManager:
                 "task_classification_mode": "heuristic",
                 "task_classifier_model": "",
                 "image_try_model": "",
+                "user_goal": "",
+                "default_tier": "",
             }
         data = dict(row)
         for source, target in (
@@ -587,6 +605,8 @@ class DBManager:
         data.setdefault("task_classifier_model", "")
         data.setdefault("image_try_model", "")
         data.setdefault("color_mode", "dark")
+        data.setdefault("user_goal", "")
+        data.setdefault("default_tier", "")
         return data
 
     def upsert_user_preferences(
@@ -602,6 +622,8 @@ class DBManager:
         task_classifier_model: str | None = None,
         color_mode: str | None = None,
         image_try_model: str | None = None,
+        user_goal: str | None = None,
+        default_tier: str | None = None,
     ) -> dict:
         current = self.get_user_preferences(user_id)
         next_theme = theme if theme is not None else str(current.get("theme") or "amber")
@@ -650,14 +672,25 @@ class DBManager:
             if image_try_model is not None
             else str(current.get("image_try_model") or "")
         )
+        next_user_goal = (
+            user_goal
+            if user_goal is not None
+            else str(current.get("user_goal") or "")
+        )
+        next_default_tier = (
+            default_tier
+            if default_tier is not None
+            else str(current.get("default_tier") or "")
+        )
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO user_preferences
                     (user_id, theme, font, color_mode, gen_models_json, target_models_json,
                      simple_improve_preset, simple_improve_meta,
-                     task_classification_mode, task_classifier_model, image_try_model, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     task_classification_mode, task_classifier_model, image_try_model,
+                     user_goal, default_tier, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id) DO UPDATE SET
                     theme = excluded.theme,
                     font = excluded.font,
@@ -669,6 +702,8 @@ class DBManager:
                     task_classification_mode = excluded.task_classification_mode,
                     task_classifier_model = excluded.task_classifier_model,
                     image_try_model = excluded.image_try_model,
+                    user_goal = excluded.user_goal,
+                    default_tier = excluded.default_tier,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -683,6 +718,8 @@ class DBManager:
                     next_cls_mode,
                     next_cls_model.strip()[:500],
                     str(next_image_try).strip()[:500],
+                    str(next_user_goal).strip()[:32],
+                    str(next_default_tier).strip()[:32],
                 ),
             )
         return self.get_user_preferences(user_id)
