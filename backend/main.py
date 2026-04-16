@@ -27,6 +27,7 @@ load_dotenv(ROOT / ".env")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
 
 from backend.api import (
+    admin,
     agent_route,
     auth,
     community,
@@ -60,6 +61,7 @@ api_app = FastAPI(
 
 api_app.include_router(config.router, tags=["config"])
 api_app.include_router(auth.router, tags=["auth"])
+api_app.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_app.include_router(settings.router, tags=["settings"])
 api_app.include_router(user_info.router, tags=["user-info"])
 api_app.include_router(models.router, tags=["models"])

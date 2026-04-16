@@ -64,9 +64,23 @@ type Props = {
   counts: Counts
   recentSessions: RecentSession[]
   workspaceLabel: string | null
+  isAdmin?: boolean
 }
 
-export default function AppSidebar({ collapsed, onToggleCollapse, counts, recentSessions, workspaceLabel }: Props) {
+const ShieldIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+  </svg>
+)
+
+export default function AppSidebar({
+  collapsed,
+  onToggleCollapse,
+  counts,
+  recentSessions,
+  workspaceLabel,
+  isAdmin,
+}: Props) {
   const location = useLocation()
   const navigate = useNavigate()
   const tab = new URLSearchParams(location.search).get('tab')
@@ -183,6 +197,22 @@ export default function AppSidebar({ collapsed, onToggleCollapse, counts, recent
               <span className={styles.label}>Пресеты</span>
             </NavLink>
           </div>
+
+          {isAdmin ? (
+            <div className={styles.section}>
+              <div className={styles.sectionLabel}>Админ</div>
+              <NavLink
+                to="/admin"
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+                title="Пользователи и лимиты"
+              >
+                <span className={styles.icon} aria-hidden>
+                  <ShieldIcon />
+                </span>
+                <span className={styles.label}>Админка</span>
+              </NavLink>
+            </div>
+          ) : null}
 
           {recentSessions.length > 0 ? (
             <div className={styles.section}>

@@ -78,6 +78,7 @@ def _auth_response(user: dict, session_id: str) -> dict:
             "username": str(user["username"]),
             "email": user.get("email"),
             "avatar_url": user.get("avatar_url"),
+            "is_admin": bool(int(user.get("is_admin") or 0)),
         },
     }
 
@@ -117,6 +118,8 @@ def login(req: AuthRequest, request: Request, db: DBManager = Depends(get_db)):
     user = db.get_user_by_username(username)
     if not user or not verify_password(req.password, user.get("password_hash", "")):
         raise HTTPException(401, "Invalid username or password")
+    if int(user.get("is_blocked") or 0):
+        raise HTTPException(403, "Account disabled")
     session_id = generate_session_id()
     db.bind_session_to_user(session_id, int(user["id"]))
     return _auth_response(user, session_id)
@@ -140,6 +143,7 @@ def me(user: dict = Depends(get_current_user)):
             "username": str(user["username"]),
             "email": user.get("email"),
             "avatar_url": user.get("avatar_url"),
+            "is_admin": bool(int(user.get("is_admin") or 0)),
         }
     }
 
@@ -276,6 +280,9 @@ def github_oauth_callback(code: str, state: str, db: DBManager = Depends(get_db)
         user = db.get_user_by_id(int(user_id))
         if not user:
             return RedirectResponse(error_redirect)
+
+    if int(user.get("is_blocked") or 0):
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=account_disabled")
 
     session_id = generate_session_id()
     db.bind_session_to_user(session_id, int(user["id"]))

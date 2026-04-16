@@ -32,6 +32,14 @@ def get_current_user(
     user = db.get_session_user(x_session_id)
     if not user:
         raise HTTPException(401, "Invalid session")
+    if int(user.get("is_blocked") or 0):
+        raise HTTPException(403, "Account disabled")
+    return user
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if not int(user.get("is_admin") or 0):
+        raise HTTPException(403, "Admin only")
     return user
 
 

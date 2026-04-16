@@ -20,6 +20,7 @@ import PortalDropdown from '../components/PortalDropdown'
 import SelectDropdown from '../components/SelectDropdown'
 import WorkspacePicker from '../components/WorkspacePicker'
 import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
+import HomeOnboardingHints from '../components/HomeOnboardingHints'
 import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
@@ -2579,6 +2580,7 @@ export default function Home() {
 
   return (
     <div className={`${styles.home} ${styles.homeFlexFill}`}>
+      <HomeOnboardingHints />
       <FirstVisitHomeTip />
       <div ref={agentSplitRootRef} className={`${styles.splitRoot} ${styles.splitRootFill}`}>
           <div

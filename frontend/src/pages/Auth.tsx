@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { setAuthSessionId } from '../api/client'
@@ -60,11 +60,17 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [focusedField, setFocusedField] = useState<string | null>(null)
+  const skipHomeRedirectRef = useRef(false)
 
-  // Redirect if already logged in
+  // Redirect if already logged in (skip once right after registration → onboarding)
   useEffect(() => {
-    if (currentUser) navigate('/home', { replace: true })
-  }, [currentUser])
+    if (!currentUser) return
+    if (skipHomeRedirectRef.current) {
+      skipHomeRedirectRef.current = false
+      return
+    }
+    navigate('/home', { replace: true })
+  }, [currentUser, navigate])
 
   // Handle GitHub OAuth callback: /login?session=XXX or /login?error=XXX
   useEffect(() => {
@@ -85,7 +91,11 @@ export default function AuthPage() {
       // Clean URL
       window.history.replaceState({}, '', '/login')
     } else if (githubError) {
-      setError('Не удалось войти через GitHub. Попробуйте ещё раз.')
+      if (githubError === 'account_disabled') {
+        setError('Аккаунт отключён. Обратитесь к администратору.')
+      } else {
+        setError('Не удалось войти через GitHub. Попробуйте ещё раз.')
+      }
       window.history.replaceState({}, '', '/login')
     }
   }, [])
@@ -104,8 +114,13 @@ export default function AuthPage() {
     }
     setLoading(true)
     try {
-      if (mode === 'login') await login(username, password)
-      else await register(username, password, email.trim())
+      if (mode === 'login') {
+        await login(username, password)
+      } else {
+        skipHomeRedirectRef.current = true
+        await register(username, password, email.trim())
+        navigate('/onboarding', { replace: true })
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка авторизации')
     } finally {

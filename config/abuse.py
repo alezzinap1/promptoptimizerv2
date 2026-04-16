@@ -11,6 +11,8 @@ from threading import Lock
 from fastapi import Request
 
 from config.settings import (
+    ADMIN_API_RATE_LIMIT_REQUESTS,
+    ADMIN_API_RATE_WINDOW_SEC,
     AUTH_LOGIN_RATE_LIMIT_REQUESTS,
     AUTH_LOGIN_RATE_WINDOW_SEC,
     AUTH_REGISTER_RATE_LIMIT_REQUESTS,
@@ -67,6 +69,10 @@ _auth_login_limiter = RateLimiter(
     max_requests=AUTH_LOGIN_RATE_LIMIT_REQUESTS,
     window_sec=float(AUTH_LOGIN_RATE_WINDOW_SEC),
 )
+_admin_api_limiter = RateLimiter(
+    max_requests=ADMIN_API_RATE_LIMIT_REQUESTS,
+    window_sec=float(ADMIN_API_RATE_WINDOW_SEC),
+)
 
 
 def client_ip(request: Request) -> str:
@@ -85,6 +91,10 @@ def check_auth_register_rate_limit(request: Request) -> tuple[bool, str]:
 
 def check_auth_login_rate_limit(request: Request) -> tuple[bool, str]:
     return _auth_login_limiter.allow(f"auth_login:{client_ip(request)}")
+
+
+def check_admin_api_rate_limit(admin_user_id: int) -> tuple[bool, str]:
+    return _admin_api_limiter.allow(f"admin_api:{admin_user_id}")
 
 
 def check_rate_limit(session_id: str) -> tuple[bool, str]:

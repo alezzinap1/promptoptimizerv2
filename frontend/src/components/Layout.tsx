@@ -37,7 +37,7 @@ function pickWorkspaceName(items: Workspace[], id: number, listReady: boolean): 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const location = useLocation()
-  const isLanding = location.pathname === '/'
+  const isWelcomePublic = location.pathname === '/welcome'
 
   const [collapsed, setCollapsed] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem(COLLAPSED_KEY) === '1')
   const [counts, setCounts] = useState<{ prompts: number | null; techniques: number | null; skills: number }>({
@@ -50,7 +50,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [workspacesListReady, setWorkspacesListReady] = useState(false)
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(0)
 
-  const showSidebar = !!user && !isLanding
+  const showSidebar = !!user && !isWelcomePublic
 
   const refreshNavCounts = useCallback(() => {
     if (!user) return
@@ -147,11 +147,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </span>
   )
 
-  if (isLanding && !user) {
+  if (isWelcomePublic && !user) {
     return (
       <div className={styles.publicShell}>
         <header className={styles.publicHeader}>
-          <NavLink to="/" className={styles.logo}>
+          <NavLink to="/welcome" className={styles.logo}>
             <span className={styles.logoGlyph} aria-hidden />
             {logoWordmark}
           </NavLink>
@@ -173,6 +173,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           counts={counts}
           recentSessions={recent}
           workspaceLabel={workspaceLabel}
+          isAdmin={!!user?.is_admin}
         />
       ) : null}
       <div className={styles.shell}>

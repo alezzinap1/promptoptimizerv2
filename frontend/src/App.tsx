@@ -4,7 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import PrivateOnlyMessage from './components/PrivateOnlyMessage'
 import AuthPage from './pages/Auth'
-import Landing from './pages/Landing'
+import RootRedirect from './pages/RootRedirect'
+import Welcome from './pages/Welcome'
 import Home from './pages/Home'
 import Compare from './pages/Compare'
 import Library from './pages/Library'
@@ -16,6 +17,9 @@ import Presets from './pages/Presets'
 import SimpleImprove from './pages/SimpleImprove'
 import Community from './pages/Community'
 import Help from './pages/Help'
+import OnboardingPreferences from './pages/OnboardingPreferences'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminUserDetail from './pages/admin/AdminUserDetail'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -41,10 +45,14 @@ function AppShell() {
     <Layout>
       <Routes>
         {/* Public */}
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/welcome" element={<Welcome />} />
 
         {/* Private */}
         <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
+        <Route path="/onboarding" element={<RequireAuth><OnboardingPreferences /></RequireAuth>} />
+        <Route path="/admin" element={<RequireAuth><AdminUsers /></RequireAuth>} />
+        <Route path="/admin/users/:userId" element={<RequireAuth><AdminUserDetail /></RequireAuth>} />
         <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
         <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
         <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
@@ -61,7 +69,7 @@ function AppShell() {
         <Route path="/metrics" element={<Navigate to="/user-info#product-metrics" replace />} />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/welcome" replace />} />
       </Routes>
     </Layout>
   )

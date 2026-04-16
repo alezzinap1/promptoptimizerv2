@@ -6,11 +6,30 @@ export interface User {
   username: string
   email?: string | null
   avatar_url?: string | null
+  is_admin?: boolean
 }
 
 export interface AuthResponse {
   session_id: string
   user: User
+}
+
+export type AdminUserRow = {
+  id: number
+  username: string
+  email?: string | null
+  created_at?: string | null
+  is_admin: number
+  is_blocked: number
+  last_active_at?: string | null
+}
+
+export type AdminUserEvent = {
+  id?: number
+  event_name: string
+  created_at?: string | null
+  session_id?: string
+  payload: Record<string, unknown>
 }
 
 export interface PromptIdeIssue {
@@ -486,6 +505,7 @@ function parseApiErrorBody(text: string, status: number): string {
   const t = text.trim()
   if (!t) {
     if (status === 401) return 'Требуется вход. Войдите в аккаунт.'
+    if (status === 403) return 'Доступ запрещён или аккаунт отключён.'
     return `Ошибка ${status}`
   }
   try {
@@ -557,6 +577,25 @@ export const api = {
     fetchApi<{ ok: boolean; email: string }>('/auth/me/email', { method: 'PATCH', body: JSON.stringify({ email }) }),
 
   getSettings: () => fetchApi<Settings>('/settings'),
+  adminListUsers: (params?: { q?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.q) sp.set('q', params.q)
+    if (params?.limit != null) sp.set('limit', String(params.limit))
+    if (params?.offset != null) sp.set('offset', String(params.offset))
+    const q = sp.toString()
+    return fetchApi<{ items: AdminUserRow[]; total: number }>(`/admin/users${q ? `?${q}` : ''}`)
+  },
+  adminGetUser: (id: number) =>
+    fetchApi<{ user: Record<string, unknown>; usage: Record<string, unknown>; trial: Record<string, unknown> }>(
+      `/admin/users/${id}`,
+    ),
+  adminBlockUser: (id: number) => fetchApi<{ ok: boolean }>(`/admin/users/${id}/block`, { method: 'POST' }),
+  adminUnblockUser: (id: number) => fetchApi<{ ok: boolean }>(`/admin/users/${id}/unblock`, { method: 'POST' }),
+  adminResetTrialUsage: (id: number) =>
+    fetchApi<{ ok: boolean }>(`/admin/users/${id}/reset-trial-usage`, { method: 'POST' }),
+  adminUserEvents: (id: number, limit = 50) =>
+    fetchApi<{ events: AdminUserEvent[] }>(`/admin/users/${id}/events?limit=${limit}`),
+
   updateSettings: (req: {
     openrouter_api_key?: string
     theme?: string
