@@ -1,6 +1,6 @@
 # CD: SSH на VPS → git pull → docker build → перезапуск prompt-opt
 # Требуются repository secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
-# Опционально: SSH_PORT (если не 22), SSH_KNOWN_HOSTS (вывод ssh-keyscan -H host)
+# Нестандартный SSH-порт: добавьте в шаг appleboy/ssh-action строку port: 2222
 #
 # Каталог деплоя на сервере: repository variable DEPLOY_PATH (например /home/user1/promptoptimizerv2).
 # Если переменная не задана, используется ~/promptoptimizerv2 от имени SSH-пользователя.
