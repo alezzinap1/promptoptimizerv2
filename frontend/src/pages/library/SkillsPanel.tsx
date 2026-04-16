@@ -6,6 +6,7 @@ import MarkdownOutput from '../../components/MarkdownOutput'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import SelectDropdown from '../../components/SelectDropdown'
+import TranslateButton from '../../components/TranslateButton'
 import {
   importLocalSkillsBundle,
   loadLocalSkills,
@@ -444,7 +445,17 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
               />
             </label>
             <label className={styles.field}>
-              Тело скилла (Markdown)
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span>Тело скилла (Markdown)</span>
+                <TranslateButton
+                  getValue={() => draft.body}
+                  setValue={(v) => setDraft((d) => ({ ...d, body: v }))}
+                  kind="skill"
+                  compact
+                  disabled={!draft.body.trim()}
+                  title="Перевести тело скилла RU↔EN"
+                />
+              </span>
               <textarea
                 rows={12}
                 className={styles.bodyInput}

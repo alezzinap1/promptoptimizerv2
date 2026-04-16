@@ -18,6 +18,8 @@ import menuStyles from '../components/DropdownMenu.module.css'
 import MarkdownOutput from '../components/MarkdownOutput'
 import PortalDropdown from '../components/PortalDropdown'
 import SelectDropdown from '../components/SelectDropdown'
+import TierSelector, { loadTier, type TierValue } from '../components/TierSelector'
+import TranslateButton from '../components/TranslateButton'
 import WorkspacePicker from '../components/WorkspacePicker'
 import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
 import HomeOnboardingHints from '../components/HomeOnboardingHints'
@@ -341,6 +343,7 @@ export default function Home() {
   const [expertLevel, setExpertLevel] = useState<ExpertLevel>('mid')
   /** Если false — при смене уровня подставляется EXPERT_DEFAULT_GEN_MODEL. */
   const [useCustomGenModel, setUseCustomGenModel] = useState(false)
+  const [tier, setTier] = useState<TierValue>(() => loadTier())
   const [baseTaskRef, setBaseTaskRef] = useState('')
   const [questionCarouselIdx, setQuestionCarouselIdx] = useState(0)
   const [quickSaved, setQuickSaved] = useState(false)
@@ -1045,6 +1048,7 @@ export default function Home() {
         skill_body: skillBody.trim() || undefined,
         recent_technique_ids: loadRecentTechniqueIds(),
         expert_level: expertLevel,
+        tier,
       }
       setAgentThinkingLine(null)
       const res = normalizeClientGenerateResult(await api.generate(req))
@@ -2312,6 +2316,13 @@ export default function Home() {
                     title={promptType === 'skill' ? 'Копировать тело скилла' : 'Копировать промпт'}
                   />
                   <TryInGeminiButton prompt={result.prompt_block} />
+                  <TranslateButton
+                    getValue={() => result.prompt_block || ''}
+                    setValue={(v) => setResult({ ...result, prompt_block: v })}
+                    kind={promptType === 'skill' ? 'skill' : 'prompt'}
+                    compact
+                    title="Перевести промпт RU↔EN (одной кнопкой)"
+                  />
                   {promptType === 'text' && (
                     <button
                       type="button"
@@ -3162,27 +3173,46 @@ export default function Home() {
                       >
                         {activeLevelBundle.estimatedCalls} вызов(ов) · {activeLevelBundle.estimatedCostHint}
                       </span>
-                      <span
-                        title={
-                          isReasoningModelId(genModel)
-                            ? 'Эта модель думает сама — упрощённый промпт даст лучший результат'
-                            : undefined
-                        }
-                        className={styles.genModelWrap}
-                      >
-                        <SelectDropdown
-                          value={genModel}
-                          options={genModelSelectOptions}
-                          onChange={(v) => {
-                            setUseCustomGenModel(true)
-                            setGenModel(v)
-                          }}
-                          aria-label="Модель генерации"
-                          variant="composer"
-                          disabled={loading}
-                          footerLink={{ to: '/models', label: 'Добавить модель' }}
-                        />
-                      </span>
+                      <TierSelector
+                        value={tier}
+                        onChange={(t) => {
+                          setTier(t)
+                          if (t !== 'custom') setUseCustomGenModel(false)
+                        }}
+                        disabled={loading}
+                        compact
+                      />
+                      <TranslateButton
+                        getValue={() => chatInput}
+                        setValue={setChatInput}
+                        kind="plain"
+                        compact
+                        disabled={loading}
+                        title="Перевести текущее сообщение RU↔EN"
+                      />
+                      {tier === 'custom' ? (
+                        <span
+                          title={
+                            isReasoningModelId(genModel)
+                              ? 'Эта модель думает сама — упрощённый промпт даст лучший результат'
+                              : undefined
+                          }
+                          className={styles.genModelWrap}
+                        >
+                          <SelectDropdown
+                            value={genModel}
+                            options={genModelSelectOptions}
+                            onChange={(v) => {
+                              setUseCustomGenModel(true)
+                              setGenModel(v)
+                            }}
+                            aria-label="Модель генерации"
+                            variant="composer"
+                            disabled={loading}
+                            footerLink={{ to: '/models', label: 'Добавить модель' }}
+                          />
+                        </span>
+                      ) : null}
                       <WorkspacePicker
                         workspaces={workspaces}
                         workspaceId={workspaceId}

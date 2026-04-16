@@ -192,6 +192,8 @@ export interface GenerateRequest {
   recent_technique_ids?: string[]
   /** Профиль студии: junior | mid | senior | creative — подсказка бэкенду для политики вопросов */
   expert_level?: string | null
+  /** Тир сложности: auto | fast | mid | advanced | custom. При !custom бэкенд сам выбирает модель. */
+  tier?: string | null
 }
 
 export type SuggestedStudioAction = {
@@ -775,6 +777,7 @@ export const api = {
     }),
 
   getDomains: () => fetchApi<{ domains: { id: string; name: string }[] }>('/domains'),
+  getModelTiers: () => fetchApi<{ tiers: { id: string; label: string }[] }>('/model-tiers'),
 
   compare: (req: {
     task_input: string

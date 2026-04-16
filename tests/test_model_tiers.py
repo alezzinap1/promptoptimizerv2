@@ -111,3 +111,21 @@ def test_admin_metrics_and_model_health_endpoints(monkeypatch):
             data = r3.json()
             assert isinstance(data["items"], list)
             assert any(it["model_id"] == ok_model for it in data["items"])
+
+            r4 = client.get("/api/model-tiers", headers={"X-Session-Id": sid})
+            assert r4.status_code == 200
+            tiers = r4.json()["tiers"]
+            assert isinstance(tiers, list) and len(tiers) >= 4
+            tier_ids = {t["id"] for t in tiers}
+            assert {"auto", "fast", "mid", "advanced"} <= tier_ids
+
+
+def test_generate_request_accepts_tier_field():
+    """Backend must accept `tier` in GenerateRequest without validation error."""
+    from backend.api.generate import GenerateRequest
+
+    req = GenerateRequest(task_input="hi", tier="mid")
+    assert req.tier == "mid"
+
+    req2 = GenerateRequest(task_input="hi", tier=None)
+    assert req2.tier is None

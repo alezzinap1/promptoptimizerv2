@@ -40,6 +40,7 @@ from core.context_gap import compute_context_gap, gap_missing_summary, get_quest
 from core.task_classifier import classify_task, heuristic_classification_confidence
 from core.task_llm_classifier import classify_task_with_llm
 from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.model_router import resolve as tier_resolve
 from services.openrouter_models import get_model_pricing, completion_price_per_m
 from services.prompt_workflow import (
     apply_evidence_decisions,
@@ -321,6 +322,9 @@ class GenerateRequest(BaseModel):
     skill_target_env: str | None = None
     recent_technique_ids: list[str] = Field(default_factory=list)
     expert_level: str | None = None
+    # Фаза 2: тир вместо явного gen_model. "custom" (или пусто) → использовать gen_model из запроса как раньше.
+    # "auto" | "fast" | "mid" | "advanced" → model_router.resolve игнорирует gen_model и выбирает сам.
+    tier: str | None = None
 
 
 def _apply_expert_level_questions_policy(policy: dict, expert_level: str | None) -> dict:
@@ -425,6 +429,31 @@ def _get_openrouter_model_id(provider: str) -> str:
     if "/" in provider:
         return provider
     return provider
+
+
+_VALID_TIERS = {"auto", "fast", "mid", "advanced"}
+
+
+def _resolve_tier_to_model(
+    req: "GenerateRequest",
+    db: DBManager,
+    *,
+    using_host_key: bool,
+) -> str | None:
+    """
+    Если req.tier — один из auto/fast/mid/advanced, вернуть конкретный model_id из каталога
+    (через model_router) и записать его в req.gen_model. Вернуть raw picked id для reasoning.
+    Если tier пустой / "custom" — не трогать.
+    """
+    tier = (req.tier or "").strip().lower()
+    if not tier or tier == "custom" or tier not in _VALID_TIERS:
+        return None
+    mode = "image" if req.prompt_type == "image" else ("skill" if req.prompt_type == "skill" else "text")
+    picked, _reasoning = tier_resolve(db, tier, mode, trial=using_host_key)  # type: ignore[arg-type]
+    if not picked:
+        return None
+    req.gen_model = picked
+    return picked
 
 
 def _estimate_generation_input(
@@ -609,6 +638,8 @@ def estimate_generate_input(
     if not ok:
         raise HTTPException(429, err)
     user_id = int(user["id"])
+    user_key = db.get_user_openrouter_api_key(user_id)
+    _resolve_tier_to_model(req, db, using_host_key=not bool(user_key))
     try:
         return _estimate_generation_input(req, user_id, db, registry)
     except HTTPException:
@@ -642,6 +673,7 @@ def generate_prompt(
         )
 
     using_host_key = not bool(user_key)
+    tier_picked = _resolve_tier_to_model(req, db, using_host_key=using_host_key)
     if using_host_key:
         usage = db.get_user_usage(user_id)
         lim = effective_trial_tokens_limit(usage)
@@ -715,6 +747,8 @@ def generate_prompt(
             "technique_mode": req.technique_mode,
             "workspace_id": req.workspace_id or 0,
             "task_classification_mode": cls_mode,
+            "tier": (req.tier or "custom"),
+            "tier_picked_model": tier_picked or "",
         },
         user_id=int(user["id"]),
     )
