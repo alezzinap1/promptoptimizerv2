@@ -1,5 +1,6 @@
 const KEY = 'metaprompt-recent-sessions-v1'
-const MAX = 5
+/** Локально в браузере; 50 сессий с короткими подписями укладываются в квоту storage. */
+const MAX = 50
 
 export type RecentSession = {
   sessionId: string

@@ -21,6 +21,7 @@ from services.api_key_resolver import resolve_openrouter_api_key
 from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
 from services.openrouter_models import get_model_pricing, completion_price_per_m
 from services.user_preferences import get_user_preferences_payload
+from services.model_router import resolve as resolve_tier_model
 
 router = APIRouter()
 
@@ -36,6 +37,8 @@ class SimpleImproveRequest(BaseModel):
     gen_model: str | None = None
     preset: str | None = None
     target_model: str | None = None
+    """Как на Студии: auto|fast|mid|advanced → resolve в OpenRouter id; custom → gen_model."""
+    tier: str | None = None
 
 
 class SimpleImproveResponse(BaseModel):
@@ -77,6 +80,14 @@ def simple_improve(
     gen_list = payload.get("preferred_generation_models") or []
     gen_model = (req.gen_model or "").strip() or (gen_list[0] if gen_list else DEFAULT_PROVIDER)
 
+    tier_raw = (req.tier or "").strip().lower()
+    if tier_raw in ("auto", "fast", "mid", "advanced"):
+        resolved, _reason = resolve_tier_model(db, tier_raw, "text", trial=using_host_key)
+        if resolved:
+            gen_model = resolved
+    elif tier_raw == "custom":
+        gen_model = (req.gen_model or "").strip() or (gen_list[0] if gen_list else DEFAULT_PROVIDER)
+
     if using_host_key:
         usage = db.get_user_usage(user_id)
         lim = effective_trial_tokens_limit(usage)
@@ -110,7 +121,12 @@ def simple_improve(
     db.log_event(
         "simple_improve_requested",
         session_id=auth_session_id or "",
-        payload={"preset": preset_used, "gen_model": gen_model, "target_model": target_model_resolved},
+        payload={
+            "preset": preset_used,
+            "gen_model": gen_model,
+            "target_model": target_model_resolved,
+            "tier": tier_raw or None,
+        },
         user_id=user_id,
     )
     started = time.perf_counter()

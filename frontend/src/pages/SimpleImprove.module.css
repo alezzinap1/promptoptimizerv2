@@ -36,6 +36,31 @@
   color: var(--accent);
 }
 
+.simpleFooterMid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.simpleControlIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.62;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.targetTriggerIconOnly {
+  max-width: 36px !important;
+  min-width: 32px !important;
+  padding: 4px 4px !important;
+  justify-content: center;
+}
+
 .hint {
   margin: 0 0 20px;
   padding: 12px 14px;

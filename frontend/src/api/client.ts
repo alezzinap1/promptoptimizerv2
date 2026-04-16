@@ -735,6 +735,8 @@ export const api = {
     gen_model?: string
     preset?: string
     target_model?: string
+    /** Как на Студии: auto|fast|mid|advanced|custom */
+    tier?: string | null
   }) =>
     fetchApi<SimpleImproveResponse>('/simple-improve', { method: 'POST', body: JSON.stringify(req) }),
 

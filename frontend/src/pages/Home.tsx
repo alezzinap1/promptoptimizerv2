@@ -517,8 +517,6 @@ export default function Home() {
   )
   const [promptPlaygroundBusy, setPromptPlaygroundBusy] = useState(false)
   const prevGenModelForReasoningRef = useRef<string>('')
-  const techPickerBtnRef = useRef<HTMLButtonElement>(null)
-  const [techPickerOpen, setTechPickerOpen] = useState(false)
   const [techMenuFilter, setTechMenuFilter] = useState('')
   const skillInsertBtnRef = useRef<HTMLButtonElement>(null)
   const [skillInsertOpen, setSkillInsertOpen] = useState(false)
@@ -539,9 +537,9 @@ export default function Home() {
     return () => window.removeEventListener('metaprompt-nav-refresh', fn)
   }, [])
 
-  useLayoutEffect(() => {
-    if (!techPickerOpen) setTechMenuFilter('')
-  }, [techPickerOpen])
+  useEffect(() => {
+    if (techniqueMode !== 'manual') setTechMenuFilter('')
+  }, [techniqueMode])
 
   const localSkillsForPicker = useMemo(() => loadLocalSkills(), [localSkillsTick])
 
@@ -2627,16 +2625,12 @@ export default function Home() {
                         disabled={loading}
                         footerLink={{ to: '/help', label: 'Справка: уровни' }}
                       />
-                      <span
-                        className={styles.expertLevelModelHint}
-                        title={
-                          useCustomGenModel
-                            ? 'Сбросить к модели, рекомендованной для выбранного уровня'
-                            : `Модель по умолчанию для «${EXPERT_LEVEL_LABELS[expertLevel]}» (смените внизу — будет «своя»)`
-                        }
-                      >
-                        <span className={styles.expertLevelModelShort}>{shortGenerationModelLabel(genModel)}</span>
-                        {useCustomGenModel ? (
+                      {useCustomGenModel ? (
+                        <span
+                          className={styles.expertLevelModelHint}
+                          title="Сбросить к модели профиля уровня студии (ниже — сложность Авто/Повседневный/…)"
+                        >
+                          <span className={styles.expertLevelModelShort}>{shortGenerationModelLabel(genModel)}</span>
                           <button
                             type="button"
                             className={styles.expertLevelModelReset}
@@ -2648,10 +2642,8 @@ export default function Home() {
                           >
                             к профилю
                           </button>
-                        ) : (
-                          <span className={styles.expertLevelModelRecBadge}>рекоменд.</span>
-                        )}
-                      </span>
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <button
@@ -3180,15 +3172,6 @@ export default function Home() {
                           if (t !== 'custom') setUseCustomGenModel(false)
                         }}
                         disabled={loading}
-                        compact
-                      />
-                      <TranslateButton
-                        getValue={() => chatInput}
-                        setValue={setChatInput}
-                        kind="plain"
-                        compact
-                        disabled={loading}
-                        title="Перевести текущее сообщение RU↔EN"
                       />
                       {tier === 'custom' ? (
                         <span
@@ -3309,71 +3292,43 @@ export default function Home() {
                 </div>
                 {techniqueMode === 'manual' && (
                   <div className={`${cb.composerInset} ${styles.techPickerInset}`}>
-                    <div className={styles.techPickerBar}>
-                      <button
-                        ref={techPickerBtnRef}
-                        type="button"
-                        className={`${styles.techPickerTrigger} ${cb.composerGhostBtn}`}
-                        aria-expanded={techPickerOpen}
-                        aria-haspopup="listbox"
-                        aria-label="Выбор техник для генерации"
-                        disabled={loading}
-                        onClick={() => !loading && setTechPickerOpen((o) => !o)}
-                      >
-                        Техники
-                        {manualTechs.length > 0 ? (
-                          <span className={styles.techPickerTriggerCount}>{manualTechs.length}</span>
-                        ) : null}
-                      </button>
-                      <PortalDropdown
-                        open={techPickerOpen}
-                        onClose={() => setTechPickerOpen(false)}
-                        anchorRef={techPickerBtnRef}
-                        minWidth={300}
-                        align="left"
-                      >
-                        <input
-                          type="search"
-                          className={styles.techMenuSearch}
-                          placeholder="Поиск по названию или id…"
-                          value={techMenuFilter}
-                          onChange={(e) => setTechMenuFilter(e.target.value)}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          aria-label="Фильтр списка техник"
-                        />
-                        {techniques
-                          .filter((t) => {
-                            const q = techMenuFilter.trim().toLowerCase()
-                            if (!q) return true
-                            return (
-                              t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
-                            )
-                          })
-                          .map((t) => {
-                            const on = manualTechs.includes(t.id)
-                            return (
-                              <button
-                                key={t.id}
-                                type="button"
-                                role="option"
-                                aria-selected={on}
-                                className={`${menuStyles.menuItem} ${on ? menuStyles.menuItemActive : ''}`}
-                                onClick={() => {
-                                  setManualTechs((prev) =>
-                                    prev.includes(t.id)
-                                      ? prev.filter((x) => x !== t.id)
-                                      : [...prev, t.id],
-                                  )
-                                }}
-                              >
-                                <span className={styles.techMenuCheck} aria-hidden>
-                                  {on ? '\u2713 ' : '\u2003'}
-                                </span>
-                                {t.name}
-                              </button>
-                            )
-                          })}
-                      </PortalDropdown>
+                    <input
+                      type="search"
+                      className={styles.techMenuSearch}
+                      placeholder="Поиск по названию или id…"
+                      value={techMenuFilter}
+                      onChange={(e) => setTechMenuFilter(e.target.value)}
+                      aria-label="Фильтр списка техник"
+                    />
+                    <div className={styles.techPickerInlineList} role="listbox" aria-label="Техники для генерации">
+                      {techniques
+                        .filter((t) => {
+                          const q = techMenuFilter.trim().toLowerCase()
+                          if (!q) return true
+                          return t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
+                        })
+                        .map((t) => {
+                          const on = manualTechs.includes(t.id)
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              role="option"
+                              aria-selected={on}
+                              className={`${menuStyles.menuItem} ${on ? menuStyles.menuItemActive : ''}`}
+                              onClick={() => {
+                                setManualTechs((prev) =>
+                                  prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                                )
+                              }}
+                            >
+                              <span className={styles.techMenuCheck} aria-hidden>
+                                {on ? '\u2713 ' : '\u2003'}
+                              </span>
+                              {t.name}
+                            </button>
+                          )
+                        })}
                     </div>
                   </div>
                 )}

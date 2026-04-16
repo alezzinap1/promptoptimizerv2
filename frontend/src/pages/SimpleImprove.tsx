@@ -9,6 +9,7 @@ import {
 import AutoTextarea from '../components/AutoTextarea'
 import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
+import TierSelector, { loadTier, persistTier, type TierValue } from '../components/TierSelector'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import { TryExternalChatButton } from '../components/TryExternalChatButton'
 import SimpleLineDiff from '../components/SimpleLineDiff'
@@ -21,9 +22,53 @@ const PRESET_SELECT_OPTIONS = SIMPLE_PRESET_IDS.map((id) => ({
   label: SIMPLE_PRESET_LABELS[id],
 }))
 
+function IconSliders() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  )
+}
+
+function IconSparkles() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+    </svg>
+  )
+}
+
+function IconGlobe() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  )
+}
+
+function IconLayers() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  )
+}
+
 export default function SimpleImprove() {
   const [promptText, setPromptText] = useState('')
   const [preset, setPreset] = useState<SimplePresetId>('balanced')
+  const [tier, setTier] = useState<TierValue>(() => loadTier())
   const [genModel, setGenModel] = useState('')
   const [targetModel, setTargetModel] = useState('unknown')
   const [models, setModels] = useState<string[]>([])
@@ -83,7 +128,8 @@ export default function SimpleImprove() {
       const res = await api.simpleImprove({
         prompt_text: t,
         preset,
-        gen_model: genModel.trim() || undefined,
+        tier,
+        gen_model: tier === 'custom' ? genModel.trim() || undefined : undefined,
         target_model: targetModel.trim() || undefined,
       })
       if (!res.improved_text?.trim()) {
@@ -133,10 +179,10 @@ export default function SimpleImprove() {
             />
             <div className={cb.composerFooter}>
               <div className={cb.composerFooterRow}>
-                <div className={cb.composerFooterStart}>
-                  <span className={cb.metaMuted}>Пресет, генерация, целевая</span>
-                </div>
-                <div className={cb.composerFooterMid}>
+                <div className={`${cb.composerFooterMid} ${styles.simpleFooterMid}`}>
+                  <span className={styles.simpleControlIcon} title="Пресет улучшения">
+                    <IconSliders />
+                  </span>
                   <SelectDropdown
                     value={preset}
                     options={PRESET_SELECT_OPTIONS}
@@ -144,21 +190,46 @@ export default function SimpleImprove() {
                     aria-label="Пресет"
                     variant="composer"
                   />
-                  <SelectDropdown
-                    value={genModel}
-                    options={modelOptions}
-                    onChange={setGenModel}
-                    aria-label="Модель генерации"
-                    variant="composer"
-                    footerLink={{ to: '/models', label: 'Добавить модель' }}
+                  <span className={styles.simpleControlIcon} title="Сложность генерации (как на Студии)">
+                    <IconSparkles />
+                  </span>
+                  <TierSelector
+                    value={tier}
+                    onChange={(v) => {
+                      persistTier(v)
+                      setTier(v)
+                    }}
+                    disabled={loading}
                   />
+                  {tier === 'custom' ? (
+                    <>
+                      <span className={styles.simpleControlIcon} title="Модель OpenRouter">
+                        <IconLayers />
+                      </span>
+                      <SelectDropdown
+                        value={genModel}
+                        options={modelOptions}
+                        onChange={setGenModel}
+                        aria-label="Модель генерации"
+                        variant="composer"
+                        disabled={loading}
+                        footerLink={{ to: '/models', label: 'Добавить модель' }}
+                      />
+                    </>
+                  ) : null}
+                  <span className={styles.simpleControlIcon} title="Целевая модель промпта">
+                    <IconGlobe />
+                  </span>
                   <SelectDropdown
                     value={targetModel}
                     options={targetOptions}
                     onChange={setTargetModel}
                     aria-label="Целевая модель промпта"
                     variant="composer"
+                    disabled={loading}
                     footerLink={{ to: '/settings', label: 'Настроить список' }}
+                    triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
+                    triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
                   />
                 </div>
                 <div className={cb.composerFooterEnd}>

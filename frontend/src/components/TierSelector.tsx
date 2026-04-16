@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
+import SelectDropdown from './SelectDropdown'
 
 export type TierValue = 'auto' | 'fast' | 'mid' | 'advanced' | 'custom'
 
@@ -40,9 +41,19 @@ type Props = {
   onChange: (tier: TierValue) => void
   disabled?: boolean
   compact?: boolean
+  /** `dropdown` — как выбор модели (один компактный селект). `pills` — старая строка кнопок. */
+  variant?: 'pills' | 'dropdown'
+  className?: string
 }
 
-export default function TierSelector({ value, onChange, disabled, compact }: Props) {
+export default function TierSelector({
+  value,
+  onChange,
+  disabled,
+  compact: _compact,
+  variant = 'dropdown',
+  className = '',
+}: Props) {
   const [labels, setLabels] = useState<Record<string, string>>(FALLBACK_LABELS)
 
   useEffect(() => {
@@ -64,6 +75,33 @@ export default function TierSelector({ value, onChange, disabled, compact }: Pro
       cancelled = true
     }
   }, [])
+
+  const options = useMemo(
+    () =>
+      ALL_TIERS.map((t) => ({
+        value: t,
+        label: labels[t] || FALLBACK_LABELS[t],
+        title: TIER_HINTS[t],
+      })),
+    [labels],
+  )
+
+  if (variant === 'dropdown') {
+    return (
+      <SelectDropdown
+        value={value}
+        options={options}
+        onChange={(v) => {
+          persistTier(v as TierValue)
+          onChange(v as TierValue)
+        }}
+        aria-label="Сложность генерации"
+        variant="composer"
+        disabled={disabled}
+        className={className}
+      />
+    )
+  }
 
   return (
     <div
@@ -95,10 +133,10 @@ export default function TierSelector({ value, onChange, disabled, compact }: Pro
               onChange(t)
             }}
             style={{
-              padding: compact ? '3px 10px' : '5px 14px',
+              padding: _compact ? '3px 10px' : '5px 14px',
               border: 'none',
               borderRadius: 999,
-              fontSize: compact ? 11 : 12.5,
+              fontSize: _compact ? 11 : 12.5,
               fontWeight: active ? 600 : 500,
               background: active ? 'var(--color-text-primary, #fff)' : 'transparent',
               color: active ? 'var(--color-background-primary, #000)' : 'var(--color-text-secondary, #999)',
