@@ -227,6 +227,88 @@ const en: Dict = {
     body: 'Sign in to open this section.',
     tryDemo: 'Try without signing up',
   },
+
+  onboarding: {
+    progress: 'Step {current} of {total}',
+    skip: 'Skip',
+    back: 'Back',
+    next: 'Next',
+    step1: {
+      eyebrow: '01 · WHY',
+      title: 'What do you need prompts for?',
+      lede: 'Pick one — it shapes the starter hints. You can change it later.',
+      goals: [
+        { id: 'work', label: 'Work', hint: 'Docs, emails, code, marketing, analytics.' },
+        { id: 'study', label: 'Study', hint: 'Summaries, outlines, argument checks.' },
+        { id: 'own', label: 'Own thing', hint: 'Content, ideas, scripts, experiments.' },
+      ],
+    },
+    step2: {
+      eyebrow: '02 · HOW',
+      title: 'What complexity do you usually work at?',
+      lede: 'Pick a default tier. You can change it on each request.',
+      tiers: [
+        {
+          id: 'auto',
+          label: 'Auto',
+          body: 'The product picks the model for the task. Best starting point.',
+        },
+        {
+          id: 'fast',
+          label: 'Fast',
+          body: 'Short tasks, templates, quick iterations.',
+        },
+        {
+          id: 'mid',
+          label: 'Mid',
+          body: 'Balance. Most everyday work.',
+        },
+        {
+          id: 'advanced',
+          label: 'Advanced',
+          body: 'Long reasoning, heavy context.',
+        },
+      ],
+    },
+    step3: {
+      eyebrow: '03 · TRY',
+      title: 'Build your first prompt',
+      lede: 'Describe a task in one or two sentences. The product turns it into a structured prompt and saves it in your sessions.',
+      placeholder: 'Write a blog post for our company about launching a new product.',
+      submit: 'Build the prompt',
+      submitting: 'Building',
+      errorShort: 'Describe the task in at least one sentence.',
+      errorNetwork: 'Couldn\u2019t generate. Try again.',
+      resultTitle: 'Done — this is your first prompt',
+      actions: {
+        openStudio: 'Open in Studio →',
+        again: 'Try another task',
+      },
+      suggestionsTitle: 'Ideas:',
+      suggestionsByGoal: {
+        work: [
+          'Draft an email to a client about a project delay.',
+          'Make release notes from these commits: …',
+          'Summarise weekly KPIs from these metrics.',
+        ],
+        study: [
+          'Plan exam prep for linear algebra over two weeks.',
+          'Compare two papers on the same methodology.',
+          'Compress this text into 10 thesis points, grouped by topic.',
+        ],
+        own: [
+          'Tagline and three subheads for a product about …',
+          'Landing offer for a course on …',
+          'Five content topic ideas for a Telegram channel.',
+        ],
+      },
+    },
+    done: {
+      title: 'You\u2019re in Studio',
+      body: 'Your first session is saved — it\u2019s already in the list on the left.',
+      cta: 'Go to Studio',
+    },
+  },
 }
 
 export default en

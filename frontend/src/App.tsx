@@ -19,7 +19,7 @@ import Presets from './pages/Presets'
 import SimpleImprove from './pages/SimpleImprove'
 import Community from './pages/Community'
 import Help from './pages/Help'
-import OnboardingPreferences from './pages/OnboardingPreferences'
+import Onboarding from './pages/Onboarding'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminUserDetail from './pages/admin/AdminUserDetail'
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -68,7 +68,7 @@ function AppShell() {
 
         {/* Private */}
         <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
-        <Route path="/onboarding" element={<RequireAuth><OnboardingPreferences /></RequireAuth>} />
+        <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
         <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
         <Route path="/admin/users/:userId" element={<RequireAuth><AdminUserDetail /></RequireAuth>} />

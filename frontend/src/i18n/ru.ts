@@ -134,6 +134,43 @@ const ru: {
   }
   notFound: { title: string; body: string; cta: string }
   privateOnly: { title: string; body: string; tryDemo: string }
+  onboarding: {
+    progress: string
+    skip: string
+    back: string
+    next: string
+    step1: {
+      eyebrow: string
+      title: string
+      lede: string
+      goals: ReadonlyArray<{ id: string; label: string; hint: string }>
+    }
+    step2: {
+      eyebrow: string
+      title: string
+      lede: string
+      tiers: ReadonlyArray<{ id: string; label: string; body: string }>
+    }
+    step3: {
+      eyebrow: string
+      title: string
+      lede: string
+      placeholder: string
+      submit: string
+      submitting: string
+      errorShort: string
+      errorNetwork: string
+      resultTitle: string
+      actions: { openStudio: string; again: string }
+      suggestionsTitle: string
+      suggestionsByGoal: Record<string, readonly string[]>
+    }
+    done: {
+      title: string
+      body: string
+      cta: string
+    }
+  }
 } = {
   lang: {
     name: 'RU',
@@ -357,6 +394,100 @@ const ru: {
     title: 'Требуется вход',
     body: 'Войдите в аккаунт, чтобы открыть этот раздел.',
     tryDemo: 'Попробовать без регистрации',
+  },
+
+  onboarding: {
+    progress: 'Шаг {current} из {total}',
+    skip: 'Пропустить',
+    back: 'Назад',
+    next: 'Далее',
+    step1: {
+      eyebrow: '01 · ЗАЧЕМ',
+      title: 'Для чего вам промпты?',
+      lede: 'Выберите одно — это повлияет на стартовые подсказки. Потом можно поменять.',
+      goals: [
+        {
+          id: 'work',
+          label: 'Работа',
+          hint: 'Документы, письма, код, маркетинг, аналитика.',
+        },
+        {
+          id: 'study',
+          label: 'Учёба',
+          hint: 'Резюме материала, план, проверка аргументов.',
+        },
+        {
+          id: 'own',
+          label: 'Своё дело',
+          hint: 'Контент, идеи, сценарии, эксперименты.',
+        },
+      ],
+    },
+    step2: {
+      eyebrow: '02 · КАК',
+      title: 'С какой сложностью обычно работаете?',
+      lede: 'Выберите тир по умолчанию. Его можно менять в каждом запросе.',
+      tiers: [
+        {
+          id: 'auto',
+          label: 'Auto',
+          body: 'Продукт сам выберет модель под задачу. Лучший старт.',
+        },
+        {
+          id: 'fast',
+          label: 'Fast',
+          body: 'Короткие задачи, шаблоны, быстрые итерации.',
+        },
+        {
+          id: 'mid',
+          label: 'Mid',
+          body: 'Баланс. Большинство рабочих задач.',
+        },
+        {
+          id: 'advanced',
+          label: 'Advanced',
+          body: 'Длинные рассуждения, сложный контекст.',
+        },
+      ],
+    },
+    step3: {
+      eyebrow: '03 · ПРОБА',
+      title: 'Соберите свой первый промпт',
+      lede: 'Опишите задачу одной-двумя фразами. Продукт превратит её в структурированный промпт и сохранит в сессиях.',
+      placeholder: 'Напишите текст для поста в блог компании про запуск нового продукта.',
+      submit: 'Собрать промпт',
+      submitting: 'Собираю',
+      errorShort: 'Опишите задачу хотя бы одним предложением.',
+      errorNetwork: 'Не получилось сгенерировать. Попробуйте ещё раз.',
+      resultTitle: 'Готово — это ваш первый промпт',
+      actions: {
+        openStudio: 'Открыть в Studio →',
+        again: 'Попробовать на другой задаче',
+      },
+      suggestionsTitle: 'Идеи:',
+      suggestionsByGoal: {
+        work: [
+          'Напиши черновик письма клиенту с задержкой по проекту.',
+          'Собери release notes по этим коммитам: …',
+          'Сверстай KPI-дашборд на неделю по вот этим метрикам.',
+        ],
+        study: [
+          'Сделай план подготовки к экзамену по линейной алгебре на 2 недели.',
+          'Сравни две статьи по одинаковой методологии.',
+          'Сведи этот текст к 10 тезисам с разбивкой по темам.',
+        ],
+        own: [
+          'Придумай tagline и 3 подзаголовка для продукта про …',
+          'Сформулируй оффер для лендинга курса по …',
+          'Сгенерируй 5 идей тем для телеграм-канала.',
+        ],
+      },
+    },
+    done: {
+      title: 'Всё, вы в Studio',
+      body: 'Первая сессия сохранена — она уже есть в списке слева.',
+      cta: 'Перейти в Studio',
+    },
   },
 }
 
