@@ -8,7 +8,7 @@ import { CopyIconButton, TryInGeminiButton } from '../../components/PromptToolba
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
 import { useT } from '../../i18n'
-import { getStartersForGoal, type StarterGoal } from '../../data/starterPrompts'
+import { getStartersForGoal, type StarterGoal } from '../../lib/starterPrompts'
 import styles from '../Library.module.css'
 
 type LibraryView = 'all' | 'recent' | 'best' | 'stale' | 'untagged'
