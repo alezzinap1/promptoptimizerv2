@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../api/client'
 import { useT } from '../i18n'
+import { useTypewriterReveal } from '../lib/reveal'
 import styles from './Welcome.module.css'
 
 /*
@@ -206,6 +207,9 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [revealKey, setRevealKey] = useState(0)
+  const { visible: revealed, done: revealDone, skip: revealSkip } =
+    useTypewriterReveal(result, { durationMs: 650, resetKey: revealKey })
 
   if (user) return <Navigate to="/home" replace />
 
@@ -221,6 +225,7 @@ export default function Welcome() {
     try {
       const r = await api.demoGenerate(trimmed)
       setResult(r.prompt_block)
+      setRevealKey((k) => k + 1)
     } catch (e) {
       setErr(e instanceof Error ? e.message : t.landing.composer.errorNetwork)
     } finally {
@@ -340,7 +345,14 @@ export default function Welcome() {
                 ) : null}
                 {result ? (
                   <>
-                    <pre className={styles.composerResult}>{result}</pre>
+                    <pre
+                      className={styles.composerResult}
+                      onClick={revealDone ? undefined : revealSkip}
+                      title={revealDone ? undefined : 'click to reveal full prompt'}
+                    >
+                      {revealed}
+                      {!revealDone ? <span className={styles.revealCaret} aria-hidden /> : null}
+                    </pre>
                     <div className={styles.composerActions}>
                       <button type="button" className={styles.composerActionBtn} onClick={copyResult}>
                         {t.landing.composer.actions.copy}

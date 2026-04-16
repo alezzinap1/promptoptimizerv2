@@ -266,6 +266,16 @@
   margin: 0;
 }
 
+.revealCaret {
+  display: inline-block;
+  width: 7px;
+  height: 0.9em;
+  vertical-align: -0.1em;
+  background: var(--primary);
+  margin-left: 1px;
+  animation: mp-caret-blink 900ms steps(1) infinite;
+}
+
 .resultPre {
   margin: 0;
   padding: 12px 14px;

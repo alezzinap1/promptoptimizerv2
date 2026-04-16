@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useT } from '../i18n'
 import { pushRecentSession } from '../lib/recentSessions'
+import { useTypewriterReveal } from '../lib/reveal'
 import styles from './Onboarding.module.css'
 
 /*
@@ -70,6 +71,12 @@ export default function Onboarding() {
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<string>('')
   const [sessionId, setSessionId] = useState<string>('')
+  const [revealKey, setRevealKey] = useState(0)
+  const {
+    visible: revealed,
+    done: revealDone,
+    skip: revealSkip,
+  } = useTypewriterReveal(result, { durationMs: 700, resetKey: revealKey })
 
   const progressPct = Math.min(100, (step / totalSteps) * 100)
   const progressLabel = t.onboarding.progress
@@ -117,6 +124,7 @@ export default function Onboarding() {
         technique_mode: 'auto',
       })
       setResult(r.prompt_block || r.llm_raw || '')
+      setRevealKey((k) => k + 1)
       if (r.session_id) {
         setSessionId(r.session_id)
         pushRecentSession(r.session_id, trimmed)
@@ -251,7 +259,14 @@ export default function Onboarding() {
               {result ? (
                 <div className={styles.resultBlock}>
                   <h3 className={styles.resultTitle}>{t.onboarding.step3.resultTitle}</h3>
-                  <pre className={styles.resultPre}>{result}</pre>
+                  <pre
+                    className={styles.resultPre}
+                    onClick={revealDone ? undefined : revealSkip}
+                    title={revealDone ? undefined : 'click to reveal full prompt'}
+                  >
+                    {revealed}
+                    {!revealDone ? <span className={styles.revealCaret} aria-hidden /> : null}
+                  </pre>
                   <div className={styles.resultActions}>
                     <button type="button" className={styles.btnPrimary} onClick={openInStudio}>
                       {t.onboarding.step3.actions.openStudio}
