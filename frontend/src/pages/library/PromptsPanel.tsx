@@ -7,7 +7,47 @@ import SelectDropdown from '../../components/SelectDropdown'
 import { CopyIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
+import { useT } from '../../i18n'
+import { getStartersForGoal, type StarterGoal } from '../../data/starterPrompts'
 import styles from '../Library.module.css'
+
+type LibraryView = 'all' | 'recent' | 'best' | 'stale' | 'untagged'
+
+const LS_ONBOARDING_GOAL = 'metaprompt-onboarding-goal'
+
+function readGoal(): StarterGoal | null {
+  try {
+    const v = localStorage.getItem(LS_ONBOARDING_GOAL)
+    if (v === 'work' || v === 'study' || v === 'own') return v
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function applyView(items: LibraryItem[], view: LibraryView): LibraryItem[] {
+  if (view === 'all') return items
+  if (view === 'untagged') return items.filter((i) => (i.tags || []).length === 0)
+  const now = Date.now()
+  if (view === 'recent') {
+    return items.filter((i) => {
+      const t = Date.parse(i.updated_at || i.created_at || '')
+      return !Number.isNaN(t) && now - t <= 7 * DAY_MS
+    })
+  }
+  if (view === 'stale') {
+    return items.filter((i) => {
+      const t = Date.parse(i.updated_at || i.created_at || '')
+      return !Number.isNaN(t) && now - t >= 30 * DAY_MS
+    })
+  }
+  if (view === 'best') {
+    return [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 10)
+  }
+  return items
+}
 
 function ratingLabel(rating: number | undefined | null) {
   const r = rating ?? 0
@@ -29,12 +69,18 @@ type Props = {
 
 export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Props) {
   const navigate = useNavigate()
+  const { t } = useT()
   const [searchParams] = useSearchParams()
   const [items, setItems] = useState<LibraryItem[]>([])
   const [stats, setStats] = useState<{ total: number; models?: string[]; task_types?: string[] }>({ total: 0 })
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [taskType, setTaskType] = useState('all')
+  const [view, setView] = useState<LibraryView>('all')
   const [sortBy, setSortBy] = useState<'rating' | 'date' | 'tokens' | 'name'>('rating')
+  const [starterBusy, setStarterBusy] = useState<string | null>(null)
+  const [starterAdded, setStarterAdded] = useState<Record<string, boolean>>({})
+  const [starterErr, setStarterErr] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -63,18 +109,26 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
     if (q) setSearch(q)
   }, [searchParams])
 
+  // Debounce user input by 200ms so that typing doesn't hammer the
+  // backend on every keystroke — keeps the grid feeling fast on long
+  // libraries.
+  useEffect(() => {
+    const h = window.setTimeout(() => setDebouncedSearch(search), 200)
+    return () => window.clearTimeout(h)
+  }, [search])
+
   useEffect(() => {
     setLoading(true)
     setError(null)
     api
       .getLibrary({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         task_type: taskType !== 'all' ? taskType : undefined,
       })
       .then((r) => setItems(r.items))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false))
-  }, [search, taskType])
+  }, [debouncedSearch, taskType])
 
   const taskTypeOptions = useMemo(
     () => [
@@ -91,8 +145,10 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
     { value: 'name', label: 'По имени' },
   ], [])
 
+  const viewed = useMemo(() => applyView(items, view), [items, view])
+
   const sorted = useMemo(() => {
-    const arr = [...items]
+    const arr = [...viewed]
     switch (sortBy) {
       case 'rating': return arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.id - a.id)
       case 'date': return arr.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -100,7 +156,46 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
       case 'name': return arr.sort((a, b) => a.title.localeCompare(b.title))
       default: return arr
     }
-  }, [items, sortBy])
+  }, [viewed, sortBy])
+
+  const viewOptions: { id: LibraryView; label: string }[] = useMemo(
+    () => [
+      { id: 'all', label: t.library.views.all },
+      { id: 'recent', label: t.library.views.recent },
+      { id: 'best', label: t.library.views.best },
+      { id: 'stale', label: t.library.views.stale },
+      { id: 'untagged', label: t.library.views.untagged },
+    ],
+    [t],
+  )
+
+  const isTrulyEmpty =
+    !loading && stats.total === 0 && !debouncedSearch && taskType === 'all' && view === 'all'
+
+  const addStarter = async (starterId: string, title: string, body: string, tags: string[], taskType: string) => {
+    setStarterBusy(starterId)
+    setStarterErr((p) => {
+      const n = { ...p }
+      delete n[starterId]
+      return n
+    })
+    try {
+      await api.saveToLibrary({ title, prompt: body, tags, task_type: taskType })
+      setStarterAdded((p) => ({ ...p, [starterId]: true }))
+      const s = await api.getLibraryStats()
+      setStats(s)
+      onPromptCountChanged?.()
+      const refreshed = await api.getLibrary({})
+      setItems(refreshed.items)
+    } catch (e) {
+      setStarterErr((p) => ({
+        ...p,
+        [starterId]: e instanceof Error ? e.message : t.library.starters.failed,
+      }))
+    } finally {
+      setStarterBusy(null)
+    }
+  }
 
   const startEdit = (item: LibraryItem) => {
     setEditingId(item.id)
@@ -202,7 +297,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
       <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
         <input
           type="search"
-          placeholder="Поиск по тексту и тегам…"
+          placeholder={t.library.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={`${styles.search} ${styles.searchCompact}`}
@@ -225,6 +320,23 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
         />
       </div>
 
+      {!isTrulyEmpty && (
+        <div className={styles.viewsRow} role="tablist" aria-label={t.library.views.label}>
+          {viewOptions.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              role="tab"
+              aria-selected={view === opt.id}
+              className={view === opt.id ? styles.viewChipActive : styles.viewChip}
+              onClick={() => setView(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && <p className={styles.error}>{error}</p>}
 
       {publishItem && (
@@ -244,6 +356,58 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
 
       {loading ? (
         <p>Загрузка...</p>
+      ) : isTrulyEmpty ? (
+        <div className={styles.starters}>
+          <div className={styles.starterHeader}>
+            <div className={styles.starterEyebrow}>{t.library.starters.eyebrow}</div>
+            <h2 className={styles.starterTitle}>{t.library.starters.title}</h2>
+            <p className={styles.starterLede}>{t.library.starters.lede}</p>
+          </div>
+          <div className={styles.starterGrid}>
+            {(() => {
+              const goal = readGoal()
+              const starters = getStartersForGoal(goal)
+              const goalTag =
+                goal === 'study'
+                  ? t.library.starters.goalTag.study
+                  : goal === 'own'
+                    ? t.library.starters.goalTag.own
+                    : t.library.starters.goalTag.work
+              return starters.map((sp) => {
+                const busy = starterBusy === sp.id
+                const added = !!starterAdded[sp.id]
+                const err = starterErr[sp.id]
+                return (
+                  <div key={sp.id} className={styles.starterCard}>
+                    <div className={styles.starterCardGoalTag}>{goalTag}</div>
+                    <div className={styles.starterCardTitle}>{sp.title}</div>
+                    <pre className={styles.starterCardBody}>{sp.body}</pre>
+                    <div className={styles.starterCardTags}>
+                      {sp.tags.map((tag) => (
+                        <span key={tag} className={styles.starterCardTag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.starterCardBtn}
+                      disabled={busy || added}
+                      onClick={() => addStarter(sp.id, sp.title, sp.body, sp.tags, sp.taskType)}
+                    >
+                      {added
+                        ? t.library.starters.added
+                        : busy
+                          ? t.library.starters.adding
+                          : `+ ${t.library.starters.add}`}
+                    </button>
+                    {err && <div className={styles.starterCardErr}>{err}</div>}
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </div>
       ) : items.length === 0 ? (
         <p className={styles.empty}>Нет сохранённых промптов</p>
       ) : (

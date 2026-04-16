@@ -250,6 +250,28 @@ const en: Dict = {
     },
   },
 
+  library: {
+    views: {
+      label: 'Views',
+      all: 'All',
+      recent: 'Recent',
+      best: 'Top by rating',
+      stale: 'Untouched',
+      untagged: 'Untagged',
+    },
+    starters: {
+      eyebrow: 'Starters',
+      title: 'Your library is empty',
+      lede: 'Seed one of these templates — you can rework it like any prompt.',
+      add: 'Add',
+      adding: 'Adding…',
+      added: 'Added',
+      failed: 'Failed',
+      goalTag: { work: 'for work', study: 'for study', own: 'for your projects' },
+    },
+    searchPlaceholder: 'Search by text and tags…',
+  },
+
   notFound: {
     title: 'Page not found',
     body: 'The link is stale or points to a private part of the product.',

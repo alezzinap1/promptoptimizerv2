@@ -108,6 +108,164 @@
   margin: 0 0 8px;
 }
 
+/* Smart views — compact chip row, sits above the main grid.
+ * Spec: docs/superpowers/specs/2026-04-16-product-ux-visual-design.md §8.1. */
+.viewsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.viewChip,
+.viewChipActive {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--duration-fast, 120ms) ease,
+    border-color var(--duration-fast, 120ms) ease,
+    background var(--duration-fast, 120ms) ease;
+}
+
+.viewChip:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.viewChipActive {
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+/* Starter empty-state — shown only when library truly empty.
+ * Spec §8.5 — seeded client-side from onboarding goal. */
+.starters {
+  padding: 22px 4px 40px;
+}
+
+.starterHeader {
+  max-width: 560px;
+  margin: 0 0 18px;
+}
+
+.starterEyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+.starterTitle {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.starterLede {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.starterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.starterCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 12px;
+  border-radius: var(--r-card, 14px);
+  border: 1px solid color-mix(in srgb, var(--muted) 25%, transparent);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+.starterCardGoalTag {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--primary) 80%, var(--muted));
+}
+
+.starterCardTitle {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.starterCardBody {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: 92px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  margin: 0;
+  position: relative;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.starterCardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.starterCardTag {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 15%, transparent);
+  color: var(--muted);
+}
+
+.starterCardBtn {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: var(--r-control, 10px);
+  border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--duration-fast, 120ms) ease;
+  margin-top: 2px;
+}
+
+.starterCardBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.starterCardBtn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.starterCardErr {
+  font-size: 11.5px;
+  color: #e06060;
+}
+
 .empty {
   padding: 60px 40px;
   text-align: center;

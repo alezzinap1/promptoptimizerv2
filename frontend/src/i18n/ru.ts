@@ -160,6 +160,27 @@ const ru: {
       githubDisabled: string
     }
   }
+  library: {
+    views: {
+      label: string
+      all: string
+      recent: string
+      best: string
+      stale: string
+      untagged: string
+    }
+    starters: {
+      eyebrow: string
+      title: string
+      lede: string
+      add: string
+      adding: string
+      added: string
+      failed: string
+      goalTag: { work: string; study: string; own: string }
+    }
+    searchPlaceholder: string
+  }
   notFound: { title: string; body: string; cta: string }
   privateOnly: { title: string; body: string; tryDemo: string }
   onboarding: {
@@ -444,6 +465,28 @@ const ru: {
       github: 'Не удалось войти через GitHub. Попробуйте ещё раз.',
       githubDisabled: 'Аккаунт отключён. Обратитесь к администратору.',
     },
+  },
+
+  library: {
+    views: {
+      label: 'Подборки',
+      all: 'Все',
+      recent: 'Недавние',
+      best: 'Топ по оценке',
+      stale: 'Давно не трогали',
+      untagged: 'Без тегов',
+    },
+    starters: {
+      eyebrow: 'С чего начать',
+      title: 'Ваша библиотека пока пуста',
+      lede: 'Добавьте один из стартовых шаблонов — его можно будет отредактировать как обычный промпт.',
+      add: 'Добавить',
+      adding: 'Добавляю…',
+      added: 'Добавлено',
+      failed: 'Не получилось',
+      goalTag: { work: 'для работы', study: 'для учёбы', own: 'для своих проектов' },
+    },
+    searchPlaceholder: 'Поиск по тексту и тегам…',
   },
 
   notFound: {
