@@ -1,5 +1,8 @@
-"""Admin API — users, trial reset, block (beta)."""
+"""Admin API — users, trial reset, block, metrics, model-health (beta)."""
 from __future__ import annotations
+
+import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
@@ -8,6 +11,8 @@ from config.abuse import check_admin_api_rate_limit
 from config.settings import TRIAL_MAX_COMPLETION_PER_M, TRIAL_TOKENS_LIMIT
 from db.manager import DBManager
 from services.admin_event_sanitize import sanitize_event_payload
+from services.model_health import ensure_fresh, run_health_check
+from services.model_router import catalog_summary
 from services.trial_budget import effective_trial_tokens_limit, effective_session_generation_budget
 
 router = APIRouter()
@@ -170,3 +175,180 @@ def admin_user_events(
             }
         )
     return {"events": events}
+
+
+def _parse_ts(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+@router.get("/metrics")
+def admin_metrics(
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+):
+    """Aggregated metrics for admin dashboard. Все цифры без текста промптов."""
+    _admin_rate_guard(admin)
+    now = datetime.now(timezone.utc)
+    d1 = now - timedelta(days=1)
+    d7 = now - timedelta(days=7)
+    d30 = now - timedelta(days=30)
+
+    with db._conn() as conn:  # noqa: SLF001
+        users_total = int(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])
+        blocked = int(
+            conn.execute("SELECT COUNT(*) FROM users WHERE COALESCE(is_blocked,0)=1").fetchone()[0]
+        )
+        admins = int(
+            conn.execute("SELECT COUNT(*) FROM users WHERE COALESCE(is_admin,0)=1").fetchone()[0]
+        )
+        with_key = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM user_preferences WHERE COALESCE(openrouter_api_key,'') <> ''"
+            ).fetchone()[0]
+        )
+        tokens_total = int(
+            conn.execute("SELECT COALESCE(SUM(tokens_used),0) FROM user_usage").fetchone()[0]
+        )
+        dollars_total = float(
+            conn.execute("SELECT COALESCE(SUM(dollars_used),0) FROM user_usage").fetchone()[0]
+        )
+        users_new_7d = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM users WHERE datetime(created_at) >= datetime(?)",
+                (d7.isoformat(),),
+            ).fetchone()[0]
+        )
+        users_new_30d = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM users WHERE datetime(created_at) >= datetime(?)",
+                (d30.isoformat(),),
+            ).fetchone()[0]
+        )
+        users_active_1d = int(
+            conn.execute(
+                """SELECT COUNT(DISTINCT user_id) FROM user_sessions
+                   WHERE datetime(updated_at) >= datetime(?)""",
+                (d1.isoformat(),),
+            ).fetchone()[0]
+        )
+        users_active_7d = int(
+            conn.execute(
+                """SELECT COUNT(DISTINCT user_id) FROM user_sessions
+                   WHERE datetime(updated_at) >= datetime(?)""",
+                (d7.isoformat(),),
+            ).fetchone()[0]
+        )
+        events_7d_rows = conn.execute(
+            """SELECT event_name, COUNT(*) AS c FROM app_events
+               WHERE datetime(created_at) >= datetime(?)
+               GROUP BY event_name ORDER BY c DESC LIMIT 20""",
+            (d7.isoformat(),),
+        ).fetchall()
+        events_1d = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM app_events WHERE datetime(created_at) >= datetime(?)",
+                (d1.isoformat(),),
+            ).fetchone()[0]
+        )
+        events_7d_total = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM app_events WHERE datetime(created_at) >= datetime(?)",
+                (d7.isoformat(),),
+            ).fetchone()[0]
+        )
+        trial_exhausted = int(
+            conn.execute(
+                """
+                SELECT COUNT(*) FROM user_usage uu
+                WHERE uu.tokens_used >= COALESCE(uu.trial_tokens_limit, ?)
+                """,
+                (TRIAL_TOKENS_LIMIT,),
+            ).fetchone()[0]
+        )
+        top_users = conn.execute(
+            """
+            SELECT u.id, u.username, COALESCE(uu.tokens_used,0) AS tokens_used,
+                   COALESCE(uu.dollars_used,0) AS dollars_used
+            FROM users u
+            LEFT JOIN user_usage uu ON uu.user_id = u.id
+            ORDER BY tokens_used DESC LIMIT 5
+            """
+        ).fetchall()
+
+    return {
+        "generated_at": int(time.time()),
+        "users": {
+            "total": users_total,
+            "admins": admins,
+            "blocked": blocked,
+            "with_own_key": with_key,
+            "new_7d": users_new_7d,
+            "new_30d": users_new_30d,
+            "active_1d": users_active_1d,
+            "active_7d": users_active_7d,
+            "trial_exhausted": trial_exhausted,
+        },
+        "usage": {
+            "tokens_total": tokens_total,
+            "dollars_total": round(dollars_total, 6),
+            "trial_tokens_limit_global": TRIAL_TOKENS_LIMIT,
+            "trial_max_completion_per_m": TRIAL_MAX_COMPLETION_PER_M,
+        },
+        "events": {
+            "last_1d": events_1d,
+            "last_7d": events_7d_total,
+            "by_name_7d": [{"event": r["event_name"], "count": int(r["c"])} for r in events_7d_rows],
+        },
+        "top_users_by_tokens": [
+            {
+                "id": r["id"],
+                "username": r["username"],
+                "tokens_used": int(r["tokens_used"]),
+                "dollars_used": round(float(r["dollars_used"]), 6),
+            }
+            for r in top_users
+        ],
+    }
+
+
+@router.get("/model-health")
+def admin_model_health(
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+):
+    """Snapshot здоровья моделей каталога + история замен."""
+    _admin_rate_guard(admin)
+    ensure_fresh(db)
+    rows = db.list_model_health()
+    events = db.list_model_health_events(limit=50)
+    last_checked = None
+    for r in rows:
+        dt = _parse_ts(r.get("last_checked_at"))
+        if dt and (last_checked is None or dt > last_checked):
+            last_checked = dt
+    return {
+        "catalog": catalog_summary(),
+        "items": rows,
+        "events": events,
+        "last_checked_at": last_checked.isoformat() if last_checked else None,
+    }
+
+
+@router.post("/model-health/run")
+def admin_model_health_run(
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+):
+    """Принудительно запустить healthcheck сейчас."""
+    _admin_rate_guard(admin)
+    summary = run_health_check(db)
+    db.log_admin_audit(int(admin["id"]), "model_health.run", None, {"summary": summary})
+    return {"ok": True, "summary": summary}

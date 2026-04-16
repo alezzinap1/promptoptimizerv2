@@ -20,6 +20,7 @@ import Help from './pages/Help'
 import OnboardingPreferences from './pages/OnboardingPreferences'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminUserDetail from './pages/admin/AdminUserDetail'
+import AdminDashboard from './pages/admin/AdminDashboard'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -51,7 +52,8 @@ function AppShell() {
         {/* Private */}
         <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
         <Route path="/onboarding" element={<RequireAuth><OnboardingPreferences /></RequireAuth>} />
-        <Route path="/admin" element={<RequireAuth><AdminUsers /></RequireAuth>} />
+        <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
+        <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
         <Route path="/admin/users/:userId" element={<RequireAuth><AdminUserDetail /></RequireAuth>} />
         <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
         <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />

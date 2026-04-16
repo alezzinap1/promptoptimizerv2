@@ -56,7 +56,7 @@ export default function AdminUserDetail() {
   }, [user?.is_admin, id])
 
   if (!user?.is_admin) return <Navigate to="/home" replace />
-  if (!Number.isFinite(id) || id <= 0) return <Navigate to="/admin" replace />
+  if (!Number.isFinite(id) || id <= 0) return <Navigate to="/admin/users" replace />
 
   const reload = () => {
     setErr(null)
@@ -124,7 +124,7 @@ export default function AdminUserDetail() {
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
       <p>
-        <Link to="/admin">← К списку</Link>
+        <Link to="/admin/users">← К списку</Link>
       </p>
       <h1 className="pageTitleGradient" style={{ marginBottom: 16 }}>
         Пользователь #{id}

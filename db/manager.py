@@ -179,6 +179,7 @@ class DBManager:
             self._migrate_phase13_image_try_model(conn)
             self._migrate_phase14_admin_flags(conn)
             self._migrate_phase15_user_usage_limits(conn)
+            self._migrate_phase16_model_health(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -389,6 +390,35 @@ class DBManager:
         self._safe_add_column(conn, "user_usage", "trial_tokens_limit", "INTEGER")
         self._safe_add_column(conn, "user_usage", "rate_limit_rpm", "INTEGER")
         self._safe_add_column(conn, "user_usage", "session_generation_budget", "INTEGER")
+
+    def _migrate_phase16_model_health(self, conn: sqlite3.Connection) -> None:
+        """Daily health snapshot for catalog models + swap audit for admin UI."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_health (
+                model_id                TEXT PRIMARY KEY,
+                mode                    TEXT NOT NULL DEFAULT '',
+                tier                    TEXT NOT NULL DEFAULT '',
+                available               INTEGER NOT NULL DEFAULT 1,
+                reason                  TEXT NOT NULL DEFAULT '',
+                last_pricing_prompt     REAL,
+                last_pricing_completion REAL,
+                swapped_to              TEXT,
+                last_checked_at         TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_health_events (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                model_id        TEXT NOT NULL,
+                event           TEXT NOT NULL,
+                detail          TEXT NOT NULL DEFAULT '',
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
     def _safe_add_column(
         self,
@@ -1288,6 +1318,72 @@ class DBManager:
             except Exception:
                 data[dst] = default
         return data
+
+    # ─── Model health (Phase 16) ───────────────────────────────────────────────
+
+    def upsert_model_health(
+        self,
+        *,
+        model_id: str,
+        mode: str,
+        tier: str,
+        available: bool,
+        reason: str,
+        pricing_prompt: float | None,
+        pricing_completion: float | None,
+        swapped_to: str | None,
+    ) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO model_health (
+                    model_id, mode, tier, available, reason,
+                    last_pricing_prompt, last_pricing_completion,
+                    swapped_to, last_checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(model_id) DO UPDATE SET
+                    mode = excluded.mode,
+                    tier = excluded.tier,
+                    available = excluded.available,
+                    reason = excluded.reason,
+                    last_pricing_prompt = excluded.last_pricing_prompt,
+                    last_pricing_completion = excluded.last_pricing_completion,
+                    swapped_to = excluded.swapped_to,
+                    last_checked_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    model_id,
+                    mode,
+                    tier,
+                    1 if available else 0,
+                    reason,
+                    pricing_prompt,
+                    pricing_completion,
+                    swapped_to,
+                ),
+            )
+
+    def list_model_health(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM model_health ORDER BY mode, tier, model_id"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def log_model_health_event(self, model_id: str, event: str, detail: str = "") -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO model_health_events (model_id, event, detail) VALUES (?, ?, ?)",
+                (model_id, event, detail),
+            )
+
+    def list_model_health_events(self, limit: int = 50) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM model_health_events ORDER BY created_at DESC, id DESC LIMIT ?",
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # ─── Product events / metrics ──────────────────────────────────────────────
 

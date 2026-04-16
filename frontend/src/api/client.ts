@@ -29,6 +29,65 @@ export type AdminUserRow = {
   session_generation_budget?: number | null
 }
 
+export type AdminMetrics = {
+  generated_at: number
+  users: {
+    total: number
+    admins: number
+    blocked: number
+    with_own_key: number
+    new_7d: number
+    new_30d: number
+    active_1d: number
+    active_7d: number
+    trial_exhausted: number
+  }
+  usage: {
+    tokens_total: number
+    dollars_total: number
+    trial_tokens_limit_global: number
+    trial_max_completion_per_m: number
+  }
+  events: {
+    last_1d: number
+    last_7d: number
+    by_name_7d: { event: string; count: number }[]
+  }
+  top_users_by_tokens: {
+    id: number
+    username: string
+    tokens_used: number
+    dollars_used: number
+  }[]
+}
+
+export type AdminModelHealthItem = {
+  model_id: string
+  mode: string
+  tier: string
+  available: number
+  reason: string
+  last_pricing_prompt: number | null
+  last_pricing_completion: number | null
+  swapped_to: string | null
+  last_checked_at: string | null
+}
+
+export type AdminModelHealthEvent = {
+  id: number
+  model_id: string
+  event: string
+  detail: string
+  created_at: string
+}
+
+export type AdminModelHealth = {
+  catalog: Record<string, Record<string, string[]>>
+  items: AdminModelHealthItem[]
+  events: AdminModelHealthEvent[]
+  last_checked_at: string | null
+}
+
 export type AdminUserEvent = {
   id?: number
   event_name: string
@@ -598,6 +657,15 @@ export const api = {
   adminUnblockUser: (id: number) => fetchApi<{ ok: boolean }>(`/admin/users/${id}/unblock`, { method: 'POST' }),
   adminResetTrialUsage: (id: number) =>
     fetchApi<{ ok: boolean }>(`/admin/users/${id}/reset-trial-usage`, { method: 'POST' }),
+  adminMetrics: () => fetchApi<AdminMetrics>(`/admin/metrics`),
+  adminModelHealth: () => fetchApi<AdminModelHealth>(`/admin/model-health`),
+  adminRunModelHealth: () =>
+    fetchApi<{ ok: boolean; summary: Record<string, unknown> }>(`/admin/model-health/run`, { method: 'POST' }),
+  translate: (req: { text: string; direction?: 'ru->en' | 'en->ru' | 'auto'; kind?: 'prompt' | 'skill' | 'plain' }) =>
+    fetchApi<{ translated: string; direction: string; detected_language: string | null; model_used: string }>(
+      '/translate',
+      { method: 'POST', body: JSON.stringify(req) },
+    ),
   adminPatchUserLimits: (
     id: number,
     body: {

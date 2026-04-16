@@ -49,6 +49,7 @@ from backend.api import (
     skills,
     techniques,
     tokenizer,
+    translate,
     user_info,
     workspaces,
 )
@@ -80,6 +81,7 @@ api_app.include_router(compare.router, tags=["compare"])
 api_app.include_router(library.router, tags=["library"])
 api_app.include_router(community.router, tags=["community"])
 api_app.include_router(skills.router, tags=["skills"])
+api_app.include_router(translate.router, tags=["translate"])
 api_app.include_router(techniques.router, tags=["techniques"])
 api_app.include_router(tokenizer.router, tags=["tokenizer"])
 api_app.include_router(image_meta.router, tags=["meta"])
