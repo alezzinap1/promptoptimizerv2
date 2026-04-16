@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { LanguageProvider, useT } from './i18n'
 import Layout from './components/Layout'
 import PrivateOnlyMessage from './components/PrivateOnlyMessage'
+import CommandPalette from './components/CommandPalette'
 import AuthPage from './pages/Auth'
 import RootRedirect from './pages/RootRedirect'
 import Welcome from './pages/Welcome'
@@ -56,11 +57,17 @@ function AppShell() {
   if (location.pathname === '/login') {
     // If already logged in, redirect to home
     if (user) return <Navigate to="/home" replace />
-    return <AuthPage />
+    return (
+      <>
+        <AuthPage />
+        <CommandPalette />
+      </>
+    )
   }
 
   return (
     <Layout>
+      <CommandPalette />
       <Routes>
         {/* Public */}
         <Route path="/" element={<RootRedirect />} />

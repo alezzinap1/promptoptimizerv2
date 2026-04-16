@@ -22,6 +22,34 @@ const ru: {
     | 'languageSwitch',
     string
   >
+  palette: {
+    open: string
+    hint: string
+    placeholder: string
+    empty: string
+    groups: { navigate: string; actions: string; recent: string; admin: string }
+    cmd: {
+      goStudio: string
+      goSimple: string
+      goCompare: string
+      goLibrary: string
+      goCommunity: string
+      goModels: string
+      goWorkspaces: string
+      goPresets: string
+      goSettings: string
+      goUserInfo: string
+      goHelp: string
+      goAdmin: string
+      themeLight: string
+      themeDark: string
+      langRu: string
+      langEn: string
+      signOut: string
+      signIn: string
+    }
+    sessionPrefix: string
+  }
   header: {
     modeStudio: string
     modeSimple: string
@@ -187,6 +215,40 @@ const ru: {
     retry: 'Повторить',
     copy: 'Копировать',
     languageSwitch: 'Язык интерфейса',
+  },
+
+  palette: {
+    open: 'Команды',
+    hint: '⌘K',
+    placeholder: 'Поиск команд и сессий…',
+    empty: 'Ничего не нашли',
+    groups: {
+      navigate: 'Перейти',
+      actions: 'Действия',
+      recent: 'Недавние сессии',
+      admin: 'Админ',
+    },
+    cmd: {
+      goStudio: 'Открыть Studio',
+      goSimple: 'Открыть «Улучшить»',
+      goCompare: 'Открыть A/B Compare',
+      goLibrary: 'Открыть библиотеку',
+      goCommunity: 'Открыть Community',
+      goModels: 'Открыть «Модели»',
+      goWorkspaces: 'Пространства',
+      goPresets: 'Пресеты',
+      goSettings: 'Настройки',
+      goUserInfo: 'Мой профиль и метрики',
+      goHelp: 'Справка',
+      goAdmin: 'Админ-панель',
+      themeLight: 'Сменить тему: светлая',
+      themeDark: 'Сменить тему: тёмная',
+      langRu: 'Язык: Русский',
+      langEn: 'Language: English',
+      signOut: 'Выйти',
+      signIn: 'Войти',
+    },
+    sessionPrefix: 'Открыть сессию: ',
   },
 
   header: {
