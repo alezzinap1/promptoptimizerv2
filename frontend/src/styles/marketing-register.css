@@ -1,0 +1,145 @@
+/*
+ * Marketing register — cream editorial palette overlay.
+ * Applied on <body class="register-marketing"> by Layout.tsx
+ * for public surfaces: /welcome, /login, /onboarding, /404.
+ *
+ * Deliberately overrides the user's chosen theme — marketing pages
+ * are brand-level, not personalisable. The user's theme stays saved;
+ * it reapplies automatically on product surfaces.
+ *
+ * Specificity note: body[class].register-marketing beats
+ * html[data-palette][data-theme] because of equal-ish specificity plus
+ * later source order (this file imports after theme-palettes.css).
+ */
+
+body.register-marketing {
+  --bg: #f8f5f0;
+  --header-bg: rgba(248, 245, 240, 0.82);
+  --panel: rgba(26, 20, 16, 0.045);
+  --panel-strong: rgba(26, 20, 16, 0.08);
+  --secondary: var(--panel);
+  --surface: #ffffff;
+  --surface-2: rgba(26, 20, 16, 0.02);
+  --text: #1a1410;
+  --text-1: var(--text);
+  --text-2: rgba(26, 20, 16, 0.64);
+  --muted: rgba(26, 20, 16, 0.62);
+  --primary: #c45f28;
+  --primary-strong: #a34d1f;
+  --accent: #d97b45;
+  --accent-2: #b8732f;
+  --stroke: rgba(26, 20, 16, 0.1);
+  --border: var(--stroke);
+
+  /* Editorial grid — barely visible, turned on by surfaces that opt in */
+  --grid-line: rgba(26, 20, 16, 0.055);
+
+  /* Orb/glow tokens used by legacy surfaces — keep harmless values */
+  --glow: 0 8px 32px rgba(196, 95, 40, 0.12);
+  --orb-1: rgba(196, 95, 40, 0.08);
+  --orb-2: rgba(217, 123, 69, 0.05);
+  --orb-3: rgba(168, 123, 82, 0.04);
+
+  --option-bg: #ffffff;
+  --option-text: #1a1410;
+  --select-surface: #ffffff;
+  --modal-surface: #ffffff;
+  --modal-border: rgba(26, 20, 16, 0.1);
+
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: light;
+}
+
+/* Make sure <select>/<input>/<textarea> pick up light UA controls on marketing. */
+body.register-marketing select,
+body.register-marketing input,
+body.register-marketing textarea {
+  color-scheme: light;
+}
+
+/* Marketing-only typographic reset: body font stays UI sans, headings get display font,
+ * serif-italic is only for .serif-accent spans. */
+body.register-marketing {
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+body.register-marketing .serif-accent {
+  font-family: var(--font-serif-italic);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--primary);
+}
+
+/* Small-caps eyebrow utility */
+body.register-marketing .eyebrow {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+/* Marketing-register override for legacy global button styles.
+ * The default button in index.css has a dark translucent background which
+ * looks wrong on cream paper. We reset to a light variant. */
+body.register-marketing button {
+  background: transparent;
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+body.register-marketing button:hover:not(:disabled) {
+  border-color: rgba(26, 20, 16, 0.28);
+  background: rgba(26, 20, 16, 0.04);
+  transform: none;
+  box-shadow: none;
+}
+
+body.register-marketing button.btn-primary,
+body.register-marketing .btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 6px 18px rgba(196, 95, 40, 0.22);
+}
+
+body.register-marketing button.btn-primary:hover:not(:disabled),
+body.register-marketing .btn-primary:hover:not(:disabled) {
+  background: var(--primary-strong);
+  filter: none;
+}
+
+body.register-marketing button.btn-secondary,
+body.register-marketing .btn-secondary {
+  background: #ffffff;
+  border: 1px solid var(--stroke);
+  color: var(--text);
+}
+
+body.register-marketing ::selection {
+  background: rgba(196, 95, 40, 0.22);
+  color: var(--text);
+}
+
+body.register-marketing :focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+body.register-marketing ::-webkit-scrollbar-track {
+  background: rgba(26, 20, 16, 0.04);
+}
+
+body.register-marketing ::-webkit-scrollbar-thumb {
+  background: rgba(26, 20, 16, 0.18);
+}
+
+body.register-marketing ::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 20, 16, 0.3);
+}

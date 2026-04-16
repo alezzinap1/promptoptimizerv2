@@ -1,0 +1,102 @@
+/*
+ * Design primitives — shared tokens used by every new surface.
+ * Intentionally layout-neutral: no component styles live here.
+ * Spec: docs/superpowers/specs/2026-04-16-product-ux-visual-design.md §4.3
+ */
+
+:root {
+  /* Radii */
+  --r-card: 14px;
+  --r-control: 10px;
+  --r-pill: 999px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-med: 220ms;
+  --duration-slow: 360ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Type scale — fluid, clamps on viewport width */
+  --fs-display-xl: clamp(40px, 6vw, 84px);
+  --fs-display-lg: clamp(28px, 4vw, 48px);
+  --fs-display-md: clamp(22px, 2.4vw, 30px);
+  --fs-title: 22px;
+  --fs-body-lg: 17px;
+  --fs-body: 15px;
+  --fs-meta: 13px;
+  --fs-micro: 11px;
+
+  /* Line heights */
+  --lh-display: 1.05;
+  --lh-title: 1.2;
+  --lh-body: 1.55;
+
+  /* Tracking */
+  --ls-display: -0.025em;
+  --ls-title: -0.01em;
+  --ls-eyebrow: 0.14em;
+
+  /* Serif italic accent — used ONLY for 1-word accents in marketing headlines.
+     Already loaded alongside other fonts in index.css. */
+  --font-serif-italic: "Source Serif 4", Georgia, "Times New Roman", serif;
+
+  /* Shadows */
+  --shadow-soft:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-soft-strong:
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    0 18px 48px rgba(0, 0, 0, 0.14);
+  --shadow-ring: 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  /* Editorial grid — visible only when a surface opts in */
+  --grid-line: rgba(255, 255, 255, 0.05);
+}
+
+/* Respect reduced-motion — any animation using these tokens shortens to near-zero. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-med: 1ms;
+    --duration-slow: 1ms;
+  }
+}
+
+/* Mount reveal — used by marketing/onboarding surfaces via .reveal-on-mount. */
+@keyframes mp-reveal-mount {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-on-mount {
+  animation: mp-reveal-mount var(--duration-med) var(--ease-out) both;
+}
+
+/* Skeleton shimmer — used while waiting on async work. */
+@keyframes mp-skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--panel) 0%,
+    var(--panel-strong) 50%,
+    var(--panel) 100%
+  );
+  background-size: 200% 100%;
+  animation: mp-skeleton-shimmer 1800ms linear infinite;
+  border-radius: var(--r-control);
+}

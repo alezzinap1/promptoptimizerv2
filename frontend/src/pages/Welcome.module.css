@@ -1,0 +1,847 @@
+/*
+ * Welcome (landing) page — marketing register.
+ * Design rules applied:
+ *   - Whole page aims to fit in ≤ 2 desktop screens.
+ *   - No clamped monster paddings; section paddings 32–56px.
+ *   - Hero + working composer live side-by-side (no separate demo section).
+ *   - Unique elements: rotating typewriter headline slot, hand-drawn
+ *     SVG annotations (circle + arrow + brackets), micro-ticker band,
+ *     editorial horizontal rule background on hero only.
+ * Spec: docs/superpowers/specs/2026-04-16-product-ux-visual-design.md §5
+ */
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.container {
+  width: 100%;
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 0 clamp(18px, 3vw, 40px);
+}
+
+/* ==================================================================
+ * HERO — single-screen, composer lives on the right
+ * ================================================================== */
+
+.hero {
+  position: relative;
+  padding: clamp(28px, 4vw, 56px) 0 clamp(20px, 3vw, 40px);
+  border-bottom: 1px solid var(--stroke);
+  overflow: hidden;
+}
+
+/* Editorial ruling: horizontal lines every 32px, extremely faint.
+ * Grounds the page visually without looking like a generic "grid pattern". */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    rgba(26, 20, 16, 0.035) 31px,
+    rgba(26, 20, 16, 0.035) 32px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Warm corner light, stays but very subtle. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 800px 500px at top right,
+    rgba(196, 95, 40, 0.07) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.heroGrid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 64px);
+  align-items: start;
+}
+
+@media (max-width: 920px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.heroLeft {
+  position: relative;
+  padding-top: 8px;
+}
+
+.heroEyebrow {
+  display: inline-block;
+  margin-bottom: 14px;
+}
+
+.heroTitle {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: clamp(34px, 4.5vw, 58px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: var(--ls-display);
+  color: var(--text);
+  margin: 0 0 14px;
+  max-width: 16ch;
+}
+
+/* Slot that holds the rotating word. Fixed height prevents layout reflow.
+ * The SVG circle annotation wraps the whole slot. */
+.rotatingSlot {
+  position: relative;
+  display: inline-block;
+  min-width: 7ch;
+  min-height: 1em;
+  padding: 0 0.1em;
+}
+
+.rotatingWord {
+  font-family: var(--font-serif-italic);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.rotatingCaret {
+  display: inline-block;
+  width: 2px;
+  height: 0.85em;
+  background: var(--primary);
+  margin-left: 2px;
+  vertical-align: -0.05em;
+  animation: mp-caret-blink 900ms steps(1) infinite;
+}
+
+@keyframes mp-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Hand-drawn annotation circle around the rotating slot */
+.annotCircle {
+  position: absolute;
+  inset: -8px -10px -6px -10px;
+  pointer-events: none;
+  color: var(--primary);
+  opacity: 0.55;
+}
+
+.heroSubtitle {
+  font-size: var(--fs-body-lg);
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 20px;
+  max-width: 44ch;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.btnPrimary,
+.btnGhost {
+  padding: 10px 18px;
+  border-radius: var(--r-control);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.btnPrimary {
+  background: var(--primary);
+  color: #ffffff;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 14px rgba(196, 95, 40, 0.2);
+}
+
+.btnPrimary:hover {
+  background: var(--primary-strong);
+  transform: translateY(-1px);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--stroke);
+}
+
+.btnGhost:hover {
+  border-color: rgba(26, 20, 16, 0.28);
+  background: rgba(26, 20, 16, 0.03);
+}
+
+.heroFootnote {
+  margin-top: 14px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+/* Right side: live composer card. Wrapper provides space for a hand-drawn
+ * arrow annotation to the left + brackets on the corners. */
+.composerWrap {
+  position: relative;
+  padding-left: clamp(0px, 4vw, 40px);
+}
+
+.composerBrackets {
+  position: absolute;
+  inset: -6px -6px -6px -6px;
+  pointer-events: none;
+  color: var(--primary);
+  opacity: 0.35;
+}
+
+.composerArrow {
+  position: absolute;
+  left: -6px;
+  top: 36px;
+  width: 54px;
+  height: 80px;
+  color: var(--primary);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+@media (max-width: 920px) {
+  .composerArrow {
+    display: none;
+  }
+  .composerWrap {
+    padding-left: 0;
+  }
+}
+
+.composerCard {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-card);
+  padding: 18px;
+  box-shadow: var(--shadow-soft);
+}
+
+.composerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.composerTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.composerTitleDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+.composerTag {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+
+.composerTextarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-control);
+  background: #ffffff;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.composerTextarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(196, 95, 40, 0.14);
+}
+
+.composerFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.composerRate {
+  font-size: var(--fs-micro);
+  color: var(--muted);
+}
+
+.composerRunBtn {
+  padding: 9px 16px;
+  border-radius: var(--r-control);
+  background: var(--primary);
+  color: #ffffff;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.composerRunBtn:hover:not(:disabled) {
+  background: var(--primary-strong);
+}
+
+.composerRunBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.composerResult {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: rgba(26, 20, 16, 0.035);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-control);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.composerResult strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.composerError {
+  margin-top: 10px;
+  color: #b91c1c;
+  font-size: var(--fs-micro);
+}
+
+.composerActions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.composerActionBtn {
+  padding: 6px 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--stroke);
+  background: #ffffff;
+  color: var(--text);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.composerActionBtn:hover {
+  border-color: rgba(26, 20, 16, 0.3);
+  background: rgba(26, 20, 16, 0.03);
+}
+
+.composerSkeleton {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(26, 20, 16, 0.05) 0%,
+    rgba(26, 20, 16, 0.1) 50%,
+    rgba(26, 20, 16, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: mp-skeleton-shimmer 1600ms linear infinite;
+  margin-bottom: 6px;
+}
+
+.composerSkeleton:nth-child(2) { width: 90%; }
+.composerSkeleton:nth-child(3) { width: 70%; }
+.composerSkeleton:nth-child(4) { width: 85%; }
+
+/* ==================================================================
+ * TICKER — narrow band below hero
+ * ================================================================== */
+
+.ticker {
+  background: #1a1410;
+  color: #f8f5f0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(26, 20, 16, 0.2);
+  position: relative;
+}
+
+.tickerTrack {
+  display: inline-flex;
+  align-items: center;
+  gap: 36px;
+  padding: 10px 0;
+  white-space: nowrap;
+  animation: mp-ticker-slide 38s linear infinite;
+  will-change: transform;
+}
+
+.ticker:hover .tickerTrack {
+  animation-play-state: paused;
+}
+
+@keyframes mp-ticker-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.tickerItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.02em;
+}
+
+.tickerLabel {
+  color: rgba(248, 245, 240, 0.5);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.tickerValue {
+  color: #f8f5f0;
+}
+
+.tickerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(248, 245, 240, 0.25);
+}
+
+.tickerDot.ok { background: #4ade80; }
+.tickerDot.degraded { background: #fbbf24; }
+
+/* ==================================================================
+ * SHARED — section header
+ * ================================================================== */
+
+.section {
+  padding: clamp(32px, 4vw, 56px) 0;
+  border-bottom: 1px solid var(--stroke);
+  position: relative;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.sectionNum {
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--primary);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 600;
+  letter-spacing: var(--ls-title);
+  color: var(--text);
+  margin: 0;
+}
+
+.sectionLede {
+  font-size: var(--fs-body);
+  color: var(--muted);
+  margin: 2px 0 0;
+  max-width: 60ch;
+}
+
+/* ==================================================================
+ * HOW — 3 compact cards in one row
+ * ================================================================== */
+
+.howGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 760px) {
+  .howGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.howCard {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-card);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.howCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(26, 20, 16, 0.18);
+  box-shadow: var(--shadow-soft);
+}
+
+.howCardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.howCardNum {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--primary);
+  letter-spacing: 0.12em;
+}
+
+.howCardGlyph {
+  color: var(--primary);
+  opacity: 0.65;
+}
+
+.howCardTitle {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.howCardBody {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ==================================================================
+ * FOR WHO — dense 2-column chips with brief body
+ * ================================================================== */
+
+.forWho {
+  padding: clamp(32px, 4vw, 56px) 0;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.forWhoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 760px) {
+  .forWhoGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.forWhoCol {
+  background: #ffffff;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-card);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.forWhoHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.forWhoBadge {
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.forWhoBadge.beginner {
+  background: rgba(217, 123, 69, 0.16);
+  color: #a34d1f;
+}
+
+.forWhoBadge.engineer {
+  background: rgba(196, 95, 40, 0.14);
+  color: var(--primary);
+}
+
+.forWhoTitle {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: var(--fs-body-lg);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.forWhoList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.forWhoList li {
+  position: relative;
+  padding-left: 14px;
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.forWhoList li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ==================================================================
+ * TRUST — compact horizontal band
+ * ================================================================== */
+
+.trustBar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0 8px;
+}
+
+.trustCell {
+  flex: 1 1 150px;
+  min-width: 140px;
+  background: #ffffff;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-control);
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.trustInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.trustLabel {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.trustMode {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+}
+
+.trustDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.trustDot.ok {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+.trustDot.degraded {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+}
+
+.trustDot.down {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+}
+
+.trustFootnote {
+  margin-top: 10px;
+  font-size: var(--fs-micro);
+  color: var(--muted);
+}
+
+/* ==================================================================
+ * FAQ — dense accordion, rows touch each other
+ * ================================================================== */
+
+.faqList {
+  margin-top: 4px;
+  border-top: 1px solid var(--stroke);
+}
+
+.faqItem {
+  border-bottom: 1px solid var(--stroke);
+}
+
+.faqSummary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.faqSummary::-webkit-details-marker {
+  display: none;
+}
+
+.faqSummary:hover {
+  color: var(--primary);
+}
+
+.faqChevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform var(--duration-med) var(--ease-out);
+}
+
+.faqItem[open] .faqChevron {
+  transform: rotate(45deg);
+  color: var(--primary);
+}
+
+.faqBody {
+  padding: 0 2px 14px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 72ch;
+}
+
+/* ==================================================================
+ * FOOTER — single line
+ * ================================================================== */
+
+.footerBar {
+  padding: 18px 0 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: var(--fs-micro);
+  color: var(--muted);
+}
+
+.footerBar a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.footerBar a:hover {
+  color: var(--primary);
+}
+
+.footerLinks {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}

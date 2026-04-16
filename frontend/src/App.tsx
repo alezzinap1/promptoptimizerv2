@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -29,9 +30,22 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+const MARKETING_PATHS = new Set<string>(['/welcome', '/login', '/onboarding'])
+
 function AppShell() {
   const { user, loading } = useAuth()
   const location = useLocation()
+
+  // Register switch: marketing (cream editorial) for public/onboarding surfaces,
+  // product (user's chosen theme) elsewhere. Applied via <body> class; see
+  // frontend/src/styles/marketing-register.css and spec §4.1.
+  useEffect(() => {
+    const isMarketing = MARKETING_PATHS.has(location.pathname)
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('register-marketing', isMarketing)
+      document.body.classList.toggle('register-product', !isMarketing)
+    }
+  }, [location.pathname])
 
   if (loading) return <div style={{ padding: 24 }}>Загрузка…</div>
 
