@@ -81,7 +81,7 @@
 
 Вход по логину/паролю; сессия передаётся заголовком `X-Session-Id` (хранится на клиенте после login/register).
 
-**Администратор:** выставить флаг в SQLite — `python scripts/set_admin_user.py --username <логин>` (путь к БД из `DB_PATH` в `.env`).
+**Администратор:** выставить флаг в SQLite — `python scripts/set_admin_user.py --username <логин>` (можно несколько раз `--username`; путь к БД из `DB_PATH` в `.env`).
 
 ---
 

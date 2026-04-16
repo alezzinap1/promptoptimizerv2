@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 
 const STORAGE_KEY = 'home_onboarding_visit_count'
@@ -10,6 +11,7 @@ export default function HomeOnboardingHints() {
     () => typeof localStorage !== 'undefined' && localStorage.getItem(DISMISS_KEY) === '1',
   )
   const [visits, setVisits] = useState(0)
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     if (typeof localStorage === 'undefined') return
@@ -25,35 +27,89 @@ export default function HomeOnboardingHints() {
     setVisits(next)
   }, [])
 
-  if (dismissed || visits > MAX_VISITS || visits === 0) return null
+  useEffect(() => {
+    if (dismissed || visits > MAX_VISITS || visits === 0) return
+    setOpen(true)
+  }, [dismissed, visits])
 
-  const dismiss = () => {
+  if (dismissed || visits > MAX_VISITS || visits === 0 || !open) return null
+
+  const dismissForever = () => {
     localStorage.setItem(DISMISS_KEY, '1')
     setDismissed(true)
+    setOpen(false)
   }
 
-  return (
+  const closeThisTime = () => {
+    setOpen(false)
+  }
+
+  const modal = (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="home-onboarding-title"
       style={{
-        marginBottom: 12,
-        padding: '12px 14px',
-        borderRadius: 10,
-        border: '1px solid rgba(255,255,255,0.12)',
-        background: 'rgba(0,0,0,0.2)',
-        fontSize: 14,
-        lineHeight: 1.45,
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10050,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        background: 'rgba(0,0,0,0.55)',
+        backdropFilter: 'blur(4px)',
       }}
+      onClick={closeThisTime}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-        <div>
+      <div
+        style={{
+          maxWidth: 440,
+          width: '100%',
+          borderRadius: 14,
+          padding: '20px 22px',
+          border: '1px solid rgba(255,255,255,0.14)',
+          background: 'var(--surface-elevated, rgba(22,24,32,0.98))',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.45)',
+          fontSize: 14,
+          lineHeight: 1.5,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="home-onboarding-title" style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 700 }}>
+          Подсказка
+        </h2>
+        <p style={{ margin: '0 0 16px', opacity: 0.92 }}>
           <strong>С чего начать:</strong> опиши задачу слева → сгенерируй промпт → при необходимости сохрани в{' '}
-          <Link to="/library">библиотеку</Link>. Ключ OpenRouter — в <Link to="/settings">настройках</Link>, лимиты
-          trial — на <Link to="/user-info">странице профиля</Link>. Подробнее в <Link to="/help">справке</Link>.
+          <Link to="/library" onClick={closeThisTime}>
+            библиотеку
+          </Link>
+          . Ключ OpenRouter — в{' '}
+          <Link to="/settings" onClick={closeThisTime}>
+            настройках
+          </Link>
+          , лимиты trial — на{' '}
+          <Link to="/user-info" onClick={closeThisTime}>
+            странице профиля
+          </Link>
+          . Подробнее в{' '}
+          <Link to="/help" onClick={closeThisTime}>
+            справке
+          </Link>
+          .
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
+          <button type="button" onClick={dismissForever}>
+            Не показывать больше
+          </button>
+          <button type="button" onClick={closeThisTime} style={{ fontWeight: 600 }}>
+            Понятно
+          </button>
         </div>
-        <button type="button" onClick={dismiss} style={{ flexShrink: 0 }}>
-          Не показывать
-        </button>
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(modal, document.body)
 }
