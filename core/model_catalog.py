@@ -22,10 +22,11 @@ TRIAL_MAX_COMPLETION_PER_M: float = 1.0
 
 CATALOG: dict[Mode, dict[Tier, list[str]]] = {
     "text": {
+        # Trial / fast path: prefer fast, cheap models that feel snappier than DeepSeek for many users.
         "fast": [
-            "deepseek/deepseek-chat",
             "google/gemini-2.5-flash",
             "mistralai/mistral-nemo",
+            "deepseek/deepseek-chat",
         ],
         "mid": [
             "x-ai/grok-3-mini",
@@ -52,8 +53,8 @@ CATALOG: dict[Mode, dict[Tier, list[str]]] = {
     },
     "skill": {
         "fast": [
-            "deepseek/deepseek-chat",
             "google/gemini-2.5-flash",
+            "deepseek/deepseek-chat",
         ],
         "mid": [
             "x-ai/grok-3-mini",

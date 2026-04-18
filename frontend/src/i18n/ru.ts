@@ -181,6 +181,34 @@ const ru: {
     }
     searchPlaceholder: string
   }
+  expertLevels: {
+    labels: Record<'junior' | 'mid' | 'senior' | 'creative', string>
+    hints: Record<'junior' | 'mid' | 'senior' | 'creative', string>
+  }
+  tiersUi: {
+    auto: { label: string; hint: string }
+    fast: { label: string; hint: string }
+    mid: { label: string; hint: string }
+    advanced: { label: string; hint: string }
+    custom: { label: string; hint: string }
+  }
+  studio: {
+    taskTitle: string
+    newChat: string
+    tabText: string
+    tabImage: string
+    tabSkill: string
+    taskWord: string
+    expertLevelAria: string
+    helpLevelsFooter: string
+    resetToProfile: string
+    tierSelectAria: string
+    tierRadiogroupAria: string
+    levelBundles: Record<
+      'quick' | 'balanced' | 'precise' | 'creative_profile',
+      { label: string; description: string }
+    >
+  }
   notFound: { title: string; body: string; cta: string }
   privateOnly: { title: string; body: string; tryDemo: string }
   onboarding: {
@@ -487,6 +515,76 @@ const ru: {
       goalTag: { work: 'для работы', study: 'для учёбы', own: 'для своих проектов' },
     },
     searchPlaceholder: 'Поиск по тексту и тегам…',
+  },
+
+  expertLevels: {
+    labels: {
+      junior: 'Junior',
+      mid: 'Mid',
+      senior: 'Senior',
+      creative: 'Creative',
+    },
+    hints: {
+      junior: 'Больше уточняющих вопросов, авто-техники, сдержанная креативность.',
+      mid: 'Баланс как по умолчанию.',
+      senior: 'Без лишних вопросов, ручной набор сильных техник, выше температура.',
+      creative: 'Фото/скилл: глубже стиль и структура; текст — разнообразие техник.',
+    },
+  },
+
+  tiersUi: {
+    auto: {
+      label: 'Авто',
+      hint: 'MetaPrompt сам подбирает модель под задачу',
+    },
+    fast: {
+      label: 'Повседневный',
+      hint: 'Быстрый недорогой ответ — повседневные задачи',
+    },
+    mid: {
+      label: 'Средний',
+      hint: 'Баланс качества и цены',
+    },
+    advanced: {
+      label: 'Продвинутый',
+      hint: 'Глубже думает, вспомогательные модели — сложные задачи',
+    },
+    custom: {
+      label: 'Свой выбор',
+      hint: 'Вручную выбрать модель (дорогие — со своим ключом OpenRouter)',
+    },
+  },
+
+  studio: {
+    taskTitle: 'Задача',
+    newChat: 'Новый диалог',
+    tabText: '📝 Текст',
+    tabImage: '📷 Фото',
+    tabSkill: '⚡ Скилл',
+    taskWord: 'задача',
+    expertLevelAria: 'Уровень студии',
+    helpLevelsFooter: 'Справка: уровни',
+    resetToProfile: 'к профилю',
+    tierSelectAria: 'Сложность генерации (тир модели)',
+    tierRadiogroupAria: 'Уровень сложности',
+    levelBundles: {
+      quick: {
+        label: 'Быстро',
+        description: 'Больше уточнений, сдержанная температура — для новых задач.',
+      },
+      balanced: {
+        label: 'Стандарт',
+        description: 'Баланс по умолчанию.',
+      },
+      precise: {
+        label: 'Точно',
+        description: 'Минимум вопросов, сильные техники вручную.',
+      },
+      creative_profile: {
+        label: 'Творчески',
+        description: 'Больше разнообразия; температура ограничена потолком для стабильного [PROMPT].',
+      },
+    },
   },
 
   notFound: {

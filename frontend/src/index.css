@@ -22,6 +22,8 @@
 
 html {
   height: 100%;
+  /* Lets document.startViewTransition() cross-fade the whole UI on theme change. */
+  view-transition-name: root;
 }
 
 body {
@@ -322,4 +324,19 @@ input, textarea, select {
 ::selection {
   background: var(--primary);
   color: #041016;
+}
+
+/* Theme / palette: soften hard flashes (View Transitions + color interpolation fallback). */
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    transition:
+      background-color 0.42s ease,
+      color 0.42s ease;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.38s;
+    animation-timing-function: ease;
+  }
 }

@@ -1,26 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api } from '../api/client'
+import { useMemo } from 'react'
 import SelectDropdown from './SelectDropdown'
+import { useT } from '../i18n'
 
 export type TierValue = 'auto' | 'fast' | 'mid' | 'advanced' | 'custom'
 
 export const ALL_TIERS: TierValue[] = ['auto', 'fast', 'mid', 'advanced', 'custom']
-
-const FALLBACK_LABELS: Record<TierValue, string> = {
-  auto: 'Авто',
-  fast: 'Повседневный',
-  mid: 'Средний',
-  advanced: 'Продвинутый',
-  custom: 'Свой выбор',
-}
-
-const TIER_HINTS: Record<TierValue, string> = {
-  auto: 'MetaPrompt сам подбирает модель под задачу',
-  fast: 'Быстрый дешёвый ответ — повседневные задачи',
-  mid: 'Баланс качества и цены',
-  advanced: 'Глубже думает, использует вспомогательные модели — сложные задачи',
-  custom: 'Вручную выбрать конкретную модель (нужен свой OpenRouter ключ для дорогих)',
-}
 
 const TIER_STORAGE_KEY = 'studio.tier.v1'
 
@@ -54,36 +38,19 @@ export default function TierSelector({
   variant = 'dropdown',
   className = '',
 }: Props) {
-  const [labels, setLabels] = useState<Record<string, string>>(FALLBACK_LABELS)
-
-  useEffect(() => {
-    let cancelled = false
-    api
-      .getModelTiers()
-      .then((r) => {
-        if (cancelled) return
-        const mapped: Record<string, string> = { ...FALLBACK_LABELS }
-        for (const t of r.tiers) {
-          mapped[t.id] = t.label
-        }
-        setLabels(mapped)
-      })
-      .catch(() => {
-        /* fallback labels */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { t } = useT()
 
   const options = useMemo(
     () =>
-      ALL_TIERS.map((t) => ({
-        value: t,
-        label: labels[t] || FALLBACK_LABELS[t],
-        title: TIER_HINTS[t],
-      })),
-    [labels],
+      ALL_TIERS.map((tier) => {
+        const pack = t.tiersUi[tier]
+        return {
+          value: tier,
+          label: pack.label,
+          title: pack.hint,
+        }
+      }),
+    [t],
   )
 
   if (variant === 'dropdown') {
@@ -95,7 +62,7 @@ export default function TierSelector({
           persistTier(v as TierValue)
           onChange(v as TierValue)
         }}
-        aria-label="Сложность генерации"
+        aria-label={t.studio.tierSelectAria}
         variant="composer"
         disabled={disabled}
         className={className}
@@ -106,7 +73,7 @@ export default function TierSelector({
   return (
     <div
       role="radiogroup"
-      aria-label="Уровень сложности"
+      aria-label={t.studio.tierRadiogroupAria}
       style={{
         display: 'inline-flex',
         gap: 4,
@@ -117,20 +84,21 @@ export default function TierSelector({
         flexWrap: 'wrap',
       }}
     >
-      {ALL_TIERS.map((t) => {
-        const active = value === t
+      {ALL_TIERS.map((tier) => {
+        const active = value === tier
+        const pack = t.tiersUi[tier]
         return (
           <button
-            key={t}
+            key={tier}
             type="button"
             role="radio"
             aria-checked={active}
             disabled={disabled}
-            title={TIER_HINTS[t]}
+            title={pack.hint}
             onClick={() => {
               if (disabled) return
-              persistTier(t)
-              onChange(t)
+              persistTier(tier)
+              onChange(tier)
             }}
             style={{
               padding: _compact ? '3px 10px' : '5px 14px',
@@ -145,7 +113,7 @@ export default function TierSelector({
               opacity: disabled ? 0.55 : 1,
             }}
           >
-            {labels[t] || FALLBACK_LABELS[t]}
+            {pack.label}
           </button>
         )
       })}

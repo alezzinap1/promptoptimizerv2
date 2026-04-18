@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { flushSync } from 'react-dom'
 import { api } from '../api/client'
 import { useAuth } from './AuthContext'
 
@@ -102,6 +103,30 @@ function savePrefs(palette: PaletteId, font: FontId, mode: ColorMode) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ palette, font, mode }))
 }
 
+/** Softer theme / palette changes: View Transitions when supported, else no-op. */
+function runWithThemeTransition(run: () => void) {
+  if (typeof document === 'undefined') {
+    run()
+    return
+  }
+  const reduced =
+    typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reduced) {
+    run()
+    return
+  }
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void | Promise<void>) => { finished: Promise<void> }
+  }
+  if (typeof doc.startViewTransition === 'function') {
+    doc.startViewTransition(() => {
+      flushSync(run)
+    })
+  } else {
+    run()
+  }
+}
+
 function applyDom(palette: PaletteId, mode: ColorMode, font: FontId) {
   const root = document.documentElement
   root.setAttribute('data-palette', palette)
@@ -183,26 +208,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [user?.id])
 
   const setPalette = (p: PaletteId) => {
-    setPrefs((prev) => {
-      savePrefs(p, prev.font, prev.mode)
-      void pushServer(p, prev.font, prev.mode)
-      return { ...prev, palette: p }
+    runWithThemeTransition(() => {
+      setPrefs((prev) => {
+        savePrefs(p, prev.font, prev.mode)
+        void pushServer(p, prev.font, prev.mode)
+        return { ...prev, palette: p }
+      })
     })
   }
 
   const setMode = (m: ColorMode) => {
-    setPrefs((prev) => {
-      savePrefs(prev.palette, prev.font, m)
-      void pushServer(prev.palette, prev.font, m)
-      return { ...prev, mode: m }
+    runWithThemeTransition(() => {
+      setPrefs((prev) => {
+        savePrefs(prev.palette, prev.font, m)
+        void pushServer(prev.palette, prev.font, m)
+        return { ...prev, mode: m }
+      })
     })
   }
 
   const setFont = (f: FontId) => {
-    setPrefs((prev) => {
-      savePrefs(prev.palette, f, prev.mode)
-      void pushServer(prev.palette, f, prev.mode)
-      return { ...prev, font: f }
+    runWithThemeTransition(() => {
+      setPrefs((prev) => {
+        savePrefs(prev.palette, f, prev.mode)
+        void pushServer(prev.palette, f, prev.mode)
+        return { ...prev, font: f }
+      })
     })
   }
 

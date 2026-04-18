@@ -272,6 +272,76 @@ const en: Dict = {
     searchPlaceholder: 'Search by text and tags…',
   },
 
+  expertLevels: {
+    labels: {
+      junior: 'Junior',
+      mid: 'Mid',
+      senior: 'Senior',
+      creative: 'Creative',
+    },
+    hints: {
+      junior: 'More clarifying questions, auto techniques, restrained creativity.',
+      mid: 'Balanced default.',
+      senior: 'Fewer questions, strong manual techniques, higher temperature.',
+      creative: 'Image/skill: deeper style and structure; text: more technique variety.',
+    },
+  },
+
+  tiersUi: {
+    auto: {
+      label: 'Auto',
+      hint: 'We pick a model for the task',
+    },
+    fast: {
+      label: 'Everyday',
+      hint: 'Fast, inexpensive answers for routine work',
+    },
+    mid: {
+      label: 'Balanced',
+      hint: 'Quality vs cost balance',
+    },
+    advanced: {
+      label: 'Advanced',
+      hint: 'Deeper reasoning and helper models for harder tasks',
+    },
+    custom: {
+      label: 'Custom',
+      hint: 'Pick a model manually (bring your OpenRouter key for pricey ones)',
+    },
+  },
+
+  studio: {
+    taskTitle: 'Task',
+    newChat: 'New chat',
+    tabText: '📝 Text',
+    tabImage: '📷 Image',
+    tabSkill: '⚡ Skill',
+    taskWord: 'task',
+    expertLevelAria: 'Studio level',
+    helpLevelsFooter: 'Help: levels',
+    resetToProfile: 'match profile',
+    tierSelectAria: 'Generation tier (model class)',
+    tierRadiogroupAria: 'Difficulty tier',
+    levelBundles: {
+      quick: {
+        label: 'Quick',
+        description: 'More clarifications, moderate temperature — good for new tasks.',
+      },
+      balanced: {
+        label: 'Standard',
+        description: 'Default balance.',
+      },
+      precise: {
+        label: 'Precise',
+        description: 'Fewer questions, strong manual techniques.',
+      },
+      creative_profile: {
+        label: 'Creative',
+        description: 'More variety; temperature capped for a stable [PROMPT] block.',
+      },
+    },
+  },
+
   notFound: {
     title: 'Page not found',
     body: 'The link is stale or points to a private part of the product.',

@@ -40,10 +40,9 @@ import {
   clampExpertGenerationTemperature,
   EXPERT_DEFAULT_GEN_MODEL,
   EXPERT_GENERATION_TEMPERATURE_CAP,
-  EXPERT_LEVEL_HINTS,
-  EXPERT_LEVEL_LABELS,
   getExpertLevelPreset,
 } from '../lib/expertLevelPresets'
+import { useT } from '../i18n'
 import { getLevelBundleForExpertLevel } from '../lib/levelBundle'
 import { filterManualTechsForReasoningModel, isReasoningModelId } from '../lib/modelReasoning'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
@@ -282,6 +281,7 @@ function IconGlobe() {
 }
 
 export default function Home() {
+  const { t } = useT()
   const location = useLocation()
   const navigate = useNavigate()
   const [taskInput, setTaskInput] = useState('')
@@ -2035,13 +2035,17 @@ export default function Home() {
     () =>
       (['junior', 'mid', 'senior', 'creative'] as const).map((el) => ({
         value: el,
-        label: EXPERT_LEVEL_LABELS[el],
-        title: `${EXPERT_LEVEL_HINTS[el]} · ${getLevelBundleForExpertLevel(el).estimatedCostHint}`,
+        label: t.expertLevels.labels[el],
+        title: `${t.expertLevels.hints[el]} · ${getLevelBundleForExpertLevel(el).estimatedCostHint}`,
       })),
-    [],
+    [t],
   )
 
-  const activeLevelBundle = useMemo(() => getLevelBundleForExpertLevel(expertLevel), [expertLevel])
+  const activeLevelBundle = useMemo(() => {
+    const b = getLevelBundleForExpertLevel(expertLevel)
+    const pack = t.studio.levelBundles[b.id]
+    return { ...b, label: pack.label, description: pack.description }
+  }, [expertLevel, t])
 
   const skillTargetEnvSelectOptions = useMemo(
     () => SKILL_TARGET_ENV_OPTIONS.map((o) => ({ value: o.value, label: o.label, title: o.title })),
@@ -2601,7 +2605,7 @@ export default function Home() {
                 <div className={styles.agentChatHeaderTop}>
                   <div className={styles.agentHeaderLeft}>
                     <div className={styles.agentTaskTitleRow}>
-                      <h2 className="pageTitleGradient">Задача</h2>
+                      <h2 className="pageTitleGradient">{t.studio.taskTitle}</h2>
                       <div className={styles.promptTypeTabs}>
                         {(['text', 'image', 'skill'] as const).map((pt) => (
                           <button
@@ -2611,7 +2615,7 @@ export default function Home() {
                             disabled={loading}
                             onClick={() => handlePromptTypeChange(pt)}
                           >
-                            {pt === 'text' ? '📝 Текст' : pt === 'image' ? '📷 Фото' : '⚡ Скилл'}
+                            {pt === 'text' ? t.studio.tabText : pt === 'image' ? t.studio.tabImage : t.studio.tabSkill}
                           </button>
                         ))}
                       </div>
@@ -2619,11 +2623,11 @@ export default function Home() {
                         value={expertLevel}
                         options={expertLevelSelectOptions}
                         onChange={(v) => handleExpertLevelChange(v as ExpertLevel)}
-                        aria-label="Уровень студии"
+                        aria-label={t.studio.expertLevelAria}
                         variant="toolbar"
                         className={styles.expertLevelSelectWrap}
                         disabled={loading}
-                        footerLink={{ to: '/help', label: 'Справка: уровни' }}
+                        footerLink={{ to: '/help', label: t.studio.helpLevelsFooter }}
                       />
                       {useCustomGenModel ? (
                         <span
@@ -2640,7 +2644,7 @@ export default function Home() {
                               setGenModel(EXPERT_DEFAULT_GEN_MODEL[expertLevel])
                             }}
                           >
-                            к профилю
+                            {t.studio.resetToProfile}
                           </button>
                         </span>
                       ) : null}
@@ -2652,7 +2656,7 @@ export default function Home() {
                     disabled={loading}
                     onClick={resetAgentDialog}
                   >
-                    Новый диалог
+                    {t.studio.newChat}
                   </button>
                 </div>
                 {taskRefForTitles ? (
@@ -2675,7 +2679,7 @@ export default function Home() {
                         className={styles.evalMeta}
                         title="Размер исходной формулировки задачи; сравните с ≈tok у готового промпта справа"
                       >
-                        задача
+                        {t.studio.taskWord}
                       </span>
                     </div>
                   </div>
