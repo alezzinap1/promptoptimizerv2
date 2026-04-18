@@ -527,7 +527,7 @@ Owner said "решай сам". Decisions locked in:
 - **Q2 — Compare on-target daily cap**.
   - Trial user (host key): **10 rounds/day** (an on-target pair = 2 calls counts as 1 round). Per-session hard cap 3.
   - Own-key user: unlimited at our level, bounded by their OpenRouter credit.
-  - Admin can override per user via existing `user_usage_limits` (`compare_rounds_per_day` — new integer field).
+  - Admin can override per user via nullable columns on `user_usage` (same row as `trial_tokens_limit` / RPM); `compare_rounds_per_day` is provisioned in migration phase 18 for a future daily Compare cap (`DBManager.update_user_usage_limits`).
 - **Q3 — `/api/public/model-health-snapshot`**. Returns **tier/mode statuses only** (`auto_text: ok`, `advanced_vision: degraded`), without OpenRouter slugs. Admins see slugs through the existing `/api/admin/model-health`. Cached 5 min, in-process.
 - **Q4 — ⌘T theme cycle**. Include **all themes** currently registered in `ThemeContext` (all 6+). Order = registration order in `theme-palettes.css`. In marketing register the command is hidden (see §10.1 patch).
 - **Q5 — Onboarding Step 3 abuse**. Onboarding runs **after** login (today's routing keeps it under `RequireAuth` — see `App.tsx:54`), so the "email-verified before Step 3" check is effectively already there (account creation = signup). Additionally apply the existing `check_user_rate_limit` path with the same 10 req/5 min budget as `/api/generate`. No extra gate.

@@ -23,8 +23,8 @@ export type DraftChatMessage = {
   }
 }
 
-/** @deprecated используйте AgentDraftV2 */
-export type AgentDraftV1 = {
+/** Legacy v1 shape in localStorage — migrated once into v2 on read. */
+type LegacyAgentDraftV1 = {
   v: 1
   savedAt: number
   chatMessages: DraftChatMessage[]
@@ -50,7 +50,7 @@ export type AgentDraftV2 = {
   modes: Record<PromptStudioMode, AgentStudioSnapshot>
 }
 
-function v1ToSnapshot(d: AgentDraftV1): AgentStudioSnapshot {
+function v1ToSnapshot(d: LegacyAgentDraftV1): AgentStudioSnapshot {
   return {
     chatMessages: d.chatMessages as AgentStudioSnapshot['chatMessages'],
     baseTaskRef: d.baseTaskRef,
@@ -100,7 +100,7 @@ export function loadAgentDraftV2(): AgentDraftV2 | null {
     }
     const raw1 = localStorage.getItem(KEY)
     if (raw1) {
-      const d = JSON.parse(raw1) as AgentDraftV1
+      const d = JSON.parse(raw1) as LegacyAgentDraftV1
       if (d?.v === 1 && Array.isArray(d.chatMessages)) {
         const snap = v1ToSnapshot(d)
         const empty = (m: PromptStudioMode) => createEmptyStudioSnapshot(m)
@@ -143,69 +143,4 @@ export function clearAgentDraftV2(): void {
   } catch {
     /* ignore */
   }
-}
-
-/** Совместимость: старый API для вызовов без режимов */
-export function loadAgentDraft(): AgentDraftV1 | null {
-  const v2 = loadAgentDraftV2()
-  if (!v2) return null
-  const m = v2.modes[v2.activePromptType]
-  return {
-    v: 1,
-    savedAt: v2.savedAt,
-    chatMessages: m.chatMessages,
-    baseTaskRef: m.baseTaskRef,
-    taskInput: m.taskInput,
-    feedback: m.feedback,
-    result: m.result,
-    sessionId: m.sessionId,
-    iterationMode: m.iterationMode,
-    questionState: m.questionState,
-    questionCarouselIdx: m.questionCarouselIdx,
-    quickSaved: m.quickSaved,
-    imagePresetId: m.imagePresetId,
-    imageEngine: m.imageEngine,
-    imageDeepMode: m.imageDeepMode,
-    skillPresetId: m.skillPresetId,
-  }
-}
-
-export function saveAgentDraft(
-  draft: Omit<AgentDraftV1, 'v' | 'savedAt'> & { savedAt?: number; activePromptType?: PromptStudioMode; allModes?: Record<PromptStudioMode, AgentStudioSnapshot> },
-): void {
-  if (draft.allModes && draft.activePromptType) {
-    saveAgentDraftV2({
-      activePromptType: draft.activePromptType,
-      modes: draft.allModes,
-      savedAt: draft.savedAt,
-    })
-    return
-  }
-  try {
-    const payload: AgentDraftV1 = {
-      v: 1,
-      savedAt: draft.savedAt ?? Date.now(),
-      chatMessages: draft.chatMessages,
-      baseTaskRef: draft.baseTaskRef,
-      taskInput: draft.taskInput,
-      feedback: draft.feedback,
-      result: draft.result,
-      sessionId: draft.sessionId,
-      iterationMode: draft.iterationMode,
-      questionState: draft.questionState,
-      questionCarouselIdx: draft.questionCarouselIdx,
-      quickSaved: draft.quickSaved,
-      imagePresetId: draft.imagePresetId,
-      imageEngine: draft.imageEngine,
-      imageDeepMode: draft.imageDeepMode,
-      skillPresetId: draft.skillPresetId,
-    }
-    localStorage.setItem(KEY, JSON.stringify(payload))
-  } catch {
-    /* quota */
-  }
-}
-
-export function clearAgentDraft(): void {
-  clearAgentDraftV2()
 }

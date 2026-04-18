@@ -96,7 +96,7 @@ Same structure, shorter. Each builds on the previous, none critical-path for Pha
 - Backend: `POST /api/compare/run-on-target`, extended `/api/compare/judge` response shape (backward compatible), rate limiting against host key and per-user `compare_rounds_per_day`.
 
 **Phase 9 — Migrations + public health**:
-- `_migrate_phase18_onboarding_profile`: `preferences.user_goal TEXT NULL`, `preferences.default_tier TEXT NULL`, `user_usage_limits.compare_rounds_per_day INTEGER NULL`.
+- `_migrate_phase18_onboarding_profile`: `user_preferences.user_goal`, `user_preferences.default_tier`, and reserved `user_usage.compare_rounds_per_day` (nullable INTEGER; enforce in a follow-up — column exists for per-user Compare caps alongside other limits on the same row).
 - `GET /api/public/model-health-snapshot` — reads existing `model_health` table, projects to tier/mode statuses, cache 5 min.
 
 ---

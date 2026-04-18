@@ -226,7 +226,5 @@ export function useTheme() {
   return ctx
 }
 
-/** @deprecated use PALETTES */
-const THEMES = PALETTES
-export { THEMES, PALETTES, FONTS, COLOR_MODES }
+export { PALETTES, FONTS, COLOR_MODES }
 export type { PaletteId, FontId, ColorMode }

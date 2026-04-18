@@ -1,6 +1,6 @@
 # Отчёт v5 ↔ код: матрица и чеклист
 
-Сводка по [metaprompt_full_analysis_v5.html](./metaprompt_full_analysis_v5.html): ожидание отчёта, где это в репозитории, статус.
+Сводка по [metaprompt_full_analysis_v5.html](../../../../docs/user/reports/metaprompt_full_analysis_v5.html) (источник-отчёт в `docs/user/reports/`, не в бандле фронта): ожидание отчёта, где это в репозитории, статус.
 
 **Статусы:** done — соответствует; partial — частично; gap — нет / не совпадает.
 

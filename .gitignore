@@ -17,6 +17,9 @@ build/
 node_modules/
 frontend/dist/
 
+# TypeScript incremental build cache (do not commit)
+*.tsbuildinfo
+
 # Cursor / локальные логи
 .cursor/
 *.log
