@@ -172,6 +172,7 @@ export default function AdminDashboard() {
         <h1 className="pageTitleGradient">Админ · Дашборд</h1>
         <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
           <Link to="/admin/users">Пользователи</Link>
+          <Link to="/admin/community">Лента сообщества</Link>
         </div>
       </div>
       {err ? <p style={{ color: 'var(--danger, #f87171)' }}>{err}</p> : null}

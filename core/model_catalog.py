@@ -26,22 +26,22 @@ CATALOG: dict[Mode, dict[Tier, list[str]]] = {
         "fast": [
             "google/gemini-2.5-flash",
             "mistralai/mistral-nemo",
-            "deepseek/deepseek-chat",
+            "deepseek/deepseek-v4-flash",
         ],
         "mid": [
             "x-ai/grok-3-mini",
-            "deepseek/deepseek-chat",
+            "deepseek/deepseek-v4-flash",
             "google/gemini-2.5-flash",
         ],
         "advanced": [
             "anthropic/claude-haiku-4.5",
-            "openai/gpt-5-mini",
+            "openai/gpt-4o-mini",
             "deepseek/deepseek-r1",
             "x-ai/grok-3",
         ],
         "helper": [
             "google/gemini-2.5-flash",
-            "deepseek/deepseek-chat",
+            "deepseek/deepseek-v4-flash",
             "mistralai/mistral-nemo",
         ],
     },
@@ -54,21 +54,21 @@ CATALOG: dict[Mode, dict[Tier, list[str]]] = {
     "skill": {
         "fast": [
             "google/gemini-2.5-flash",
-            "deepseek/deepseek-chat",
+            "deepseek/deepseek-v4-flash",
         ],
         "mid": [
             "x-ai/grok-3-mini",
-            "deepseek/deepseek-chat",
+            "deepseek/deepseek-v4-flash",
             "google/gemini-2.5-flash",
         ],
         "advanced": [
             "anthropic/claude-haiku-4.5",
-            "openai/gpt-5-mini",
+            "openai/gpt-4o-mini",
             "deepseek/deepseek-r1",
         ],
         "helper": [
             "google/gemini-2.5-flash",
-            "deepseek/deepseek-chat",
+            "deepseek/deepseek-v4-flash",
         ],
     },
 }

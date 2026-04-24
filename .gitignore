@@ -20,8 +20,12 @@ frontend/dist/
 # TypeScript incremental build cache (do not commit)
 *.tsbuildinfo
 
-# Cursor / локальные логи
-.cursor/
+# Cursor / локальные логи (скиллы и slash-команды репозитория — в исключении)
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
+!.cursor/commands/
+!.cursor/commands/**
 *.log
 
 # Локальная папка с документами (черновики, экспорт)

@@ -425,3 +425,49 @@ def admin_set_tier_override(
         {"mode": mode, "tier": tier, "model_id": cleaned or ""},
     )
     return {"ok": True, "mode": mode, "tier": tier, "model_id": cleaned or ""}
+
+
+@router.get("/community")
+def admin_list_community(
+    visibility: str = Query("all"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+):
+    """Модерация ленты: все посты или только публичные / скрытые (is_public)."""
+    _admin_rate_guard(admin)
+    v = (visibility or "all").lower()
+    if v not in ("all", "public", "hidden"):
+        raise HTTPException(400, "visibility must be all, public, or hidden")
+    items, total = db.list_community_prompts_admin(visibility=v, limit=limit, offset=offset)
+    return {"items": items, "total": total}
+
+
+@router.patch("/community/{prompt_id}")
+def admin_patch_community_public(
+    prompt_id: int,
+    admin: dict = Depends(require_admin),
+    db: DBManager = Depends(get_db),
+    body: dict = Body(default_factory=dict),
+):
+    """Скрыть пост из публичной ленты (is_public=0) или вернуть (is_public=1)."""
+    _admin_rate_guard(admin)
+    if "is_public" not in body:
+        raise HTTPException(400, "is_public required (0 or 1)")
+    raw = body["is_public"]
+    if raw in (True, 1, "1", "true", "True"):
+        val = 1
+    elif raw in (False, 0, "0", "false", "False"):
+        val = 0
+    else:
+        raise HTTPException(400, "is_public must be 0 or 1")
+    if not db.admin_set_community_public(prompt_id, val):
+        raise HTTPException(404, "Community prompt not found")
+    db.log_admin_audit(
+        int(admin["id"]),
+        "community.public",
+        None,
+        {"prompt_id": prompt_id, "is_public": val},
+    )
+    return {"ok": True, "is_public": val}

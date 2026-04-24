@@ -268,7 +268,7 @@ def skill_sandbox_chat(
         provider=gen_model,
         temperature=0.5,
         top_p=0.95,
-        max_tokens=2048,
+        max_tokens=8192,
     )
     reply = (reply or "").strip()
     if not reply:

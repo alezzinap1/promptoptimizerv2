@@ -24,6 +24,7 @@ import Onboarding from './pages/Onboarding'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminUserDetail from './pages/admin/AdminUserDetail'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminCommunity from './pages/admin/AdminCommunity'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -79,6 +80,7 @@ function AppShell() {
         <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
         <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
         <Route path="/admin/users/:userId" element={<RequireAuth><AdminUserDetail /></RequireAuth>} />
+        <Route path="/admin/community" element={<RequireAuth><AdminCommunity /></RequireAuth>} />
         <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
         <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
         <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />

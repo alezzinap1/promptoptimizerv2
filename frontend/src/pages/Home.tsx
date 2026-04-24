@@ -318,6 +318,8 @@ export default function Home() {
   const [llmReviewModel, setLlmReviewModel] = useState('')
   const [llmReviewFromCache, setLlmReviewFromCache] = useState(false)
   const [llmReviewHints, setLlmReviewHints] = useState<string[]>([])
+  const [llmReviewHintsOpen, setLlmReviewHintsOpen] = useState(false)
+  const [llmReviewMaximized, setLlmReviewMaximized] = useState(false)
   const [imageTryBusy, setImageTryBusy] = useState(false)
   const [imageTryCoverPath, setImageTryCoverPath] = useState<string | null>(null)
   const [imageTryDataUrl, setImageTryDataUrl] = useState<string | null>(null)
@@ -1883,6 +1885,7 @@ export default function Home() {
     if (!result?.prompt_block) return
     setLlmReviewBusy(true)
     setLlmReviewOpen(true)
+    setLlmReviewHintsOpen(false)
     setLlmReviewText('')
     setLlmReviewModel('')
     setLlmReviewFromCache(false)
@@ -3474,7 +3477,7 @@ export default function Home() {
         ? createPortal(
             <div className={styles.llmReviewDockLayer} role="presentation">
               <div
-                className={styles.llmReviewDockCard}
+                className={`${styles.llmReviewDockCard}${llmReviewMaximized ? ` ${styles.llmReviewDockCardMaximized}` : ''}`}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="llm-review-dock-title"
@@ -3483,63 +3486,102 @@ export default function Home() {
                   <h3 id="llm-review-dock-title" className={styles.llmReviewDockTitle}>
                     Оценка промпта (LLM)
                   </h3>
-                  <button
-                    type="button"
-                    className={styles.llmReviewDockClose}
-                    onClick={() => setLlmReviewOpen(false)}
-                    aria-label="Закрыть"
-                  >
-                    ×
-                  </button>
-                </div>
-                {llmReviewModel ? <p className={styles.mutedSmall}>Модель: {llmReviewModel}</p> : null}
-                {llmReviewFromCache && !llmReviewBusy ? (
-                  <p className={styles.mutedSmall}>Взяли сохранённую оценку — повторный запрос к ИИ не уходил.</p>
-                ) : null}
-                <div className={styles.llmReviewDockBody}>
-                  {llmReviewBusy ? (
-                    <p>Запрашиваю оценку…</p>
-                  ) : (
-                    <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
-                  )}
-                </div>
-                {!llmReviewBusy && llmReviewHints.length > 0 && !llmReviewText.startsWith('Ошибка:') ? (
-                  <div className={styles.llmReviewHintsBox}>
-                    <div className={styles.llmReviewHintsHead}>
-                      <strong>Быстрые шаги</strong>
-                      <button
-                        type="button"
-                        className={styles.llmReviewHintsAllBtn}
-                        disabled={loading}
-                        onClick={() => {
-                          const body = llmReviewHints.map((t, i) => `${i + 1}. ${t}`).join('\n')
-                          setChatInput(`Учти по очереди советы судьи:\n${body}`)
-                          setLlmReviewOpen(false)
-                        }}
-                      >
-                        Всё в чат
-                      </button>
-                    </div>
-                    <ul className={styles.llmReviewHintsList}>
-                      {llmReviewHints.map((tip, idx) => (
-                        <li key={idx} className={styles.llmReviewHintRow}>
-                          <span className={styles.llmReviewHintText}>{tip}</span>
-                          <button
-                            type="button"
-                            className={styles.llmReviewHintBtn}
-                            disabled={loading}
-                            onClick={() => {
-                              setChatInput(`Учти совет судьи: ${tip}`)
-                              setLlmReviewOpen(false)
-                            }}
-                          >
-                            В чат
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className={styles.llmReviewDockHeadTools}>
+                    <button
+                      type="button"
+                      className={styles.llmReviewDockToolBtn}
+                      onClick={() => setLlmReviewMaximized((m) => !m)}
+                      title={llmReviewMaximized ? 'Обычный размер окна' : 'Развернуть на весь экран'}
+                    >
+                      {llmReviewMaximized ? 'Окно' : 'На весь экран'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.llmReviewDockClose}
+                      onClick={() => {
+                        setLlmReviewMaximized(false)
+                        setLlmReviewOpen(false)
+                      }}
+                      aria-label="Закрыть"
+                    >
+                      ×
+                    </button>
                   </div>
-                ) : null}
+                </div>
+                <div className={styles.llmReviewDockMeta}>
+                  <span className={styles.llmReviewDockMetaMain}>
+                    {llmReviewBusy
+                      ? 'Запрос…'
+                      : llmReviewModel
+                        ? `${llmReviewModel}${llmReviewFromCache ? ' · из кэша' : ''}`
+                        : '—'}
+                  </span>
+                  <details className={styles.llmReviewDockHelp}>
+                    <summary>Справка</summary>
+                    <p>
+                      Судья анализирует формулировку промпта, не выполняет вашу задачу. Если текст похож на ответ
+                      задачи — «Свежая оценка».
+                    </p>
+                  </details>
+                </div>
+                <div className={styles.llmReviewDockGrow}>
+                  <div className={styles.llmReviewDockScroll}>
+                    {llmReviewBusy ? (
+                      <p>Запрашиваю оценку…</p>
+                    ) : (
+                      <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
+                    )}
+                  </div>
+                  {!llmReviewBusy && llmReviewHints.length > 0 && !llmReviewText.startsWith('Ошибка:') ? (
+                    <div className={styles.llmReviewHintsShell}>
+                      <div className={styles.llmReviewHintsBar}>
+                        <button
+                          type="button"
+                          className={styles.llmReviewHintsToggle}
+                          aria-expanded={llmReviewHintsOpen}
+                          onClick={() => setLlmReviewHintsOpen((o) => !o)}
+                        >
+                          Быстрые шаги ({llmReviewHints.length})
+                          <span className={styles.llmReviewHintsToggleChev}>{llmReviewHintsOpen ? ' ▲' : ' ▼'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.llmReviewHintsAllBtn}
+                          disabled={loading}
+                          onClick={() => {
+                            const body = llmReviewHints.map((t, i) => `${i + 1}. ${t}`).join('\n')
+                            setChatInput(`Учти по очереди советы судьи:\n${body}`)
+                            setLlmReviewOpen(false)
+                          }}
+                        >
+                          Всё в чат
+                        </button>
+                      </div>
+                      {llmReviewHintsOpen ? (
+                        <div className={styles.llmReviewHintsBox}>
+                          <ul className={styles.llmReviewHintsList}>
+                            {llmReviewHints.map((tip, idx) => (
+                              <li key={idx} className={styles.llmReviewHintRow}>
+                                <span className={styles.llmReviewHintText}>{tip}</span>
+                                <button
+                                  type="button"
+                                  className={styles.llmReviewHintBtn}
+                                  disabled={loading}
+                                  onClick={() => {
+                                    setChatInput(`Учти совет судьи: ${tip}`)
+                                    setLlmReviewOpen(false)
+                                  }}
+                                >
+                                  В чат
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
                 {!llmReviewBusy && llmReviewText && !llmReviewText.startsWith('Ошибка:') ? (
                   <div className={styles.llmReviewDockActions}>
                     <button type="button" className={styles.ideModalBtn} onClick={() => void runLlmReview(true)}>
@@ -3589,7 +3631,7 @@ export default function Home() {
         ? createPortal(
             <div className={styles.skillSandboxBackdrop} role="presentation">
               <div
-                className={styles.skillSandboxModal}
+                className={`${styles.skillSandboxModal} ${styles.skillSandboxModalPrompt}`}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Песочница промпта"
@@ -3605,6 +3647,7 @@ export default function Home() {
                     ×
                   </button>
                 </div>
+                <p className={styles.skillSandboxBanner}>Тестовый диалог с промптом справа — не панель «оценка».</p>
                 <p className={styles.skillSandboxHint}>
                   Системный контекст = текущий промпт справа. Введите тестовый запрос пользователя — ответ модели
                   появится ниже. Используется модель генерации из композера.
@@ -3658,7 +3701,7 @@ export default function Home() {
         ? createPortal(
             <div className={styles.skillSandboxBackdrop} role="presentation">
               <div
-                className={styles.skillSandboxModal}
+                className={`${styles.skillSandboxModal} ${styles.skillSandboxModalSkill}`}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Песочница скилла"
@@ -3674,6 +3717,7 @@ export default function Home() {
                     ×
                   </button>
                 </div>
+                <p className={styles.skillSandboxBanner}>Диалог со скиллом как с системным промптом — не «оценка».</p>
                 <p className={styles.skillSandboxHint}>
                   Один раунд: системный контекст = текущий промпт-скилл справа. Сообщения не сохраняются на
                   сервере.

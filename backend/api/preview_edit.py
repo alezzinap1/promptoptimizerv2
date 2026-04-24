@@ -21,7 +21,7 @@ from services.user_preferences import get_user_preferences_payload
 router = APIRouter()
 
 PREVIEW_EDIT_SYSTEM = load_prompt("backend/preview_edit_system.txt")
-PREVIEW_EDIT_MAX_OUT = 4096
+PREVIEW_EDIT_MAX_OUT = 8192
 
 
 def _get_openrouter_model_id(provider: str) -> str:

@@ -2,47 +2,111 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 
-const STORAGE_KEY = 'home_onboarding_visit_count'
-const DISMISS_KEY = 'home_onboarding_dismissed'
-const MAX_VISITS = 8
+/** «Не показывать больше» — полный отказ от цепочки онбординга */
+const DISMISS_FOREVER_KEY = 'home_onboarding_dismissed'
+/** Один раз показали краткую цепочку студии (задача → промпт → библиотека) */
+const WELCOME_ACK_KEY = 'home_onboarding_welcome_modal_done'
+/** Верхний баннер «Студия — главный режим»; модалку показываем после него, чтобы не дублировать */
+const FIRST_HOME_BANNER_KEY = 'metaprompt-home-tip-v1-dismissed'
+
+const OPEN_DELAY_MS = 900
+
+function readBlocked(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  try {
+    return (
+      localStorage.getItem(DISMISS_FOREVER_KEY) === '1' || localStorage.getItem(WELCOME_ACK_KEY) === '1'
+    )
+  } catch {
+    return false
+  }
+}
 
 export default function HomeOnboardingHints() {
-  const [dismissed, setDismissed] = useState(
-    () => typeof localStorage !== 'undefined' && localStorage.getItem(DISMISS_KEY) === '1',
-  )
-  const [visits, setVisits] = useState(0)
+  const [blocked, setBlocked] = useState(readBlocked)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
     if (typeof localStorage === 'undefined') return
-    if (localStorage.getItem(DISMISS_KEY) === '1') {
-      setDismissed(true)
-      return
+    try {
+      if (localStorage.getItem(DISMISS_FOREVER_KEY) === '1' || localStorage.getItem(WELCOME_ACK_KEY) === '1') {
+        setBlocked(true)
+      }
+    } catch {
+      setBlocked(true)
     }
-    const raw = localStorage.getItem(STORAGE_KEY)
-    const prev = raw ? parseInt(raw, 10) : 0
-    const n = Number.isFinite(prev) ? prev : 0
-    const next = n + 1
-    localStorage.setItem(STORAGE_KEY, String(next))
-    setVisits(next)
   }, [])
 
   useEffect(() => {
-    if (dismissed || visits > MAX_VISITS || visits === 0) return
-    setOpen(true)
-  }, [dismissed, visits])
+    if (blocked || typeof window === 'undefined') return
 
-  if (dismissed || visits > MAX_VISITS || visits === 0 || !open) return null
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let scheduleStarted = false
+
+    const scheduleOpen = () => {
+      if (cancelled || scheduleStarted) return
+      scheduleStarted = true
+      timer = window.setTimeout(() => {
+        if (!cancelled) setOpen(true)
+      }, OPEN_DELAY_MS)
+    }
+
+    const bannerDismissed = () => {
+      try {
+        return localStorage.getItem(FIRST_HOME_BANNER_KEY) === '1'
+      } catch {
+        return false
+      }
+    }
+
+    if (bannerDismissed()) {
+      scheduleOpen()
+    } else {
+      const onBannerGone = () => {
+        if (cancelled) return
+        scheduleOpen()
+      }
+      window.addEventListener('metaprompt-first-home-tip-dismissed', onBannerGone)
+      return () => {
+        cancelled = true
+        if (timer !== undefined) window.clearTimeout(timer)
+        window.removeEventListener('metaprompt-first-home-tip-dismissed', onBannerGone)
+      }
+    }
+
+    return () => {
+      cancelled = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [blocked])
+
+  const acknowledge = () => {
+    try {
+      localStorage.setItem(WELCOME_ACK_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+    setBlocked(true)
+    setOpen(false)
+  }
 
   const dismissForever = () => {
-    localStorage.setItem(DISMISS_KEY, '1')
-    setDismissed(true)
+    try {
+      localStorage.setItem(DISMISS_FOREVER_KEY, '1')
+      localStorage.setItem(WELCOME_ACK_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+    setBlocked(true)
     setOpen(false)
   }
 
   const closeThisTime = () => {
-    setOpen(false)
+    acknowledge()
   }
+
+  if (blocked || !open) return null
 
   const modal = (
     <div
@@ -80,7 +144,8 @@ export default function HomeOnboardingHints() {
           Подсказка
         </h2>
         <p style={{ margin: '0 0 16px', opacity: 0.92 }}>
-          <strong>С чего начать:</strong> опиши задачу слева → сгенерируй промпт → при необходимости сохрани в{' '}
+          <strong>С чего начать в студии:</strong> опишите задачу слева → сгенерируйте промпт → при необходимости
+          сохраните в{' '}
           <Link to="/library" onClick={closeThisTime}>
             библиотеку
           </Link>

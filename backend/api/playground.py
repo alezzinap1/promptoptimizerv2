@@ -99,7 +99,7 @@ def playground_run(
         provider=gen_model,
         temperature=temp,
         top_p=0.95,
-        max_tokens=2048,
+        max_tokens=8192,
     )
     reply = (reply or "").strip()
     if not reply:

@@ -83,8 +83,10 @@
 
 .logoGlyph {
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
+  height: 34px;
+  width: auto;
+  aspect-ratio: 470 / 256;
+  max-width: 96px;
   background-color: var(--primary);
   -webkit-mask-image: url(/brand-logo-mask.png);
   mask-image: url(/brand-logo-mask.png);

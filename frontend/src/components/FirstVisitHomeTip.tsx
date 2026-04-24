@@ -25,6 +25,11 @@ export default function FirstVisitHomeTip() {
       /* ignore */
     }
     setVisible(false)
+    try {
+      window.dispatchEvent(new CustomEvent('metaprompt-first-home-tip-dismissed'))
+    } catch {
+      /* ignore */
+    }
   }
 
   return (

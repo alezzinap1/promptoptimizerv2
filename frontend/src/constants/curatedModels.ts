@@ -14,10 +14,10 @@ export type CuratedModelPick = {
 
 export const CURATED_MODEL_PICKS: CuratedModelPick[] = [
   {
-    id: 'deepseek/deepseek-chat',
-    title: 'DeepSeek Chat',
-    goodFor: 'Повседневные задачи, русский язык, соотношение цена/качество.',
-    vsOthers: 'Дешевле GPT‑4o и Claude; для максимальной точности смотрите GPT‑4o или Sonnet.',
+    id: 'deepseek/deepseek-v4-flash',
+    title: 'DeepSeek V4 Flash',
+    goodFor: 'Повседневные задачи, русский язык, быстрый ответ, цена/качество.',
+    vsOthers: 'Новее V3 Chat; для глубокого рассуждения — DeepSeek R1 или Sonnet.',
   },
   {
     id: 'openai/gpt-4o-mini',

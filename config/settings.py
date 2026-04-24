@@ -49,6 +49,14 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "https://metaprompt.online")
 # ── Observability ────────────────────────────────────────────
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if APP_ENV == "prod" else "DEBUG")
+# Log full chat.completions payloads (model + messages) before each OpenRouter call — dev only; can be huge.
+OPENROUTER_LOG_REQUEST_BODIES = os.getenv("OPENROUTER_LOG_REQUEST_BODIES", "0").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+OPENROUTER_LOG_MAX_CHARS = int(os.getenv("OPENROUTER_LOG_MAX_CHARS", "262144"))
 
 # ── Семантический роутер агента (fastembed) ─────────────────
 # Косинус к центроидам; margin отсекает «почти равные» классы.

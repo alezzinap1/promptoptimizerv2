@@ -1974,6 +1974,53 @@ class DBManager:
                 (prompt_id, user_id),
             )
 
+    def list_community_prompts_admin(
+        self,
+        *,
+        visibility: str = "all",
+        sort: str = "newest",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict], int]:
+        """visibility: all | public | hidden — для модерации ленты (is_public)."""
+        vis = (visibility or "all").lower()
+        base_from = "FROM community_prompts cp LEFT JOIN users u ON cp.author_user_id = u.id"
+        if vis == "public":
+            where = " WHERE cp.is_public = 1"
+        elif vis == "hidden":
+            where = " WHERE cp.is_public = 0"
+        else:
+            where = ""
+        count_sql = f"SELECT COUNT(*) AS c {base_from}{where}"
+        with self._conn() as conn:
+            total = int(conn.execute(count_sql).fetchone()[0])
+        if sort == "popular":
+            order = " ORDER BY cp.upvotes DESC, cp.created_at DESC"
+        else:
+            order = " ORDER BY cp.created_at DESC"
+        query = f"SELECT cp.*, u.username AS author_name {base_from}{where}{order} LIMIT ? OFFSET ?"
+        with self._conn() as conn:
+            rows = conn.execute(query, (limit, offset)).fetchall()
+        items: list[dict] = []
+        for row in rows:
+            d = dict(row)
+            try:
+                d["tags"] = json.loads(d["tags"]) if d["tags"] else []
+            except Exception:
+                d["tags"] = []
+            items.append(d)
+        return items, total
+
+    def admin_set_community_public(self, prompt_id: int, is_public: int) -> bool:
+        """Скрыть/показать пост в ленте без проверки автора (только админ API)."""
+        val = 1 if int(is_public) else 0
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE community_prompts SET is_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (val, prompt_id),
+            )
+            return bool(cur.rowcount)
+
     def toggle_community_vote(self, user_id: int, prompt_id: int) -> bool:
         """Returns True if voted, False if unvoted."""
         with self._conn() as conn:

@@ -7,6 +7,7 @@ from typing import Any
 from openai import OpenAI
 
 from services.llm_client import OPENROUTER_BASE_URL
+from services.openrouter_request_log import maybe_log_openrouter_chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +88,14 @@ def generate_image_data_url(
             "messages": [{"role": "user", "content": prompt.strip()}],
             "extra_body": _extra_body(mods),
         }
+        maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="openrouter_image")
         try:
             completion = client.chat.completions.create(**kwargs)
             last_exc = None
             break
         except TypeError:
             kwargs.pop("extra_body", None)
+            maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="openrouter_image_fallback")
             try:
                 completion = client.chat.completions.create(**kwargs)
                 last_exc = None

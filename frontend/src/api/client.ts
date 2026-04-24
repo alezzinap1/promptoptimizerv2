@@ -29,6 +29,23 @@ export type AdminUserRow = {
   session_generation_budget?: number | null
 }
 
+export type AdminCommunityPromptRow = {
+  id: number
+  author_user_id: number
+  author_name?: string | null
+  title: string
+  description?: string
+  prompt: string
+  prompt_type?: string
+  category?: string
+  tags?: string[]
+  upvotes?: number
+  image_path?: string | null
+  is_public: number
+  created_at?: string
+  updated_at?: string
+}
+
 export type AdminMetrics = {
   generated_at: number
   users: {
@@ -718,6 +735,25 @@ export const api = {
     }),
   adminUserEvents: (id: number, limit = 50) =>
     fetchApi<{ events: AdminUserEvent[] }>(`/admin/users/${id}/events?limit=${limit}`),
+  adminListCommunity: (params?: {
+    visibility?: 'all' | 'public' | 'hidden'
+    limit?: number
+    offset?: number
+  }) => {
+    const sp = new URLSearchParams()
+    if (params?.visibility) sp.set('visibility', params.visibility)
+    if (params?.limit != null) sp.set('limit', String(params.limit))
+    if (params?.offset != null) sp.set('offset', String(params.offset))
+    const q = sp.toString()
+    return fetchApi<{ items: AdminCommunityPromptRow[]; total: number }>(
+      `/admin/community${q ? `?${q}` : ''}`,
+    )
+  },
+  adminPatchCommunityPublic: (id: number, is_public: 0 | 1) =>
+    fetchApi<{ ok: boolean; is_public: number }>(`/admin/community/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_public }),
+    }),
 
   updateSettings: (req: {
     openrouter_api_key?: string

@@ -16,6 +16,8 @@ from typing import Iterator
 
 from openai import OpenAI
 
+from services.openrouter_request_log import maybe_log_openrouter_chat_completion
+
 logger = logging.getLogger(__name__)
 
 # Default timeout for LLM calls (seconds). Override via OpenAI client init.
@@ -25,7 +27,7 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Generation models (for generating prompts)
 PROVIDER_MODELS: dict[str, str] = {
-    "deepseek":       "deepseek/deepseek-chat",
+    "deepseek":       "deepseek/deepseek-v4-flash",
     "deepseek_r1":    "deepseek/deepseek-r1",
     "gpt4o":          "openai/gpt-4o",
     "gpt4o_mini":     "openai/gpt-4o-mini",
@@ -41,7 +43,7 @@ PROVIDER_MODELS: dict[str, str] = {
 }
 
 PROVIDER_NAMES: dict[str, str] = {
-    "deepseek":       "DeepSeek Chat",
+    "deepseek":       "DeepSeek V4 Flash",
     "deepseek_r1":    "DeepSeek R1 (reasoning)",
     "gpt4o":          "GPT-4o",
     "gpt4o_mini":     "GPT-4o Mini",
@@ -72,10 +74,12 @@ TARGET_MODELS: dict[str, str] = {
 
 DEFAULT_PROVIDER = "deepseek"
 DEFAULT_TEMPERATURE = 0.7
+# Потолок completion: без явного max_tokens OpenRouter/провайдеры часто режут ~2048 (finish_reason=length).
+MAX_OUTPUT_TOKENS_DEFAULT = 8192
 
 MODEL_TIERS: dict[str, list[str]] = {
-    "tier1": ["google/gemini-flash-1.5", "deepseek/deepseek-chat"],
-    "tier2": ["google/gemini-pro-1.5", "anthropic/claude-3-haiku", "deepseek/deepseek-chat"],
+    "tier1": ["google/gemini-flash-1.5", "deepseek/deepseek-v4-flash"],
+    "tier2": ["google/gemini-pro-1.5", "anthropic/claude-3-haiku", "deepseek/deepseek-v4-flash"],
     "tier3": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "deepseek/deepseek-r1"],
 }
 
@@ -148,8 +152,9 @@ class LLMClient:
         messages.append({"role": "user", "content": user_content})
 
         kwargs = self._build_completion_kwargs(model, messages, temperature, top_p, top_k)
-        if max_tokens is not None and max_tokens > 0:
-            kwargs["max_tokens"] = max_tokens
+        mt = max_tokens if max_tokens is not None and max_tokens > 0 else MAX_OUTPUT_TOKENS_DEFAULT
+        kwargs["max_tokens"] = mt
+        maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="LLMClient.generate")
         response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 
@@ -175,6 +180,7 @@ class LLMClient:
             "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }
+        maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="LLMClient.generate_json")
         try:
             response = self._client.chat.completions.create(**kwargs)
         except Exception as e:
@@ -204,6 +210,7 @@ class LLMClient:
         top_p: float | None = None,
         top_k: int | None = None,
         history: list[dict] | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[str]:
         """
         Streaming generation — yields text chunks for streaming HTTP responses or other consumers.
@@ -218,6 +225,9 @@ class LLMClient:
         kwargs = self._build_completion_kwargs(
             model, messages, temperature, top_p, top_k, stream=True
         )
+        mt = max_tokens if max_tokens is not None and max_tokens > 0 else MAX_OUTPUT_TOKENS_DEFAULT
+        kwargs["max_tokens"] = mt
+        maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="LLMClient.stream")
         with self._client.chat.completions.create(**kwargs) as stream_response:
             for chunk in stream_response:
                 if not chunk.choices:
@@ -234,10 +244,12 @@ class LLMClient:
     ) -> str:
         """Lightweight call for session summarization."""
         model = self._get_model(provider)
-        response = self._client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": text}],
-            temperature=0.3,
-            max_tokens=max_tokens,
-        )
+        kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": text}],
+            "temperature": 0.3,
+            "max_tokens": max_tokens,
+        }
+        maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="LLMClient.summarize")
+        response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""

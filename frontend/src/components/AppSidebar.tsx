@@ -73,6 +73,12 @@ const ShieldIcon = () => (
   </svg>
 )
 
+const FeedModIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+  </svg>
+)
+
 export default function AppSidebar({
   collapsed,
   onToggleCollapse,
@@ -204,12 +210,22 @@ export default function AppSidebar({
               <NavLink
                 to="/admin"
                 className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-                title="Пользователи и лимиты"
+                title="Дашборд и метрики"
               >
                 <span className={styles.icon} aria-hidden>
                   <ShieldIcon />
                 </span>
                 <span className={styles.label}>Админка</span>
+              </NavLink>
+              <NavLink
+                to="/admin/community"
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+                title="Модерация ленты сообщества"
+              >
+                <span className={styles.icon} aria-hidden>
+                  <FeedModIcon />
+                </span>
+                <span className={styles.label}>Лента (модерация)</span>
               </NavLink>
             </div>
           ) : null}

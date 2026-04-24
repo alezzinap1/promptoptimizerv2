@@ -378,22 +378,36 @@
   right: 16px;
   left: auto;
   top: auto;
-  width: min(520px, calc(100vw - 32px));
-  max-height: min(56vh, 620px);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  width: min(520px, calc(100vw - 32px));
+  height: min(68vh, 620px);
+  min-width: 300px;
+  min-height: 260px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
+  overflow: hidden;
   background: var(--modal-surface, var(--panel));
   border: 1px solid var(--modal-border, var(--stroke));
   border-radius: var(--radius-lg, 12px);
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
   isolation: isolate;
-  min-height: 0;
+}
+
+.skillSandboxModalPrompt {
+  border-left: 4px solid color-mix(in srgb, var(--primary) 70%, transparent);
+}
+
+.skillSandboxModalSkill {
+  border-left: 4px solid rgba(56, 189, 248, 0.65);
 }
 
 .skillSandboxHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--stroke);
 }
@@ -401,9 +415,12 @@
 .skillSandboxTitle {
   margin: 0;
   font-size: 1rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .skillSandboxClose {
+  flex-shrink: 0;
   border: none;
   background: transparent;
   font-size: 1.4rem;
@@ -416,6 +433,16 @@
   opacity: 0.4;
 }
 
+.skillSandboxBanner {
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-bottom: 1px solid var(--stroke);
+}
+
 .skillSandboxHint {
   margin: 0;
   padding: 8px 12px;
@@ -426,8 +453,7 @@
 
 .skillSandboxLog {
   flex: 1;
-  min-height: 120px;
-  max-height: min(32vh, 280px);
+  min-height: 0;
   overflow: auto;
   padding: 8px 12px;
   display: flex;
@@ -3067,17 +3093,32 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   position: fixed;
   bottom: 16px;
   right: 16px;
-  width: min(440px, calc(100vw - 32px));
-  max-height: min(58vh, 640px);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  width: min(520px, calc(100vw - 32px));
+  height: min(78vh, 760px);
+  min-width: 300px;
+  min-height: 280px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
+  overflow: hidden;
   background: var(--modal-surface, var(--panel));
   border: 1px solid var(--modal-border, var(--stroke));
+  border-left: 4px solid rgba(251, 191, 36, 0.8);
   border-radius: 12px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.42);
-  padding: 12px 14px 14px;
-  gap: 8px;
-  overflow: hidden;
+  padding: 10px 12px 12px;
+  gap: 6px;
+}
+
+.llmReviewDockCardMaximized {
+  bottom: 10px;
+  right: 10px;
+  left: 10px;
+  width: auto;
+  height: min(94vh, calc(100vh - 20px));
+  max-width: none;
 }
 
 .llmReviewDockHead {
@@ -3090,9 +3131,73 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
 .llmReviewDockTitle {
   margin: 0;
   font-size: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.llmReviewDockHeadTools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.llmReviewDockToolBtn {
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.llmReviewDockToolBtn:hover {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.llmReviewDockMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.llmReviewDockMetaMain {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.llmReviewDockHelp {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+}
+
+.llmReviewDockHelp summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.llmReviewDockHelp summary::-webkit-details-marker {
+  display: none;
+}
+
+.llmReviewDockHelp p {
+  margin: 6px 0 0;
+  max-width: 280px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .llmReviewDockClose {
+  flex-shrink: 0;
   border: none;
   background: transparent;
   font-size: 1.35rem;
@@ -3101,13 +3206,22 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   color: var(--text-muted);
 }
 
-.llmReviewDockBody {
+.llmReviewDockGrow {
   flex: 1;
   min-height: 0;
-  max-height: min(36vh, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.llmReviewDockScroll {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   font-size: 0.88rem;
   line-height: 1.45;
+  padding-right: 2px;
 }
 
 .llmReviewDockActions {
@@ -3115,29 +3229,54 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   padding-top: 4px;
 }
 
-.llmReviewHintsBox {
+.llmReviewHintsShell {
   flex-shrink: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(250, 204, 21, 0.08);
-  border: 1px solid rgba(250, 204, 21, 0.22);
-  font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--stroke);
 }
 
-.llmReviewHintsHead {
+.llmReviewHintsBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
 }
 
-.llmReviewHintsHead strong {
+.llmReviewHintsToggle {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: rgba(250, 204, 21, 0.06);
   color: rgb(250, 204, 21);
+  cursor: pointer;
+}
+
+.llmReviewHintsToggleChev {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.llmReviewHintsBox {
+  max-height: min(22vh, 220px);
+  overflow: auto;
+  padding: 6px 8px 8px;
+  border-radius: 8px;
+  background: rgba(250, 204, 21, 0.06);
+  border: 1px solid rgba(250, 204, 21, 0.18);
+  font-size: 0.76rem;
 }
 
 .llmReviewHintsAllBtn {
-  padding: 3px 8px;
+  flex-shrink: 0;
+  padding: 5px 10px;
   font-size: 0.72rem;
   font-weight: 600;
   border-radius: 6px;
@@ -3150,7 +3289,7 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
 .llmReviewHintsList {
   margin: 0;
   padding-left: 1rem;
-  max-height: 140px;
+  max-height: min(18vh, 200px);
   overflow: auto;
 }
 
@@ -3180,7 +3319,7 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   cursor: pointer;
 }
 
-[data-theme='light'] .llmReviewHintsHead strong {
+[data-theme='light'] .llmReviewHintsToggle {
   color: rgb(161, 98, 7);
 }
 
