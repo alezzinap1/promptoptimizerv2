@@ -5,7 +5,7 @@ import hashlib
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.deps import get_current_user, get_db
 from config.settings import TRIAL_MAX_COMPLETION_PER_M
@@ -15,6 +15,7 @@ from db.manager import DBManager
 from services import translator
 from services.api_key_resolver import resolve_openrouter_api_key
 from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_review_hints import extract_llm_review_hints
 from services.openrouter_models import completion_price_per_m, get_model_pricing
 
 router = APIRouter()
@@ -123,6 +124,7 @@ class LlmReviewResponse(BaseModel):
     review: str
     judge_model: str
     from_cache: bool = False
+    hints: list[str] = Field(default_factory=list)
 
 
 @router.post("/library/llm-review", response_model=LlmReviewResponse)
@@ -165,10 +167,12 @@ def llm_review_prompt(
                 payload={"prompt_type": pt, "from_cache": True},
                 user_id=user_id,
             )
+            rev = hit["review"]
             return LlmReviewResponse(
-                review=hit["review"],
+                review=rev,
                 judge_model=hit["judge_model"],
                 from_cache=True,
+                hints=extract_llm_review_hints(rev),
             )
     if pt == "image":
         sys = (
@@ -210,7 +214,12 @@ def llm_review_prompt(
         },
         user_id=user_id,
     )
-    return LlmReviewResponse(review=review, judge_model=resolved_judge, from_cache=False)
+    return LlmReviewResponse(
+        review=review,
+        judge_model=resolved_judge,
+        from_cache=False,
+        hints=extract_llm_review_hints(review),
+    )
 
 
 class LibraryTranslateResponse(BaseModel):

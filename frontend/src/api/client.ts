@@ -876,7 +876,7 @@ export const api = {
     judge_model?: string
     force_refresh?: boolean
   }) =>
-    fetchApi<{ review: string; judge_model: string; from_cache?: boolean }>('/library/llm-review', {
+    fetchApi<{ review: string; judge_model: string; from_cache?: boolean; hints?: string[] }>('/library/llm-review', {
       method: 'POST',
       body: JSON.stringify(req),
     }),

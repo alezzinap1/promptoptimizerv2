@@ -317,6 +317,7 @@ export default function Home() {
   const [llmReviewBusy, setLlmReviewBusy] = useState(false)
   const [llmReviewModel, setLlmReviewModel] = useState('')
   const [llmReviewFromCache, setLlmReviewFromCache] = useState(false)
+  const [llmReviewHints, setLlmReviewHints] = useState<string[]>([])
   const [imageTryBusy, setImageTryBusy] = useState(false)
   const [imageTryCoverPath, setImageTryCoverPath] = useState<string | null>(null)
   const [imageTryDataUrl, setImageTryDataUrl] = useState<string | null>(null)
@@ -1885,6 +1886,7 @@ export default function Home() {
     setLlmReviewText('')
     setLlmReviewModel('')
     setLlmReviewFromCache(false)
+    setLlmReviewHints([])
     try {
       const r = await api.libraryLlmReview({
         prompt: result.prompt_block,
@@ -1895,10 +1897,12 @@ export default function Home() {
       setLlmReviewText(r.review)
       setLlmReviewModel(r.judge_model)
       setLlmReviewFromCache(Boolean(r.from_cache))
+      setLlmReviewHints(Array.isArray(r.hints) ? r.hints : [])
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setLlmReviewText(`Ошибка: ${msg}`)
       setLlmReviewFromCache(false)
+      setLlmReviewHints([])
     } finally {
       setLlmReviewBusy(false)
     }
@@ -2414,42 +2418,6 @@ export default function Home() {
               >
                 {llmReviewBusy ? 'Оценка…' : 'Оценка модели (LLM-судья)'}
               </button>
-              {llmReviewOpen && (
-                <div className={styles.modalOverlay} onClick={() => setLlmReviewOpen(false)}>
-                  <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-                    <div className={styles.modalHeader}>
-                      <h3>Оценка промпта (LLM)</h3>
-                      <button type="button" className={styles.modalClose} onClick={() => setLlmReviewOpen(false)}>
-                        ×
-                      </button>
-                    </div>
-                    {llmReviewModel ? (
-                      <p className={styles.mutedSmall}>Модель: {llmReviewModel}</p>
-                    ) : null}
-                    {llmReviewFromCache && !llmReviewBusy ? (
-                      <p className={styles.mutedSmall}>Взяли сохранённую оценку — повторный запрос к ИИ не уходил.</p>
-                    ) : null}
-                    <div className={styles.llmReviewBody}>
-                      {llmReviewBusy ? (
-                        <p>Запрашиваю оценку…</p>
-                      ) : (
-                        <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
-                      )}
-                    </div>
-                    {!llmReviewBusy && llmReviewText && !llmReviewText.startsWith('Ошибка:') ? (
-                      <p style={{ marginTop: 10 }}>
-                        <button
-                          type="button"
-                          className={styles.ideModalBtn}
-                          onClick={() => void runLlmReview(true)}
-                        >
-                          Свежая оценка (ещё один запрос)
-                        </button>
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              )}
               {result.target_model_type === 'reasoning' && (
                 <div className={styles.reasoningBadge}>
                   Reasoning-модель — техники адаптированы: убраны CoT и step-by-step, промпт компактнее
@@ -3502,6 +3470,88 @@ export default function Home() {
         favoriteIds={imageStyleFavorites}
         onToggleFavorite={toggleImageStyleFavorite}
       />
+      {llmReviewOpen
+        ? createPortal(
+            <div className={styles.llmReviewDockLayer} role="presentation">
+              <div
+                className={styles.llmReviewDockCard}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="llm-review-dock-title"
+              >
+                <div className={styles.llmReviewDockHead}>
+                  <h3 id="llm-review-dock-title" className={styles.llmReviewDockTitle}>
+                    Оценка промпта (LLM)
+                  </h3>
+                  <button
+                    type="button"
+                    className={styles.llmReviewDockClose}
+                    onClick={() => setLlmReviewOpen(false)}
+                    aria-label="Закрыть"
+                  >
+                    ×
+                  </button>
+                </div>
+                {llmReviewModel ? <p className={styles.mutedSmall}>Модель: {llmReviewModel}</p> : null}
+                {llmReviewFromCache && !llmReviewBusy ? (
+                  <p className={styles.mutedSmall}>Взяли сохранённую оценку — повторный запрос к ИИ не уходил.</p>
+                ) : null}
+                <div className={styles.llmReviewDockBody}>
+                  {llmReviewBusy ? (
+                    <p>Запрашиваю оценку…</p>
+                  ) : (
+                    <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
+                  )}
+                </div>
+                {!llmReviewBusy && llmReviewHints.length > 0 && !llmReviewText.startsWith('Ошибка:') ? (
+                  <div className={styles.llmReviewHintsBox}>
+                    <div className={styles.llmReviewHintsHead}>
+                      <strong>Быстрые шаги</strong>
+                      <button
+                        type="button"
+                        className={styles.llmReviewHintsAllBtn}
+                        disabled={loading}
+                        onClick={() => {
+                          const body = llmReviewHints.map((t, i) => `${i + 1}. ${t}`).join('\n')
+                          setChatInput(`Учти по очереди советы судьи:\n${body}`)
+                          setLlmReviewOpen(false)
+                        }}
+                      >
+                        Всё в чат
+                      </button>
+                    </div>
+                    <ul className={styles.llmReviewHintsList}>
+                      {llmReviewHints.map((tip, idx) => (
+                        <li key={idx} className={styles.llmReviewHintRow}>
+                          <span className={styles.llmReviewHintText}>{tip}</span>
+                          <button
+                            type="button"
+                            className={styles.llmReviewHintBtn}
+                            disabled={loading}
+                            onClick={() => {
+                              setChatInput(`Учти совет судьи: ${tip}`)
+                              setLlmReviewOpen(false)
+                            }}
+                          >
+                            В чат
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {!llmReviewBusy && llmReviewText && !llmReviewText.startsWith('Ошибка:') ? (
+                  <div className={styles.llmReviewDockActions}>
+                    <button type="button" className={styles.ideModalBtn} onClick={() => void runLlmReview(true)}>
+                      Свежая оценка (ещё один запрос)
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {versionRestoreConfirm ? (
         <div
           className={styles.versionRestoreBackdrop}
@@ -3537,14 +3587,13 @@ export default function Home() {
       ) : null}
       {promptPlaygroundOpen
         ? createPortal(
-            <div
-              className={styles.skillSandboxBackdrop}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Песочница промпта"
-              onClick={() => !promptPlaygroundBusy && setPromptPlaygroundOpen(false)}
-            >
-              <div className={styles.skillSandboxModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.skillSandboxBackdrop} role="presentation">
+              <div
+                className={styles.skillSandboxModal}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Песочница промпта"
+              >
                 <div className={styles.skillSandboxHead}>
                   <h3 className={styles.skillSandboxTitle}>Песочница промпта</h3>
                   <button
@@ -3607,14 +3656,13 @@ export default function Home() {
         : null}
       {skillSandboxOpen
         ? createPortal(
-            <div
-              className={styles.skillSandboxBackdrop}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Песочница скилла"
-              onClick={() => !skillSandboxBusy && setSkillSandboxOpen(false)}
-            >
-              <div className={styles.skillSandboxModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.skillSandboxBackdrop} role="presentation">
+              <div
+                className={styles.skillSandboxModal}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Песочница скилла"
+              >
                 <div className={styles.skillSandboxHead}>
                   <h3 className={styles.skillSandboxTitle}>Песочница скилла</h3>
                   <button
