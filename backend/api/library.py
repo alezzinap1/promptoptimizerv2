@@ -1,6 +1,7 @@
 """Prompt library CRUD + evaluation."""
 from __future__ import annotations
 
+import hashlib
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -115,11 +116,13 @@ class LlmReviewRequest(BaseModel):
     prompt_type: str = "text"
     original_task: str = ""
     judge_model: str | None = None
+    force_refresh: bool = False
 
 
 class LlmReviewResponse(BaseModel):
     review: str
     judge_model: str
+    from_cache: bool = False
 
 
 @router.post("/library/llm-review", response_model=LlmReviewResponse)
@@ -151,6 +154,22 @@ def llm_review_prompt(
 
     pt = (req.prompt_type or "text").strip().lower()
     task = (req.original_task or "").strip()
+
+    cache_key = hashlib.sha256(f"{user_id}\n{prompt}\n{pt}\n{mid}\n{task}".encode("utf-8")).hexdigest()
+    if not req.force_refresh:
+        hit = db.get_llm_review_cache(user_id, cache_key)
+        if hit:
+            db.log_event(
+                "library_llm_review",
+                session_id="",
+                payload={"prompt_type": pt, "from_cache": True},
+                user_id=user_id,
+            )
+            return LlmReviewResponse(
+                review=hit["review"],
+                judge_model=hit["judge_model"],
+                from_cache=True,
+            )
     if pt == "image":
         sys = (
             "Ты эксперт по промптам для генерации изображений. Кратко (на русском) оцени промпт: "
@@ -179,13 +198,19 @@ def llm_review_prompt(
         ctoks = len(review) // 4
         pp, cp = get_model_pricing(_or_model_id(gen))
         db.add_user_usage(user_id, ptoks + ctoks, ptoks * pp + ctoks * cp)
+    resolved_judge = _or_model_id(gen)
+    db.upsert_llm_review_cache(user_id, cache_key, review, resolved_judge)
     db.log_event(
         "library_llm_review",
         session_id="",
-        payload={"prompt_type": pt, "latency_ms": round((time.perf_counter() - started) * 1000, 1)},
+        payload={
+            "prompt_type": pt,
+            "latency_ms": round((time.perf_counter() - started) * 1000, 1),
+            "from_cache": False,
+        },
         user_id=user_id,
     )
-    return LlmReviewResponse(review=review, judge_model=_or_model_id(gen))
+    return LlmReviewResponse(review=review, judge_model=resolved_judge, from_cache=False)
 
 
 class LibraryTranslateResponse(BaseModel):

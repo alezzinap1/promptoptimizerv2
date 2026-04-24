@@ -92,6 +92,23 @@ export function serializeLocalSkillsExport(): string {
   return JSON.stringify(buildLocalSkillsExportBundle(), null, 2)
 }
 
+/** Один файл .md на руку — удобно вставлять в Cursor как скилл. */
+export function serializeLocalSkillsAsMarkdown(): string {
+  const skills = loadLocalSkills()
+  const lines: string[] = [
+    `<!-- MetaPrompt: экспорт скиллов, ${new Date().toISOString().slice(0, 10)} -->`,
+    '',
+  ]
+  for (const s of skills) {
+    const tags = [...s.tags, ...s.frameworks].filter(Boolean).join(', ')
+    lines.push(`# ${s.title.replace(/\n/g, ' ')}`)
+    if (tags) lines.push('', `Теги: ${tags}`)
+    if (s.description.trim()) lines.push('', s.description.trim())
+    lines.push('', '```', s.body, '```', '', '---', '')
+  }
+  return lines.join('\n').trimEnd() + '\n'
+}
+
 /** Строка из GET /skills (без циклического импорта из api/client). */
 export type ServerSkillRow = {
   id: number

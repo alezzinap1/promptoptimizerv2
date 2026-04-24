@@ -278,6 +278,22 @@
   opacity: 0.9;
 }
 
+.deleteMineBtn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.deleteMineBtn:hover {
+  border-color: #f87171;
+  color: #f87171;
+}
+
 .empty {
   text-align: center;
   color: var(--muted);

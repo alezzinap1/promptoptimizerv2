@@ -11,6 +11,10 @@ export type PublishToCommunityInitial = {
   prompt_type: PublishPromptType
   category?: string
   tags?: string[]
+  /** Уже лежит на сервере (например превью после «Проба картинки» в студии) — не просим загрузить файл снова */
+  prefilled_image_path?: string | null
+  /** Если файла на диске нет, но есть картинка в браузере — при отправке зальём сами */
+  prefilled_image_data_url?: string | null
 }
 
 type Props = {
@@ -20,6 +24,12 @@ type Props = {
   onPublished?: () => void
 }
 
+async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
+  return new File([blob], filename, { type: blob.type || 'image/png' })
+}
+
 export default function PublishToCommunityModal({ open, onClose, initial, onPublished }: Props) {
   const [title, setTitle] = useState(initial.title)
   const [prompt, setPrompt] = useState(initial.prompt)
@@ -27,6 +37,9 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
   const [tags, setTags] = useState((initial.tags || []).join(', '))
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  /** Путь с сервера, если картинку не нужно заново грузить */
+  const [reuseServerPath, setReuseServerPath] = useState<string | null>(null)
+  const [prefillDataUrl, setPrefillDataUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
@@ -47,6 +60,10 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
     setFile(null)
     clearPreview()
     setError(null)
+    const path = (initial.prefilled_image_path || '').trim() || null
+    const du = (initial.prefilled_image_data_url || '').trim() || null
+    setReuseServerPath(path)
+    setPrefillDataUrl(du && !path ? du : null)
   }, [open, initial, clearPreview])
 
   useEffect(() => {
@@ -68,6 +85,10 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
 
   const setImageFile = (f: File | null) => {
     setFile(f)
+    if (f) {
+      setReuseServerPath(null)
+      setPrefillDataUrl(null)
+    }
   }
 
   const onPasteImage = useCallback((e: ClipboardEvent) => {
@@ -101,9 +122,17 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
     setError(null)
     try {
       let imagePath: string | null = null
-      if (promptType === 'image' && file) {
-        const up = await api.uploadCommunityImage(file)
-        imagePath = up.path
+      if (promptType === 'image') {
+        if (file) {
+          const up = await api.uploadCommunityImage(file)
+          imagePath = up.path
+        } else if (reuseServerPath) {
+          imagePath = reuseServerPath
+        } else if (prefillDataUrl) {
+          const f = await dataUrlToFile(prefillDataUrl, 'studio-preview.png')
+          const up = await api.uploadCommunityImage(f)
+          imagePath = up.path
+        }
       }
       const cat = promptType === 'image' ? 'image' : promptType === 'skill' ? 'skill' : initial.category || 'general'
       await api.createCommunityPrompt({
@@ -168,14 +197,24 @@ export default function PublishToCommunityModal({ open, onClose, initial, onPubl
           <div className={styles.imageBlock}>
             <span className={styles.imageLabel}>Иллюстрация</span>
             <div className={styles.imageDrop}>
-              {previewUrl && <img src={previewUrl} alt="" className={styles.imagePreview} />}
+              {previewUrl ? (
+                <img src={previewUrl} alt="" className={styles.imagePreview} />
+              ) : reuseServerPath ? (
+                <img src={reuseServerPath} alt="" className={styles.imagePreview} />
+              ) : prefillDataUrl ? (
+                <img src={prefillDataUrl} alt="" className={styles.imagePreview} />
+              ) : null}
               <input
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,.jfif,.pjpeg"
                 className={styles.fileInput}
                 onChange={(e) => setImageFile(e.target.files?.[0] || null)}
               />
-              <p className={styles.imageHint}>Файл или Ctrl+V со скриншотом. На сервере — 256×256, webp.</p>
+              <p className={styles.imageHint}>
+                {reuseServerPath || prefillDataUrl
+                  ? 'Картинка из студии уже подставлена. Можете заменить файлом или вставкой из буфера.'
+                  : 'Файл или Ctrl+V со скриншотом. На сервере — 256×256, webp.'}
+              </p>
             </div>
           </div>
         )}

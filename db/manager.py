@@ -182,6 +182,7 @@ class DBManager:
             self._migrate_phase16_model_health(conn)
             self._migrate_phase17_prompt_alt_and_tier_overrides(conn)
             self._migrate_phase18_onboarding_profile(conn)
+            self._migrate_phase19_llm_review_cache(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -456,6 +457,28 @@ class DBManager:
         self._safe_add_column(conn, "user_preferences", "user_goal", "TEXT DEFAULT ''")
         self._safe_add_column(conn, "user_preferences", "default_tier", "TEXT DEFAULT ''")
         self._safe_add_column(conn, "user_usage", "compare_rounds_per_day", "INTEGER")
+
+    def _migrate_phase19_llm_review_cache(self, conn: sqlite3.Connection) -> None:
+        """Кэш текстовой оценки промпта (LLM-судья) — один и тот же промпт не дергает модель повторно."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS library_llm_review_cache (
+                user_id         INTEGER NOT NULL,
+                cache_key       TEXT    NOT NULL,
+                review          TEXT    NOT NULL,
+                judge_model     TEXT    NOT NULL,
+                updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, cache_key),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_llm_review_cache_user
+                ON library_llm_review_cache(user_id)
+            """
+        )
 
     def _safe_add_column(
         self,
@@ -1639,6 +1662,33 @@ class DBManager:
         }
 
     # ─── Prompt library ───────────────────────────────────────────────────────
+
+    def get_llm_review_cache(self, user_id: int, cache_key: str) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT review, judge_model FROM library_llm_review_cache
+                WHERE user_id = ? AND cache_key = ?
+                """,
+                (user_id, cache_key),
+            ).fetchone()
+            if not row:
+                return None
+            return {"review": str(row["review"]), "judge_model": str(row["judge_model"])}
+
+    def upsert_llm_review_cache(self, user_id: int, cache_key: str, review: str, judge_model: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO library_llm_review_cache (user_id, cache_key, review, judge_model)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id, cache_key) DO UPDATE SET
+                    review = excluded.review,
+                    judge_model = excluded.judge_model,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, cache_key, review, judge_model),
+            )
 
     def save_to_library(
         self,

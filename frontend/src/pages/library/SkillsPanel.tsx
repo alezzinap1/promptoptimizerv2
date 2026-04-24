@@ -12,6 +12,7 @@ import {
   loadLocalSkills,
   mergeServerSkillsIntoLocal,
   saveLocalSkills,
+  serializeLocalSkillsAsMarkdown,
   serializeLocalSkillsExport,
   type SkillItem,
 } from '../../lib/localSkillsStore'
@@ -201,8 +202,8 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
   return (
     <div className={libStyles.library}>
       <p className={styles.leadCompact}>
-        Локальная библиотека в браузере + синхронизация с сервером («С сервера» / «☁ Синхронизировать»). Резервная копия — экспорт
-        JSON. Теги в поиске; цвет чипа — по нажатию.
+        Локально в браузере и синхронизация с аккаунтом. Резервная копия — файл JSON или текст Markdown. Теги в поиске;
+        цвет чипа — по нажатию.
       </p>
 
       <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
@@ -212,7 +213,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
         <button
           type="button"
           className={`${styles.primary} ${styles.primarySmall}`}
-          title="Скачать все скиллы как JSON"
+          title="Скачать все скиллы одним JSON (импорт обратно — кнопка «Импорт»)"
           onClick={() => {
             const blob = new Blob([serializeLocalSkillsExport()], { type: 'application/json;charset=utf-8' })
             const url = URL.createObjectURL(blob)
@@ -224,6 +225,22 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
           }}
         >
           Экспорт JSON
+        </button>
+        <button
+          type="button"
+          className={`${styles.primary} ${styles.primarySmall}`}
+          title="Один .md файл: заголовки и тело каждого скилла — удобно копировать в Cursor"
+          onClick={() => {
+            const blob = new Blob([serializeLocalSkillsAsMarkdown()], { type: 'text/markdown;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `metaprompt-skills-${new Date().toISOString().slice(0, 10)}.md`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+        >
+          Экспорт Markdown
         </button>
         <button
           type="button"

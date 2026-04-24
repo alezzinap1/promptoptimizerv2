@@ -135,7 +135,7 @@ export default function AppSidebar({
               <span className={styles.icon} aria-hidden>
                 <LibraryIcon />
               </span>
-              <span className={styles.label}>Промпты</span>
+              <span className={styles.label}>Мои промпты</span>
               <span className={styles.badge}>{counts.prompts === null ? '…' : counts.prompts}</span>
             </NavLink>
             <NavLink
@@ -170,7 +170,7 @@ export default function AppSidebar({
               title="Общая библиотека"
             >
               <span className={styles.icon} aria-hidden>&#127760;</span>
-              <span className={styles.label}>Промпты</span>
+              <span className={styles.label}>Лента</span>
             </NavLink>
           </div>
 

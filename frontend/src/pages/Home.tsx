@@ -316,6 +316,7 @@ export default function Home() {
   const [llmReviewText, setLlmReviewText] = useState('')
   const [llmReviewBusy, setLlmReviewBusy] = useState(false)
   const [llmReviewModel, setLlmReviewModel] = useState('')
+  const [llmReviewFromCache, setLlmReviewFromCache] = useState(false)
   const [imageTryBusy, setImageTryBusy] = useState(false)
   const [imageTryCoverPath, setImageTryCoverPath] = useState<string | null>(null)
   const [imageTryDataUrl, setImageTryDataUrl] = useState<string | null>(null)
@@ -1877,23 +1878,27 @@ export default function Home() {
     }
   }
 
-  const runLlmReview = async () => {
+  const runLlmReview = async (forceRefresh = false) => {
     if (!result?.prompt_block) return
     setLlmReviewBusy(true)
     setLlmReviewOpen(true)
     setLlmReviewText('')
     setLlmReviewModel('')
+    setLlmReviewFromCache(false)
     try {
       const r = await api.libraryLlmReview({
         prompt: result.prompt_block,
         prompt_type: promptType,
         original_task: (baseTaskRef || taskInput).trim(),
+        force_refresh: forceRefresh,
       })
       setLlmReviewText(r.review)
       setLlmReviewModel(r.judge_model)
+      setLlmReviewFromCache(Boolean(r.from_cache))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setLlmReviewText(`Ошибка: ${msg}`)
+      setLlmReviewFromCache(false)
     } finally {
       setLlmReviewBusy(false)
     }
@@ -2005,8 +2010,11 @@ export default function Home() {
       description: '',
       prompt_type: promptType === 'image' ? 'image' : promptType === 'skill' ? 'skill' : 'text',
       tags: [],
+      prefilled_image_path: promptType === 'image' && imageTryCoverPath ? imageTryCoverPath : null,
+      prefilled_image_data_url:
+        promptType === 'image' && imageTryDataUrl && !imageTryCoverPath ? imageTryDataUrl : null,
     }),
-    [taskInput, taskRefForTitles, result, result?.prompt_block, promptType],
+    [taskInput, taskRefForTitles, result, result?.prompt_block, promptType, imageTryCoverPath, imageTryDataUrl],
   )
 
   const genModelSelectOptions = useMemo(
@@ -2418,6 +2426,9 @@ export default function Home() {
                     {llmReviewModel ? (
                       <p className={styles.mutedSmall}>Модель: {llmReviewModel}</p>
                     ) : null}
+                    {llmReviewFromCache && !llmReviewBusy ? (
+                      <p className={styles.mutedSmall}>Взяли сохранённую оценку — повторный запрос к ИИ не уходил.</p>
+                    ) : null}
                     <div className={styles.llmReviewBody}>
                       {llmReviewBusy ? (
                         <p>Запрашиваю оценку…</p>
@@ -2425,6 +2436,17 @@ export default function Home() {
                         <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
                       )}
                     </div>
+                    {!llmReviewBusy && llmReviewText && !llmReviewText.startsWith('Ошибка:') ? (
+                      <p style={{ marginTop: 10 }}>
+                        <button
+                          type="button"
+                          className={styles.ideModalBtn}
+                          onClick={() => void runLlmReview(true)}
+                        >
+                          Свежая оценка (ещё один запрос)
+                        </button>
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}

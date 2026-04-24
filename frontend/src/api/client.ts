@@ -869,8 +869,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(req),
     }),
-  libraryLlmReview: (req: { prompt: string; prompt_type?: string; original_task?: string; judge_model?: string }) =>
-    fetchApi<{ review: string; judge_model: string }>('/library/llm-review', {
+  libraryLlmReview: (req: {
+    prompt: string
+    prompt_type?: string
+    original_task?: string
+    judge_model?: string
+    force_refresh?: boolean
+  }) =>
+    fetchApi<{ review: string; judge_model: string; from_cache?: boolean }>('/library/llm-review', {
       method: 'POST',
       body: JSON.stringify(req),
     }),

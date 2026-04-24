@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type CommunityPrompt } from '../api/client'
 import PublishToCommunityModal from '../components/PublishToCommunityModal'
+import { useAuth } from '../context/AuthContext'
 import styles from './Community.module.css'
 
 const TYPES = [
@@ -19,6 +20,7 @@ const SORTS = [
 
 export default function Community() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [items, setItems] = useState<CommunityPrompt[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('')
@@ -62,6 +64,19 @@ export default function Community() {
   const handleUse = (prompt: string) => {
     navigate('/home', { state: { prefillTask: prompt } })
   }
+
+  const handleDeleteMine = async (id: number) => {
+    if (!window.confirm('Убрать эту публикацию с ленты?')) return
+    try {
+      await api.deleteCommunityPrompt(id)
+      setItems((prev) => prev.filter((it) => it.id !== id))
+    } catch {
+      window.alert('Не удалось удалить. Попробуйте ещё раз.')
+    }
+  }
+
+  const isMine = (it: CommunityPrompt) =>
+    Boolean(user && user.id > 0 && it.author_user_id === user.id)
 
   return (
     <div className={styles.page}>
@@ -150,6 +165,16 @@ export default function Community() {
                     >
                       Использовать
                     </button>
+                    {isMine(item) ? (
+                      <button
+                        type="button"
+                        className={styles.deleteMineBtn}
+                        onClick={() => void handleDeleteMine(item.id)}
+                        title="Снять с публикации"
+                      >
+                        Убрать
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -179,6 +204,16 @@ export default function Community() {
                   <button type="button" className={styles.useBtn} onClick={() => handleUse(item.prompt)}>
                     Использовать
                   </button>
+                  {isMine(item) ? (
+                    <button
+                      type="button"
+                      className={styles.deleteMineBtn}
+                      onClick={() => void handleDeleteMine(item.id)}
+                      title="Снять с публикации"
+                    >
+                      Убрать
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
