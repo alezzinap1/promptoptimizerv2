@@ -74,6 +74,30 @@ TARGET_MODELS: dict[str, str] = {
 
 DEFAULT_PROVIDER = "deepseek"
 DEFAULT_TEMPERATURE = 0.7
+
+# Full OpenRouter ids still found in old sessions / client storage → V4 Flash.
+DEPRECATED_OPENROUTER_MODEL_ALIASES: dict[str, str] = {
+    "deepseek/deepseek-chat": "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v3": "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v3-base": "deepseek/deepseek-v4-flash",
+}
+
+
+def resolve_openrouter_model_id(provider: str) -> str:
+    """
+    Logical key (e.g. deepseek) or full OpenRouter model id → id sent to the API.
+    Unknown short names without "/" pass through unchanged (legacy API callers).
+    """
+    p = (provider or "").strip()
+    if not p:
+        p = DEFAULT_PROVIDER
+    if p in PROVIDER_MODELS:
+        mid = PROVIDER_MODELS[p]
+    elif "/" in p:
+        mid = p
+    else:
+        mid = p
+    return DEPRECATED_OPENROUTER_MODEL_ALIASES.get(mid, mid)
 # Потолок completion: без явного max_tokens OpenRouter/провайдеры часто режут ~2048 (finish_reason=length).
 MAX_OUTPUT_TOKENS_DEFAULT = 8192
 
@@ -105,9 +129,10 @@ class LLMClient:
     def _get_model(self, provider: str) -> str:
         model = PROVIDER_MODELS.get(provider)
         if model:
-            return model
+            return DEPRECATED_OPENROUTER_MODEL_ALIASES.get(model, model)
         if "/" in provider:
-            return provider
+            p = provider.strip()
+            return DEPRECATED_OPENROUTER_MODEL_ALIASES.get(p, p)
         raise ValueError(f"Unknown provider: {provider}. Available: {list(PROVIDER_MODELS)}")
 
     def _build_completion_kwargs(
@@ -253,3 +278,26 @@ class LLMClient:
         maybe_log_openrouter_chat_completion(log=logger, kwargs=kwargs, context="LLMClient.summarize")
         response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
+
+    def embed(self, texts: list[str], provider: str) -> list[list[float]]:
+        """Get embeddings for `texts` via the OpenAI-compatible /embeddings endpoint.
+
+        Tries a single batch call first; if the provider rejects batched input
+        (some OpenRouter routes only accept a single string), falls back to
+        sequential one-by-one calls.
+
+        Returns a list of vectors aligned with `texts` (same length, same order).
+        """
+        if not texts:
+            return []
+        model = self._get_model(provider)
+        try:
+            resp = self._client.embeddings.create(model=model, input=list(texts))
+            return [list(item.embedding) for item in resp.data]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("embeddings batch failed (%s); falling back to sequential", exc)
+            results: list[list[float]] = []
+            for t in texts:
+                r = self._client.embeddings.create(model=model, input=[t])
+                results.append(list(r.data[0].embedding))
+            return results
