@@ -2355,3 +2355,405 @@ class DBManager:
                 (user_id, name, description, body, category, lid),
             )
             return int(cur.lastrowid)  # type: ignore[return-value]
+
+    # ─── Eval Stability: rubrics ───────────────────────────────────────────
+
+    def create_eval_rubric(
+        self,
+        user_id: int,
+        name: str,
+        criteria: list[dict],
+        preset_key: str | None = None,
+        reference_required: bool = False,
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO eval_rubrics (user_id, name, preset_key, criteria_json, reference_required)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    int(user_id),
+                    name,
+                    preset_key,
+                    json.dumps(criteria, ensure_ascii=False),
+                    1 if reference_required else 0,
+                ),
+            )
+            return int(cur.lastrowid)  # type: ignore[return-value]
+
+    @staticmethod
+    def _rubric_row_to_dict(row) -> dict:
+        d = dict(row)
+        try:
+            d["criteria"] = json.loads(d.pop("criteria_json")) if d.get("criteria_json") else []
+        except Exception:
+            d["criteria"] = []
+        d["reference_required"] = bool(d.get("reference_required") or 0)
+        return d
+
+    def list_eval_rubrics(self, user_id: int) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM eval_rubrics WHERE user_id = ? ORDER BY updated_at DESC, id DESC",
+                (int(user_id),),
+            ).fetchall()
+        return [self._rubric_row_to_dict(r) for r in rows]
+
+    def get_eval_rubric(self, rubric_id: int, user_id: int | None = None) -> dict | None:
+        with self._conn() as conn:
+            if user_id is None:
+                row = conn.execute(
+                    "SELECT * FROM eval_rubrics WHERE id = ?", (int(rubric_id),)
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM eval_rubrics WHERE id = ? AND user_id = ?",
+                    (int(rubric_id), int(user_id)),
+                ).fetchone()
+        return self._rubric_row_to_dict(row) if row else None
+
+    def update_eval_rubric(
+        self,
+        rubric_id: int,
+        user_id: int,
+        name: str | None = None,
+        criteria: list[dict] | None = None,
+        reference_required: bool | None = None,
+    ) -> bool:
+        updates: list[str] = []
+        params: list = []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if criteria is not None:
+            updates.append("criteria_json = ?")
+            params.append(json.dumps(criteria, ensure_ascii=False))
+        if reference_required is not None:
+            updates.append("reference_required = ?")
+            params.append(1 if reference_required else 0)
+        if not updates:
+            return False
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.extend([int(rubric_id), int(user_id)])
+        with self._conn() as conn:
+            cur = conn.execute(
+                f"UPDATE eval_rubrics SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                params,
+            )
+            return cur.rowcount > 0
+
+    def delete_eval_rubric(self, rubric_id: int, user_id: int) -> bool:
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM eval_rubrics WHERE id = ? AND user_id = ?",
+                (int(rubric_id), int(user_id)),
+            )
+            return cur.rowcount > 0
+
+    # ─── Eval Stability: runs ─────────────────────────────────────────────
+
+    def create_eval_run(
+        self,
+        *,
+        user_id: int,
+        mode: str,
+        prompt_a_text: str,
+        prompt_a_hash: str,
+        task_input: str,
+        target_model_id: str,
+        judge_model_id: str,
+        embedding_model_id: str,
+        rubric_snapshot: dict,
+        n_runs: int,
+        cost_preview_usd: float,
+        cost_preview_tokens: int,
+        temperature: float = 0.7,
+        prompt_a_library_id: int | None = None,
+        prompt_a_library_version: int | None = None,
+        prompt_b_text: str | None = None,
+        prompt_b_hash: str | None = None,
+        prompt_b_library_id: int | None = None,
+        prompt_b_library_version: int | None = None,
+        reference_answer: str | None = None,
+        rubric_id: int | None = None,
+        parallelism: int = 4,
+        top_p: float | None = None,
+        pair_judge_samples: int = 5,
+        status: str = "queued",
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO eval_runs (
+                    user_id, status, mode,
+                    prompt_a_text, prompt_a_hash, prompt_a_library_id, prompt_a_library_version,
+                    prompt_b_text, prompt_b_hash, prompt_b_library_id, prompt_b_library_version,
+                    task_input, reference_answer,
+                    target_model_id, judge_model_id, embedding_model_id,
+                    rubric_id, rubric_snapshot_json,
+                    n_runs, parallelism, temperature, top_p, pair_judge_samples,
+                    cost_preview_usd, cost_preview_tokens
+                ) VALUES (
+                    ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?
+                )
+                """,
+                (
+                    int(user_id), status, mode,
+                    prompt_a_text, prompt_a_hash, prompt_a_library_id, prompt_a_library_version,
+                    prompt_b_text, prompt_b_hash, prompt_b_library_id, prompt_b_library_version,
+                    task_input, reference_answer,
+                    target_model_id, judge_model_id, embedding_model_id,
+                    rubric_id, json.dumps(rubric_snapshot, ensure_ascii=False),
+                    int(n_runs), int(parallelism), float(temperature), top_p, int(pair_judge_samples),
+                    float(cost_preview_usd), int(cost_preview_tokens),
+                ),
+            )
+            return int(cur.lastrowid)  # type: ignore[return-value]
+
+    @staticmethod
+    def _run_row_to_dict(row) -> dict:
+        d = dict(row)
+        snap = d.pop("rubric_snapshot_json", None)
+        try:
+            d["rubric_snapshot"] = json.loads(snap) if snap else {}
+        except Exception:
+            d["rubric_snapshot"] = {}
+        return d
+
+    def get_eval_run(self, run_id: int, user_id: int | None = None) -> dict | None:
+        with self._conn() as conn:
+            if user_id is None:
+                row = conn.execute(
+                    "SELECT * FROM eval_runs WHERE id = ?", (int(run_id),)
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM eval_runs WHERE id = ? AND user_id = ?",
+                    (int(run_id), int(user_id)),
+                ).fetchone()
+        return self._run_row_to_dict(row) if row else None
+
+    def update_eval_run_status(self, run_id: int, status: str, error: str | None = None) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE eval_runs SET status = ?, error = COALESCE(?, error) WHERE id = ?",
+                (status, error, int(run_id)),
+            )
+
+    def finalize_eval_run(
+        self,
+        run_id: int,
+        *,
+        status: str,
+        cost_actual_usd: float | None = None,
+        cost_actual_tokens: int | None = None,
+        duration_ms: int | None = None,
+        diversity_score: float | None = None,
+        agg_overall_p50: float | None = None,
+        agg_overall_p10: float | None = None,
+        agg_overall_p90: float | None = None,
+        agg_overall_var: float | None = None,
+        pair_winner: str | None = None,
+        pair_winner_confidence: float | None = None,
+        error: str | None = None,
+    ) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE eval_runs SET
+                    status = ?,
+                    cost_actual_usd = COALESCE(?, cost_actual_usd),
+                    cost_actual_tokens = COALESCE(?, cost_actual_tokens),
+                    duration_ms = COALESCE(?, duration_ms),
+                    diversity_score = COALESCE(?, diversity_score),
+                    agg_overall_p50 = COALESCE(?, agg_overall_p50),
+                    agg_overall_p10 = COALESCE(?, agg_overall_p10),
+                    agg_overall_p90 = COALESCE(?, agg_overall_p90),
+                    agg_overall_var = COALESCE(?, agg_overall_var),
+                    pair_winner = COALESCE(?, pair_winner),
+                    pair_winner_confidence = COALESCE(?, pair_winner_confidence),
+                    error = COALESCE(?, error),
+                    finished_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    status,
+                    cost_actual_usd, cost_actual_tokens, duration_ms,
+                    diversity_score,
+                    agg_overall_p50, agg_overall_p10, agg_overall_p90, agg_overall_var,
+                    pair_winner, pair_winner_confidence,
+                    error,
+                    int(run_id),
+                ),
+            )
+
+    def list_eval_runs_for_user(self, user_id: int, limit: int = 20) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM eval_runs WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+                (int(user_id), max(1, limit)),
+            ).fetchall()
+        return [self._run_row_to_dict(r) for r in rows]
+
+    def list_eval_runs_for_library(self, library_id: int, limit: int = 20) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM eval_runs
+                WHERE prompt_a_library_id = ? OR prompt_b_library_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (int(library_id), int(library_id), max(1, limit)),
+            ).fetchall()
+        return [self._run_row_to_dict(r) for r in rows]
+
+    def mark_running_runs_failed(self, reason: str = "server restart") -> int:
+        """Mark all currently 'running' runs as failed. Used on server startup recovery."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                UPDATE eval_runs
+                SET status = 'failed',
+                    error = COALESCE(error, ?),
+                    finished_at = CURRENT_TIMESTAMP
+                WHERE status = 'running'
+                """,
+                (reason,),
+            )
+            return int(cur.rowcount or 0)
+
+    # ─── Eval Stability: results & judge scores ────────────────────────────
+
+    def insert_eval_result(
+        self,
+        *,
+        run_id: int,
+        prompt_side: str,
+        run_index: int,
+        output_text: str,
+        output_tokens: int,
+        input_tokens: int,
+        latency_ms: int | None,
+        status: str,
+        embedding: list[float] | None = None,
+        judge_overall: float | None = None,
+        judge_overall_secondary: float | None = None,
+        judge_reasoning: str | None = None,
+        parsed_as_json: bool = False,
+        parsed_top_fields: dict | None = None,
+        error: str | None = None,
+    ) -> int:
+        emb_blob = None
+        if embedding is not None:
+            emb_blob = json.dumps([float(x) for x in embedding]).encode("utf-8")
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO eval_results (
+                    run_id, prompt_side, run_index,
+                    output_text, output_tokens, input_tokens, latency_ms,
+                    status, error, embedding_blob,
+                    judge_overall, judge_overall_secondary, judge_reasoning,
+                    parsed_as_json, parsed_top_fields_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(run_id), prompt_side, int(run_index),
+                    output_text, int(output_tokens), int(input_tokens), latency_ms,
+                    status, error, emb_blob,
+                    judge_overall, judge_overall_secondary, judge_reasoning,
+                    1 if parsed_as_json else 0,
+                    json.dumps(parsed_top_fields, ensure_ascii=False) if parsed_top_fields else None,
+                ),
+            )
+            return int(cur.lastrowid)  # type: ignore[return-value]
+
+    @staticmethod
+    def _result_row_to_dict(row) -> dict:
+        d = dict(row)
+        emb = d.pop("embedding_blob", None)
+        if emb:
+            try:
+                d["embedding"] = json.loads(bytes(emb).decode("utf-8"))
+            except Exception:
+                d["embedding"] = None
+        else:
+            d["embedding"] = None
+        ptf = d.pop("parsed_top_fields_json", None)
+        try:
+            d["parsed_top_fields"] = json.loads(ptf) if ptf else None
+        except Exception:
+            d["parsed_top_fields"] = None
+        d["parsed_as_json"] = bool(d.get("parsed_as_json") or 0)
+        return d
+
+    def list_eval_results_for_run(self, run_id: int) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM eval_results
+                WHERE run_id = ?
+                ORDER BY prompt_side ASC, run_index ASC, id ASC
+                """,
+                (int(run_id),),
+            ).fetchall()
+        return [self._result_row_to_dict(r) for r in rows]
+
+    def insert_judge_scores(self, result_id: int, scores: list[dict]) -> None:
+        if not scores:
+            return
+        with self._conn() as conn:
+            conn.executemany(
+                """
+                INSERT INTO eval_judge_scores (result_id, criterion_key, score, reasoning)
+                VALUES (?, ?, ?, ?)
+                """,
+                [
+                    (
+                        int(result_id),
+                        str(s["criterion_key"]),
+                        float(s["score"]),
+                        s.get("reasoning"),
+                    )
+                    for s in scores
+                ],
+            )
+
+    def list_judge_scores_for_result(self, result_id: int) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM eval_judge_scores WHERE result_id = ? ORDER BY id ASC",
+                (int(result_id),),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ─── Eval Stability: per-user daily usage ──────────────────────────────
+
+    def get_eval_daily_usage(self, user_id: int, date_utc: str) -> float:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT dollars FROM eval_user_daily_usage WHERE user_id = ? AND date_utc = ?",
+                (int(user_id), date_utc),
+            ).fetchone()
+        return float(row["dollars"]) if row else 0.0
+
+    def add_eval_daily_usage(self, user_id: int, date_utc: str, dollars: float) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO eval_user_daily_usage (user_id, date_utc, dollars)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id, date_utc) DO UPDATE SET
+                    dollars = dollars + excluded.dollars
+                """,
+                (int(user_id), date_utc, float(dollars)),
+            )
