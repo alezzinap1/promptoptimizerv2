@@ -40,6 +40,7 @@ import {
   clampExpertGenerationTemperature,
   EXPERT_DEFAULT_GEN_MODEL,
   EXPERT_GENERATION_TEMPERATURE_CAP,
+  expertLevelUsesManualTechniqueHint,
   getExpertLevelPreset,
 } from '../lib/expertLevelPresets'
 import { useT } from '../i18n'
@@ -56,7 +57,7 @@ import {
   pickConversationalReply,
 } from '../lib/conversationalGate'
 import { looksLikeStrongEdit } from '../lib/agentFollowUp'
-import { computeLineDiffOps } from '../lib/lineDiffLcs'
+import { computeRefinedLineDiffOps } from '../lib/lineDiffLcs'
 import { buildAgentChatHistory, resolveStudioFollowUpPlan } from '../lib/agentStudioProcessPlan'
 import {
   COMPLETENESS_SCORE_TITLE,
@@ -111,7 +112,7 @@ type GenChatMsg = {
     instruction: string
     oldPrompt: string
     newPrompt: string
-    diffOps: ReturnType<typeof computeLineDiffOps>
+    diffOps: ReturnType<typeof computeRefinedLineDiffOps>
   }
 }
 
@@ -225,7 +226,7 @@ function clampSplit(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n))
 }
 
-/** Ротация фраз в студии во время генерации (нейтральные, без внутренних терминов) */
+/** Ротация фраз в студии, когда нет явной фазы запроса (медленнее и с разбросом таймингов в эффекте). */
 const AGENT_THINKING_PHASES = [
   'Разбираю формулировку…',
   'Сопоставляю с контекстом…',
@@ -235,8 +236,7 @@ const AGENT_THINKING_PHASES = [
   'Проверяю согласованность…',
 ]
 
-const THINKING_PHASE_ROTATION_MS = 4800
-const THINKING_TYPEWRITER_MS = 18
+const THINKING_TYPEWRITER_BASE_MS = 26
 
 const PRE_PROMPT_ROUTING_LINE = 'Слушаю реплику и подбираю ответ…'
 const PRE_PROMPT_TASK_LINE = 'Понял задачу — собираю промпт…'
@@ -361,6 +361,8 @@ export default function Home() {
     msgId: string
     index: number
   } | null>(null)
+  /** Раскрытый полный diff у карточки «промпт готов» (итерация). */
+  const [promptDoneFullDiffMsgId, setPromptDoneFullDiffMsgId] = useState<string | null>(null)
   /** Снимки студии по вкладкам «Текст / Фото / Скилл» — при переключении не смешиваем чаты и сессии. */
   const studioModesRef = useRef<Record<PromptStudioMode, AgentStudioSnapshot>>({
     text: cloneAgentStudioSnapshot(createEmptyStudioSnapshot('text')),
@@ -395,6 +397,10 @@ export default function Home() {
     setExpertLevel(lvl)
     const modeForPreset = targetMode ?? promptTypeRef.current
     applyExpertPreset(lvl, modeForPreset)
+    const presetAfter = getExpertLevelPreset(lvl, modeForPreset)
+    const hintProf = expertLevelUsesManualTechniqueHint(lvl, modeForPreset)
+    setManualTechPickerCollapsed(hintProf && presetAfter.techniqueMode === 'manual')
+    setManualTechHintDismissed(true)
     setImagePromptTags(fresh.imagePromptTags)
     setImagePresetId(fresh.imagePresetId)
     setImageEngine(fresh.imageEngine)
@@ -485,6 +491,10 @@ export default function Home() {
       if (loading) return
       setExpertLevel(level)
       applyExpertPreset(level, promptType)
+      const p = getExpertLevelPreset(level, promptType)
+      const hintProf = expertLevelUsesManualTechniqueHint(level, promptType)
+      setManualTechPickerCollapsed(hintProf && p.techniqueMode === 'manual')
+      setManualTechHintDismissed(!hintProf)
       if (!useCustomGenModel) {
         setGenModel(EXPERT_DEFAULT_GEN_MODEL[level])
       }
@@ -520,6 +530,15 @@ export default function Home() {
     [],
   )
   const [promptPlaygroundBusy, setPromptPlaygroundBusy] = useState(false)
+  const [promptPlaygroundThinkingLine, setPromptPlaygroundThinkingLine] = useState('')
+  const [skillSandboxThinkingLine, setSkillSandboxThinkingLine] = useState('')
+  const [llmReviewThinkingLine, setLlmReviewThinkingLine] = useState('')
+  /** У Senior / Creative (ручные техники) панель по умолчанию свёрнута — лёгкая подсказка у кнопки A/✎. */
+  const [manualTechPickerCollapsed, setManualTechPickerCollapsed] = useState(false)
+  /** Скрывается по hover до следующей смены уровня (Senior/Creative). */
+  const [manualTechHintDismissed, setManualTechHintDismissed] = useState(true)
+  /** После сохранения в библиотеку — подсказка у «Опубликовать в сообществе»; hover скрывает до следующего сохранения. */
+  const [publishCommunityHintVisible, setPublishCommunityHintVisible] = useState(false)
   const prevGenModelForReasoningRef = useRef<string>('')
   const [techMenuFilter, setTechMenuFilter] = useState('')
   const skillInsertBtnRef = useRef<HTMLButtonElement>(null)
@@ -914,10 +933,21 @@ export default function Home() {
       return
     }
     setAgentThinkingIdx(Math.floor(Math.random() * AGENT_THINKING_PHASES.length))
-    const id = window.setInterval(() => {
-      setAgentThinkingIdx((i) => (i + 1) % AGENT_THINKING_PHASES.length)
-    }, THINKING_PHASE_ROTATION_MS)
-    return () => window.clearInterval(id)
+    let cancelled = false
+    const timerIds: number[] = []
+    const scheduleNext = () => {
+      const t = window.setTimeout(() => {
+        if (cancelled) return
+        setAgentThinkingIdx((i) => (i + 1) % AGENT_THINKING_PHASES.length)
+        scheduleNext()
+      }, 6400 + Math.floor(Math.random() * 9000))
+      timerIds.push(t)
+    }
+    timerIds.push(window.setTimeout(scheduleNext, 4200 + Math.floor(Math.random() * 7000)))
+    return () => {
+      cancelled = true
+      timerIds.forEach((tid) => window.clearTimeout(tid))
+    }
   }, [loading, agentThinkingLine])
 
   useEffect(() => {
@@ -929,16 +959,23 @@ export default function Home() {
       agentThinkingLine ?? AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]
     let i = 0
     setThinkingStreamText('')
-    const id = window.setInterval(() => {
+    let cancelled = false
+    const twIds: number[] = []
+    const tick = () => {
+      if (cancelled) return
       i += 1
       if (i > full.length) {
-        window.clearInterval(id)
         setThinkingStreamText(full)
         return
       }
       setThinkingStreamText(full.slice(0, i))
-    }, THINKING_TYPEWRITER_MS + Math.floor(Math.random() * 10))
-    return () => window.clearInterval(id)
+      twIds.push(window.setTimeout(tick, THINKING_TYPEWRITER_BASE_MS + Math.floor(Math.random() * 42)))
+    }
+    twIds.push(window.setTimeout(tick, 48 + Math.floor(Math.random() * 140)))
+    return () => {
+      cancelled = true
+      twIds.forEach((tid) => window.clearTimeout(tid))
+    }
   }, [loading, agentThinkingLine, agentThinkingIdx])
 
   useEffect(() => {
@@ -1010,9 +1047,6 @@ export default function Home() {
     setSuggestedActions([])
     setSuggestionsBarExpanded(false)
     setLoading(true)
-    if (!opts?.fromPrePromptRouter) {
-      setAgentThinkingLine(null)
-    }
     setError(null)
     const isIteration =
       opts?.forceIteration !== undefined ? opts.forceIteration : iterationMode
@@ -1021,6 +1055,7 @@ export default function Home() {
       isIteration
         ? opts?.previousPromptOverride ?? result?.prompt_block
         : undefined
+    let modelWaitTimer: number | undefined
     try {
       const req: GenerateRequest = {
         task_input: effectiveTask,
@@ -1052,8 +1087,18 @@ export default function Home() {
         expert_level: expertLevel,
         tier,
       }
-      setAgentThinkingLine(null)
+      if (!opts?.fromPrePromptRouter) {
+        setAgentThinkingLine('Собираю параметры запроса…')
+        await new Promise((r) => window.setTimeout(r, 280 + Math.random() * 900))
+      } else {
+        await new Promise((r) => window.setTimeout(r, 160 + Math.random() * 420))
+      }
+      setAgentThinkingLine('Отправляю запрос на сервер…')
+      modelWaitTimer = window.setTimeout(() => {
+        setAgentThinkingLine('Ожидание ответа модели…')
+      }, 2200 + Math.random() * 4200)
       const res = normalizeClientGenerateResult(await api.generate(req))
+      if (modelWaitTimer) window.clearTimeout(modelWaitTimer)
       const nextSuggestions = normalizeSuggestedStudioActions(res.suggested_actions)
       setSuggestedActions(nextSuggestions)
       appendRecentTechniqueIds(res.technique_ids || [])
@@ -1121,6 +1166,7 @@ export default function Home() {
       setQuestionState({})
       setQuestionCarouselIdx(0)
       setQuickSaved(false)
+      setPublishCommunityHintVisible(false)
       if (!opts?.skipAgentChatReplies) {
         setChatMessages((prev) => {
           let base = prev as GenChatMsg[]
@@ -1176,8 +1222,10 @@ export default function Home() {
         })
       }
     } catch (e) {
+      if (modelWaitTimer) window.clearTimeout(modelWaitTimer)
       setError(e instanceof Error ? e.message : 'Ошибка генерации')
     } finally {
+      if (modelWaitTimer) window.clearTimeout(modelWaitTimer)
       setAgentThinkingLine(null)
       setLoading(false)
     }
@@ -1217,6 +1265,7 @@ export default function Home() {
           })
           window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
           setQuickSaved(true)
+          setPublishCommunityHintVisible(true)
           pushAssistant(`Сохранено в **локальные скиллы** как «${title}». Откройте Библиотека → Скиллы.`)
         } else {
           await api.saveToLibrary({
@@ -1229,6 +1278,7 @@ export default function Home() {
           })
           window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
           setQuickSaved(true)
+          setPublishCommunityHintVisible(true)
           pushAssistant(`Сохранено в библиотеку как «${title}».`)
         }
       } catch (e) {
@@ -1332,7 +1382,12 @@ export default function Home() {
     setPromptPlaygroundBusy(true)
     setPromptPlaygroundLog((prev) => [...prev, { role: 'user', content: q }])
     setPromptPlaygroundInput('')
+    const timers: number[] = []
+    let waitLong: number | undefined
     try {
+      setPromptPlaygroundThinkingLine('Готовлю сообщение…')
+      timers.push(window.setTimeout(() => setPromptPlaygroundThinkingLine('Отправляю в API песочницы…'), 380 + Math.random() * 700))
+      waitLong = window.setTimeout(() => setPromptPlaygroundThinkingLine('Ожидание ответа модели…'), 2000 + Math.random() * 3800)
       const r = await api.playgroundRun({
         prompt_text: promptText,
         user_input: q,
@@ -1349,6 +1404,9 @@ export default function Home() {
         },
       ])
     } finally {
+      timers.forEach((tid) => window.clearTimeout(tid))
+      if (waitLong) window.clearTimeout(waitLong)
+      setPromptPlaygroundThinkingLine('')
       setPromptPlaygroundBusy(false)
     }
   }
@@ -1360,7 +1418,12 @@ export default function Home() {
     setSkillSandboxBusy(true)
     setSkillSandboxLog((prev) => [...prev, { role: 'user', content: q }])
     setSkillSandboxInput('')
+    const timers: number[] = []
+    let waitLong: number | undefined
     try {
+      setSkillSandboxThinkingLine('Готовлю сообщение…')
+      timers.push(window.setTimeout(() => setSkillSandboxThinkingLine('Отправляю в API песочницы…'), 380 + Math.random() * 700))
+      waitLong = window.setTimeout(() => setSkillSandboxThinkingLine('Ожидание ответа модели…'), 2000 + Math.random() * 3800)
       const r = await api.skillSandboxChat({
         skill_body: skill,
         user_message: q,
@@ -1373,6 +1436,9 @@ export default function Home() {
         { role: 'assistant', content: e instanceof Error ? e.message : 'Ошибка запроса' },
       ])
     } finally {
+      timers.forEach((tid) => window.clearTimeout(tid))
+      if (waitLong) window.clearTimeout(waitLong)
+      setSkillSandboxThinkingLine('')
       setSkillSandboxBusy(false)
     }
   }
@@ -1555,7 +1621,7 @@ export default function Home() {
               prompt_type: promptType,
               gen_model: genModel || undefined,
             })
-            const diffOps = computeLineDiffOps(snapshot.prompt_block, r.new_prompt)
+            const diffOps = computeRefinedLineDiffOps(snapshot.prompt_block, r.new_prompt)
             setChatMessages((prev) => [
               ...prev,
               {
@@ -1639,6 +1705,7 @@ export default function Home() {
               })
               window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
               setQuickSaved(true)
+              setPublishCommunityHintVisible(true)
               const tagStr = plan.tags.length ? ` Теги: ${plan.tags.join(', ')}.` : ''
               pushAssistant(
                 `Сохранено в **локальные скиллы** как «${title}».${tagStr} Библиотека → Скиллы.`,
@@ -1654,6 +1721,7 @@ export default function Home() {
               })
               window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
               setQuickSaved(true)
+              setPublishCommunityHintVisible(true)
               const tagStr = plan.tags.length ? ` Теги: ${plan.tags.join(', ')}.` : ''
               pushAssistant(`Сохранено в библиотеку как «${title}».${tagStr}`)
             }
@@ -1890,7 +1958,12 @@ export default function Home() {
     setLlmReviewModel('')
     setLlmReviewFromCache(false)
     setLlmReviewHints([])
+    const timers: number[] = []
+    let waitLong: number | undefined
     try {
+      setLlmReviewThinkingLine('Готовлю запрос к судье…')
+      timers.push(window.setTimeout(() => setLlmReviewThinkingLine('Отправляю промпт на сервер…'), 400 + Math.random() * 700))
+      waitLong = window.setTimeout(() => setLlmReviewThinkingLine('Ожидание ответа модели-судьи…'), 2200 + Math.random() * 4000)
       const r = await api.libraryLlmReview({
         prompt: result.prompt_block,
         prompt_type: promptType,
@@ -1907,6 +1980,9 @@ export default function Home() {
       setLlmReviewFromCache(false)
       setLlmReviewHints([])
     } finally {
+      timers.forEach((tid) => window.clearTimeout(tid))
+      if (waitLong) window.clearTimeout(waitLong)
+      setLlmReviewThinkingLine('')
       setLlmReviewBusy(false)
     }
   }
@@ -1937,6 +2013,7 @@ export default function Home() {
       setSaveNotes('')
       setSaveTags('')
       setQuickSaved(true)
+      setPublishCommunityHintVisible(true)
       return
     }
     await api.saveToLibrary({
@@ -1954,6 +2031,7 @@ export default function Home() {
     setSaveNotes('')
     setSaveTags('')
     setQuickSaved(true)
+    setPublishCommunityHintVisible(true)
   }
 
   const handleQuickSave = async () => {
@@ -1979,6 +2057,7 @@ export default function Home() {
         .catch(() => {})
       window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
       setQuickSaved(true)
+      setPublishCommunityHintVisible(true)
       return
     }
     await api.saveToLibrary({
@@ -1992,6 +2071,7 @@ export default function Home() {
     })
     window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
     setQuickSaved(true)
+    setPublishCommunityHintVisible(true)
   }
 
   const estimatePromptCost = (modelId: string, tokenEst: number): string | null => {
@@ -2366,17 +2446,28 @@ export default function Home() {
                       {imageTryBusy ? 'Рисую…' : 'Проба картинки'}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className={styles.quickSaveBtn}
-                    title="Опубликовать в сообществе"
-                    onClick={() => setPublishCommunityOpen(true)}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                    </svg>
-                  </button>
+                  <span className={styles.techModeMicroWrap}>
+                    <button
+                      type="button"
+                      className={styles.quickSaveBtn}
+                      title="Опубликовать в сообществе"
+                      onClick={() => setPublishCommunityOpen(true)}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                      </svg>
+                    </button>
+                    {quickSaved && publishCommunityHintVisible ? (
+                      <span
+                        className={styles.seniorTechHintBubble}
+                        role="status"
+                        onMouseEnter={() => setPublishCommunityHintVisible(false)}
+                      >
+                        Можно опубликовать в ленте сообщества
+                      </span>
+                    ) : null}
+                  </span>
                   {!quickSaved && (
                     <button
                       type="button"
@@ -2859,6 +2950,51 @@ export default function Home() {
                             <span className={styles.promptDoneSep}>·</span>
                             <span className={styles.promptDoneTech}>{card.techniquesLabel}</span>
                           </div>
+                          {card.iterationDiffBase &&
+                          card.iterationDiffBase !== card.promptSnapshot &&
+                          card.promptSnapshot.trim() ? (
+                            <>
+                              <button
+                                type="button"
+                                className={styles.promptDoneDiffToggle}
+                                aria-expanded={promptDoneFullDiffMsgId === m.id}
+                                onClick={() =>
+                                  setPromptDoneFullDiffMsgId((id) => (id === m.id ? null : m.id))
+                                }
+                              >
+                                {promptDoneFullDiffMsgId === m.id ? 'Скрыть полный diff' : 'Полный diff'}
+                              </button>
+                              {promptDoneFullDiffMsgId === m.id ? (
+                                <div className={styles.promptDoneFullDiff}>
+                                  <div className={styles.promptDoneDiffTitle}>
+                                    Текст промпта:{' '}
+                                    {card.diff
+                                      ? `v${card.diff.fromVersion} → v${card.diff.toVersion}`
+                                      : `→ v${card.version}`}
+                                  </div>
+                                  <ul className={styles.editPreviewDiff} aria-label="Полный diff версий">
+                                    {computeRefinedLineDiffOps(
+                                      card.iterationDiffBase,
+                                      card.promptSnapshot,
+                                    ).map((row, i) => (
+                                      <li
+                                        key={i}
+                                        className={
+                                          row.kind === 'ins'
+                                            ? styles.editPreviewIns
+                                            : row.kind === 'del'
+                                              ? styles.editPreviewDel
+                                              : styles.editPreviewEq
+                                        }
+                                      >
+                                        {row.text || ' '}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                            </>
+                          ) : null}
                           {card.suggestions.length > 0 ? (
                             <div
                               className={styles.promptDoneSuggestionsWrap}
@@ -3207,7 +3343,7 @@ export default function Home() {
                           aria-label="Пресет стиля для изображения"
                           variant="composer"
                           disabled={loading}
-                          footerLink={{ to: '/presets', label: 'Создать пресет…' }}
+                          footerLink={{ to: '/library?tab=presets', label: 'Создать пресет…' }}
                         />
                       ) : promptType === 'skill' ? (
                         <>
@@ -3218,7 +3354,7 @@ export default function Home() {
                             aria-label="Пресет для генерации скилла"
                             variant="composer"
                             disabled={loading}
-                            footerLink={{ to: '/presets', label: 'Создать пресет…' }}
+                            footerLink={{ to: '/library?tab=presets', label: 'Создать пресет…' }}
                           />
                           <SelectDropdown
                             value={skillTargetEnv}
@@ -3253,17 +3389,41 @@ export default function Home() {
                           triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
                         />
                       )}
-                      <button
-                        type="button"
-                        className={styles.techModeMicro}
-                        title={techniqueMode === 'auto' ? 'Техники: авто — нажмите для выбора вручную' : 'Техники: вручную — нажмите для авто'}
-                        aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
-                        aria-pressed={techniqueMode === 'manual'}
-                        disabled={loading}
-                        onClick={() => setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))}
-                      >
-                        {techniqueMode === 'auto' ? 'A' : '✎'}
-                      </button>
+                      <span className={styles.techModeMicroWrap}>
+                        <button
+                          type="button"
+                          className={styles.techModeMicro}
+                          title={techniqueMode === 'auto' ? 'Техники: авто — нажмите для выбора вручную' : 'Техники: вручную — нажмите для авто'}
+                          aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
+                          aria-pressed={techniqueMode === 'manual'}
+                          disabled={loading}
+                          onClick={() => {
+                            if (
+                              expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
+                              techniqueMode === 'manual' &&
+                              manualTechPickerCollapsed
+                            ) {
+                              setManualTechPickerCollapsed(false)
+                              return
+                            }
+                            setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))
+                          }}
+                        >
+                          {techniqueMode === 'auto' ? 'A' : '✎'}
+                        </button>
+                        {expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
+                        techniqueMode === 'manual' &&
+                        manualTechPickerCollapsed &&
+                        !manualTechHintDismissed ? (
+                          <span
+                            className={styles.seniorTechHintBubble}
+                            role="status"
+                            onMouseEnter={() => setManualTechHintDismissed(true)}
+                          >
+                            Укажите техники
+                          </span>
+                        ) : null}
+                      </span>
                       <button
                         type="button"
                         className={cb.composerGhostBtn}
@@ -3287,7 +3447,8 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                {techniqueMode === 'manual' && (
+                {techniqueMode === 'manual' &&
+                  (!expertLevelUsesManualTechniqueHint(expertLevel, promptType) || !manualTechPickerCollapsed) && (
                   <div className={`${cb.composerInset} ${styles.techPickerInset}`}>
                     <input
                       type="search"
@@ -3511,7 +3672,7 @@ export default function Home() {
                 <div className={styles.llmReviewDockMeta}>
                   <span className={styles.llmReviewDockMetaMain}>
                     {llmReviewBusy
-                      ? 'Запрос…'
+                      ? llmReviewThinkingLine || 'Запрос…'
                       : llmReviewModel
                         ? `${llmReviewModel}${llmReviewFromCache ? ' · из кэша' : ''}`
                         : '—'}
@@ -3527,7 +3688,14 @@ export default function Home() {
                 <div className={styles.llmReviewDockGrow}>
                   <div className={styles.llmReviewDockScroll}>
                     {llmReviewBusy ? (
-                      <p>Запрашиваю оценку…</p>
+                      <div className={styles.auxThinkingLine} aria-live="polite">
+                        <span className={styles.auxThinkingDots} aria-hidden>
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                        <span>{llmReviewThinkingLine || 'Запрос к судье…'}</span>
+                      </div>
                     ) : (
                       <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
                     )}
@@ -3647,13 +3815,19 @@ export default function Home() {
                     ×
                   </button>
                 </div>
-                <p className={styles.skillSandboxBanner}>Тестовый диалог с промптом справа — не панель «оценка».</p>
-                <p className={styles.skillSandboxHint}>
-                  Системный контекст = текущий промпт справа. Введите тестовый запрос пользователя — ответ модели
-                  появится ниже. Используется модель генерации из композера.
-                </p>
+                <p className={styles.skillSandboxHint}>Системный контекст = текущий промпт справа.</p>
                 <div className={styles.skillSandboxLog}>
-                  {promptPlaygroundLog.length === 0 ? (
+                  {promptPlaygroundBusy && promptPlaygroundThinkingLine ? (
+                    <div className={styles.auxThinkingLine} aria-live="polite">
+                      <span className={styles.auxThinkingDots} aria-hidden>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      <span>{promptPlaygroundThinkingLine}</span>
+                    </div>
+                  ) : null}
+                  {promptPlaygroundLog.length === 0 && !promptPlaygroundBusy ? (
                     <p className={styles.skillSandboxEmpty}>Напишите тестовый ввод ниже.</p>
                   ) : (
                     promptPlaygroundLog.map((row, i) => (
@@ -3723,7 +3897,17 @@ export default function Home() {
                   сервере.
                 </p>
                 <div className={styles.skillSandboxLog}>
-                  {skillSandboxLog.length === 0 ? (
+                  {skillSandboxBusy && skillSandboxThinkingLine ? (
+                    <div className={styles.auxThinkingLine} aria-live="polite">
+                      <span className={styles.auxThinkingDots} aria-hidden>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      <span>{skillSandboxThinkingLine}</span>
+                    </div>
+                  ) : null}
+                  {skillSandboxLog.length === 0 && !skillSandboxBusy ? (
                     <p className={styles.skillSandboxEmpty}>Напишите сообщение ниже.</p>
                   ) : (
                     skillSandboxLog.map((row, i) => (

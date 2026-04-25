@@ -49,9 +49,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isWelcomePublic = location.pathname === '/welcome'
 
   const [collapsed, setCollapsed] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem(COLLAPSED_KEY) === '1')
-  const [counts, setCounts] = useState<{ prompts: number | null; techniques: number | null; skills: number }>({
+  const [counts, setCounts] = useState<{ prompts: number | null; skills: number }>({
     prompts: null,
-    techniques: null,
     skills: loadSkillCount(),
   })
   const [recent, setRecent] = useState<RecentSession[]>(() => (typeof window !== 'undefined' ? getRecentSessions() : []))
@@ -63,17 +62,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const refreshNavCounts = useCallback(() => {
     if (!user) return
-    Promise.all([
-      api.getLibraryStats().then((s) => s.total),
-      api.getTechniques().then((r) => r.techniques.length),
-    ])
-      .then(([prompts, techniques]) => {
-        setCounts({ prompts, techniques, skills: loadSkillCount() })
+    api
+      .getLibraryStats()
+      .then((s) => {
+        setCounts({ prompts: s.total, skills: loadSkillCount() })
       })
       .catch(() => {
         setCounts((c) => ({
           prompts: c.prompts ?? 0,
-          techniques: c.techniques ?? 0,
           skills: loadSkillCount(),
         }))
       })

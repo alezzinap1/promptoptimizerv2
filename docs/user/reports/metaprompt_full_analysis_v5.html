@@ -97,7 +97,7 @@ h3{font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transfo
 
 <div class="card">
   <div class="ch"><span class="badge red">КРИТИЧНО</span><span class="ct">Две независимые оси (уровень + модель) перегружают новичка</span></div>
-  <div class="cb">Пользователь видит: «Junior · Mid · Senior · Creative» И «DeepSeek V3 / Gemini / Mistral / Grok». Для него это 4×4 = 16 комбинаций без понимания разницы. Что выбрать? Документ сам признаёт проблему в разделе 10 — и предлагает решение (LevelBundle). Но это не реализовано.</div>
+  <div class="cb">Пользователь видит: «Junior · Mid · Senior · Creative» И «DeepSeek V4 / Gemini / Mistral / Grok». Для него это 4×4 = 16 комбинаций без понимания разницы. Что выбрать? Документ сам признаёт проблему в разделе 10 — и предлагает решение (LevelBundle). Но это не реализовано.</div>
   <div class="fix">→ Реализовать LevelBundle из раздела 10 документа. Каждый уровень = рекомендуемая модель + поведение. «Своя модель» — для продвинутых.</div>
 </div>
 
@@ -140,7 +140,7 @@ type LevelBundle = {
   id: 'quick' | 'balanced' | 'precise' | 'creative'
   label: string          // «Быстро», «Сбалансированно», «Точно», «Творчески»
   icon: string           // ⚡ ⚖️ 🎯 ✨
-  defaultGenModel: string  // 'deepseek/deepseek-chat' | 'google/gemini-flash-2.0' | ...
+  defaultGenModel: string  // 'deepseek/deepseek-v4-flash' | 'google/gemini-flash-2.0' | ...
   behavior: ExpertLevelPreset
   estimatedCalls: number   // 1 | 2 | 3
   estimatedCostPerRequest: string  // '&lt;$0.001' | '~$0.002'
@@ -149,7 +149,7 @@ type LevelBundle = {
 }
 
 // Пример заполнения:
-{id:'quick',    label:'Быстро',       icon:'⚡', defaultGenModel:'deepseek/deepseek-chat',    estimatedCalls:1}
+{id:'quick',    label:'Быстро',       icon:'⚡', defaultGenModel:'deepseek/deepseek-v4-flash',    estimatedCalls:1}
 {id:'balanced', label:'Стандарт',     icon:'⚖️', defaultGenModel:'google/gemini-flash-2.0',   estimatedCalls:1}
 {id:'precise',  label:'Точно',        icon:'🎯', defaultGenModel:'anthropic/claude-3-5-haiku', estimatedCalls:1}
 {id:'creative', label:'Творчески',    icon:'✨', defaultGenModel:'x-ai/grok-3',               estimatedCalls:2}</div>
@@ -236,7 +236,7 @@ type LevelBundle = {
 <h3>Дропдаун моделей (скрин 9)</h3>
 <div class="card">
   <div class="ch"><span class="badge amber">ВАЖНО</span><span class="ct">«google/gemini-flash-1.5» в дропдауне — техническое название</span></div>
-  <div class="cb">Список моделей: «DeepSeek V3», «google/gemini-flash-1.5», «Mistral Nemo», «Grok 4.1 Fast». Второй пункт — сырой OpenRouter ID без нормализации. Несоответствие стиля.</div>
+  <div class="cb">Список моделей: «DeepSeek V4», «google/gemini-flash-1.5», «Mistral Nemo», «Grok 4.1 Fast». Второй пункт — сырой OpenRouter ID без нормализации. Несоответствие стиля.</div>
   <div class="fix">→ Применить shortGenerationModelLabel из кодовой базы ко всем моделям в списке. «google/gemini-flash-1.5» → «Gemini Flash 1.5». Добавить иконки провайдеров.</div>
 </div>
 </div>

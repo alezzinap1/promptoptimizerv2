@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { computeLineDiffOps } from '../lib/lineDiffLcs'
+import { computeRefinedLineDiffOps } from '../lib/lineDiffLcs'
 import styles from './SimpleLineDiff.module.css'
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 
 /** Построчное сравнение (LCS): удаления / добавления / без изменений */
 export default function SimpleLineDiff({ before, after }: Props) {
-  const ops = useMemo(() => computeLineDiffOps(before, after), [before, after])
+  const ops = useMemo(() => computeRefinedLineDiffOps(before, after), [before, after])
 
   return (
     <div className={styles.root} role="region" aria-label="Построчное сравнение">

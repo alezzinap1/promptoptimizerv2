@@ -17,7 +17,7 @@ export const CURATED_MODEL_PICKS: CuratedModelPick[] = [
     id: 'deepseek/deepseek-v4-flash',
     title: 'DeepSeek V4 Flash',
     goodFor: 'Повседневные задачи, русский язык, быстрый ответ, цена/качество.',
-    vsOthers: 'Новее V3 Chat; для глубокого рассуждения — DeepSeek R1 или Sonnet.',
+    vsOthers: 'Актуальная линейка V4 Flash; для глубокого рассуждения — DeepSeek R1 или Sonnet.',
   },
   {
     id: 'openai/gpt-4o-mini',

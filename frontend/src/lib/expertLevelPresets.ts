@@ -71,6 +71,12 @@ export function getExpertLevelPreset(level: ExpertLevel, mode: PromptStudioMode)
   }
 }
 
+/** Senior и Creative в режиме с ручными техниками (текст) — общая подсказка у кнопки A/✎. */
+export function expertLevelUsesManualTechniqueHint(level: ExpertLevel, mode: PromptStudioMode): boolean {
+  const p = getExpertLevelPreset(level, mode)
+  return p.techniqueMode === 'manual' && (level === 'senior' || level === 'creative')
+}
+
 export const EXPERT_LEVEL_LABELS: Record<ExpertLevel, string> = {
   junior: 'Junior',
   mid: 'Mid',

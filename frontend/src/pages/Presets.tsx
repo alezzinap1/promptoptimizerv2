@@ -6,7 +6,10 @@ function dispatchPresetsRefresh(): void {
   window.dispatchEvent(new CustomEvent('metaprompt-presets-refresh'))
 }
 
-export default function Presets() {
+export type PresetsVariant = 'page' | 'embedded'
+
+export default function Presets({ variant = 'page' }: { variant?: PresetsVariant }) {
+  const embedded = variant === 'embedded'
   const [items, setItems] = useState<UserPresetRecord[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -60,12 +63,20 @@ export default function Presets() {
   }
 
   return (
-    <div className={styles.page}>
-      <h1 className="pageTitleGradient">Пресеты</h1>
-      <p className={styles.caption}>
-        Собственные пресеты для студии на главной: стиль для фото-промптов и дополнительные правила для генерации скиллов.
-        Выбор — в панели ввода рядом с workspace, когда активны режимы «Фото» или «Скилл».
-      </p>
+    <div className={embedded ? styles.presetsEmbeddedWrap : styles.page}>
+      {!embedded ? (
+        <>
+          <h1 className="pageTitleGradient">Пресеты</h1>
+          <p className={styles.caption}>
+            Собственные пресеты для студии на главной: стиль для фото-промптов и дополнительные правила для генерации скиллов.
+            Выбор — в панели ввода рядом с workspace, когда активны режимы «Фото» или «Скилл».
+          </p>
+        </>
+      ) : (
+        <p className={styles.caption} style={{ marginTop: 0 }}>
+          Пресеты для режимов «Фото» и «Скилл» на главной; выбор — в композере студии.
+        </p>
+      )}
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.section}>

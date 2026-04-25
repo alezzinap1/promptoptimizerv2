@@ -14,6 +14,8 @@ export type PromptDoneCard = {
   techniquesLabel: string
   tokenEstimate: number
   promptSnapshot: string
+  /** Текст до итерации — для полного diff в чате (кнопка «Полный diff»). */
+  iterationDiffBase?: string
   suggestions: PromptDoneSuggestion[]
   diff?: {
     fromVersion: number
@@ -184,6 +186,8 @@ export function buildPromptDoneCard(
     techniquesLabel,
     tokenEstimate,
     promptSnapshot,
+    iterationDiffBase:
+      ctx.isIteration && ctx.previousPromptBlock?.trim() ? ctx.previousPromptBlock : undefined,
     suggestions,
     diff,
     skillTestCases,

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import Presets from '../Presets'
 import PromptsPanel from './PromptsPanel'
 import SkillsPanel from './SkillsPanel'
-import Techniques from '../Techniques'
 import hubStyles from './LibraryHub.module.css'
 
 const GRID_KEY = 'prompt-engineer-library-grid-cols'
@@ -21,30 +21,40 @@ function loadGridCols(): GridCols {
 
 const TABS = [
   { id: 'prompts', label: 'Промпты' },
-  { id: 'techniques', label: 'Техники' },
+  { id: 'presets', label: 'Пресеты' },
   { id: 'skills', label: 'Скиллы' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
 
 function normalizeTab(raw: string | null): TabId {
-  if (raw === 'techniques' || raw === 'skills' || raw === 'prompts') return raw
+  if (raw === 'presets' || raw === 'skills' || raw === 'prompts') return raw
   return 'prompts'
 }
 
 export default function LibraryHub() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = useMemo(() => normalizeTab(searchParams.get('tab')), [searchParams])
 
-  const [counts, setCounts] = useState({ prompts: 0, techniques: 0, skills: 0 })
+  const [counts, setCounts] = useState({ prompts: 0, presets: 0, skills: 0 })
   const [gridCols, setGridCols] = useState<GridCols>(() => loadGridCols())
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'techniques') {
+      navigate('/techniques', { replace: true })
+    }
+  }, [searchParams, navigate])
 
   const refreshPromptCount = useCallback(() => {
     api.getLibraryStats().then((s) => setCounts((c) => ({ ...c, prompts: s.total })))
   }, [])
 
-  const refreshTechniqueCount = useCallback(() => {
-    api.getTechniques().then((r) => setCounts((c) => ({ ...c, techniques: r.techniques.length })))
+  const refreshPresetCount = useCallback(() => {
+    api
+      .listPresets()
+      .then((r) => setCounts((c) => ({ ...c, presets: r.items.length })))
+      .catch(() => setCounts((c) => ({ ...c, presets: 0 })))
   }, [])
 
   const handleSkillsCount = useCallback((n: number) => {
@@ -53,8 +63,14 @@ export default function LibraryHub() {
 
   useEffect(() => {
     refreshPromptCount()
-    refreshTechniqueCount()
-  }, [refreshPromptCount, refreshTechniqueCount])
+    refreshPresetCount()
+  }, [refreshPromptCount, refreshPresetCount])
+
+  useEffect(() => {
+    const onRefresh = () => refreshPresetCount()
+    window.addEventListener('metaprompt-presets-refresh', onRefresh)
+    return () => window.removeEventListener('metaprompt-presets-refresh', onRefresh)
+  }, [refreshPresetCount])
 
   const setTab = (id: TabId) => {
     setSearchParams((prev) => {
@@ -108,25 +124,18 @@ export default function LibraryHub() {
           >
             <span className={hubStyles.segLabel}>{t.label}</span>
             <span className={hubStyles.tabBadge} aria-hidden>
-              {t.id === 'prompts' ? counts.prompts : t.id === 'techniques' ? counts.techniques : counts.skills}
+              {t.id === 'prompts' ? counts.prompts : t.id === 'presets' ? counts.presets : counts.skills}
             </span>
           </button>
         ))}
       </div>
 
       <div className={hubStyles.viewport}>
-        {/* Одна видимая панель за раз (hidden), без translateX-карусели — иначе после модалок
-            фокус/скролл могли «подсвечивать» соседнюю колонку и визуально путать вкладки. */}
         <div className={hubStyles.panel} hidden={tab !== 'prompts'}>
           <PromptsPanel onPromptCountChanged={refreshPromptCount} gridCols={gridCols} />
         </div>
-        <div className={hubStyles.panel} hidden={tab !== 'techniques'}>
-          <Techniques
-            variant="embedded"
-            libraryActiveTab={tab}
-            onCatalogChanged={refreshTechniqueCount}
-            gridCols={gridCols}
-          />
+        <div className={hubStyles.panel} hidden={tab !== 'presets'}>
+          <Presets variant="embedded" />
         </div>
         <div className={hubStyles.panel} hidden={tab !== 'skills'}>
           <SkillsPanel libraryActiveTab={tab} onCountChange={handleSkillsCount} gridCols={gridCols} />

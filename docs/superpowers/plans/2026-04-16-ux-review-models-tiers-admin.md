@@ -16,7 +16,7 @@
 ## Директивы пользователя
 
 1. **Тиры вместо моделей в UI**: `Auto` / `Fast (повседневный)` / `Mid (средний)` / `Advanced (продвинутый)`. Пользователь не видит названий.
-2. **Раскладка**: Fast ≈ DeepSeek V3, Mid ≈ Grok-3-mini / Gemini-2.5-Flash, Advanced ≈ новые Claude Haiku / GPT-5-mini / DeepSeek-R1. Advanced использует «думающие» модели + helper-модель для промежуточных шагов.
+2. **Раскладка**: Fast ≈ DeepSeek V4 Flash, Mid ≈ Grok-3-mini / Gemini-2.5-Flash, Advanced ≈ новые Claude Haiku / GPT-5-mini / DeepSeek-R1. Advanced использует «думающие» модели + helper-модель для промежуточных шагов.
 3. **Бюджет**: выход ≤ **$3 / 1M tokens**. Никогда не выбирать дороже в Auto/тирах.
 4. **Healthcheck** раз в сутки: если модель пропала в OpenRouter / сломалась — авто-подбор замены; событие в админке.
 5. **В Настройках** — ручной выбор моделей, если есть свой OpenRouter ключ.

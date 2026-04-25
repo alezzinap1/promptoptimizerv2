@@ -75,7 +75,7 @@
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-decoration: none;
   color: var(--text);
   flex-shrink: 0;
@@ -83,10 +83,10 @@
 
 .logoGlyph {
   flex-shrink: 0;
-  height: 34px;
+  height: 28px;
   width: auto;
   aspect-ratio: 470 / 256;
-  max-width: 96px;
+  max-width: 80px;
   background-color: var(--primary);
   -webkit-mask-image: url(/brand-logo-mask.png);
   mask-image: url(/brand-logo-mask.png);
@@ -100,7 +100,7 @@
 
 .logoText {
   font-family: var(--font-display);
-  font-size: 0.98rem;
+  font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   display: inline-flex;

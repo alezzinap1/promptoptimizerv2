@@ -18,12 +18,6 @@ const LibraryIcon = () => (
   </svg>
 )
 
-const TechIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-  </svg>
-)
-
 const SkillsIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -56,7 +50,7 @@ const MenuIcon = () => (
   </svg>
 )
 
-type Counts = { prompts: number | null; techniques: number | null; skills: number }
+type Counts = { prompts: number | null; skills: number }
 
 type Props = {
   collapsed: boolean
@@ -91,8 +85,8 @@ export default function AppSidebar({
   const navigate = useNavigate()
   const tab = new URLSearchParams(location.search).get('tab')
 
-  const libraryPromptsActive = location.pathname === '/library' && tab !== 'techniques' && tab !== 'skills'
-  const libraryTechActive = location.pathname === '/library' && tab === 'techniques'
+  const libraryPromptsActive = location.pathname === '/library' && tab !== 'skills' && tab !== 'presets'
+  const libraryPresetsActive = location.pathname === '/library' && tab === 'presets'
   const librarySkillsActive = location.pathname === '/library' && tab === 'skills'
 
   return (
@@ -145,15 +139,14 @@ export default function AppSidebar({
               <span className={styles.badge}>{counts.prompts === null ? '…' : counts.prompts}</span>
             </NavLink>
             <NavLink
-              to="/library?tab=techniques"
-              className={`${styles.navItem} ${libraryTechActive ? styles.navActive : ''}`}
-              title="Техники"
+              to="/library?tab=presets"
+              className={`${styles.navItem} ${libraryPresetsActive ? styles.navActive : ''}`}
+              title="Пресеты"
             >
               <span className={styles.icon} aria-hidden>
-                <TechIcon />
+                <PresetsIcon />
               </span>
-              <span className={styles.label}>Техники</span>
-              <span className={styles.badge}>{counts.techniques === null ? '…' : counts.techniques}</span>
+              <span className={styles.label}>Пресеты</span>
             </NavLink>
             <NavLink
               to="/library?tab=skills"
@@ -191,16 +184,6 @@ export default function AppSidebar({
                 <FolderIcon />
               </span>
               <span className={styles.label}>Пространства</span>
-            </NavLink>
-            <NavLink
-              to="/presets"
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title="Пресеты студии"
-            >
-              <span className={styles.icon} aria-hidden>
-                <PresetsIcon />
-              </span>
-              <span className={styles.label}>Пресеты</span>
             </NavLink>
           </div>
 

@@ -68,12 +68,12 @@
 }
 
 .logoWrapper {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .logo {
-  width: 108px;
-  height: 108px;
+  width: 90px;
+  height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,10 +82,10 @@
 
 .brandLogoGlyph {
   width: 100%;
-  max-width: 160px;
+  max-width: 132px;
   height: auto;
   aspect-ratio: 470 / 256;
-  max-height: 88px;
+  max-height: 72px;
   background-color: var(--primary);
   -webkit-mask-image: url(/brand-logo-mask.png);
   mask-image: url(/brand-logo-mask.png);

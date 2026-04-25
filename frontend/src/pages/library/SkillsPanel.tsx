@@ -31,7 +31,7 @@ const emptyDraft = {
 
 type SkillsPanelProps = {
   /** При уходе со вкладки «Скиллы» в хабе — закрыть модалку создания */
-  libraryActiveTab?: 'prompts' | 'techniques' | 'skills'
+  libraryActiveTab?: 'prompts' | 'presets' | 'skills'
   onCountChange?: (n: number) => void
   gridCols?: 3 | 4
 }

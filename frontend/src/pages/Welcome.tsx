@@ -255,7 +255,7 @@ export default function Welcome() {
   // TODO(phase-9): replace hardcoded items with the health snapshot endpoint.
   const tickerItems: ReadonlyArray<{ label: string; value: string; status?: TickerStatus }> = [
     { label: t.landing.ticker.stack, value: t.landing.ticker.stackValue },
-    { label: t.landing.ticker.tierFast, value: 'deepseek-v2', status: 'ok' },
+    { label: t.landing.ticker.tierFast, value: 'deepseek-v4', status: 'ok' },
     { label: t.landing.ticker.tierMid, value: 'grok-2 · claude-haiku', status: 'ok' },
     { label: t.landing.ticker.tierAdvanced, value: 'claude-sonnet · gpt-4o', status: 'ok' },
     { label: t.landing.ticker.uptime, value: t.landing.ticker.uptimeValue, status: 'ok' },

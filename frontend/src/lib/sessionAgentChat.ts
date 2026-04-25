@@ -35,6 +35,11 @@ function parsePromptDoneCard(raw: unknown): PromptDoneCard | undefined {
   const techniquesLabel = typeof o.techniquesLabel === 'string' ? o.techniquesLabel : '—'
   const tokenEstimate = Math.round(Number(o.tokenEstimate) || 0)
   const promptSnapshot = typeof o.promptSnapshot === 'string' ? o.promptSnapshot : ''
+  const iterationDiffBaseRaw = o.iterationDiffBase
+  const iterationDiffBase =
+    typeof iterationDiffBaseRaw === 'string' && iterationDiffBaseRaw.length > 0
+      ? iterationDiffBaseRaw
+      : undefined
   const suggestions: PromptDoneCard['suggestions'] = []
   if (Array.isArray(o.suggestions)) {
     for (const x of o.suggestions) {
@@ -82,6 +87,7 @@ function parsePromptDoneCard(raw: unknown): PromptDoneCard | undefined {
     techniquesLabel,
     tokenEstimate,
     promptSnapshot,
+    iterationDiffBase,
     suggestions,
     diff,
     skillTestCases,

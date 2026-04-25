@@ -3,6 +3,13 @@
   animation: pageEnter 0.5s ease-out;
 }
 
+/* Вкладка «Пресеты» в хабе библиотеки — без полноэкранной анимации страницы */
+.presetsEmbeddedWrap {
+  max-width: none;
+  padding: 0 4px 12px;
+  animation: none;
+}
+
 @keyframes pageEnter {
   from {
     opacity: 0;

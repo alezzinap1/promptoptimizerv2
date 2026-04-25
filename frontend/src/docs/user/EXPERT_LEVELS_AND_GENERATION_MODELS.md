@@ -84,7 +84,7 @@
 
 | Уровень | OpenRouter id | Заметка |
 |---------|-----------------|---------|
-| Junior | `deepseek/deepseek-chat` | Низкая цена, сильный русский |
+| Junior | `deepseek/deepseek-v4-flash` | Низкая цена, сильный русский |
 | Mid | `google/gemini-2.5-flash-lite` | Flash Lite: скорость и экономия |
 | Senior | `google/gemini-2.5-flash` | Flash: выше потолок качества |
 | Creative | `openai/gpt-4o-mini` | Баланс креатив/стоимость |
