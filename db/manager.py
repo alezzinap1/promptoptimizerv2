@@ -183,6 +183,7 @@ class DBManager:
             self._migrate_phase17_prompt_alt_and_tier_overrides(conn)
             self._migrate_phase18_onboarding_profile(conn)
             self._migrate_phase19_llm_review_cache(conn)
+            self._migrate_phase20_eval_stability(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -477,6 +478,119 @@ class DBManager:
             """
             CREATE INDEX IF NOT EXISTS idx_llm_review_cache_user
                 ON library_llm_review_cache(user_id)
+            """
+        )
+
+    def _migrate_phase20_eval_stability(self, conn: sqlite3.Connection) -> None:
+        """Stability evaluation runs (N-runs, judge, embeddings, pair-compare).
+
+        Creates 4 tables for evaluation runs/results/judge-scores/rubrics
+        plus a per-user-per-day usage counter and the daily budget column on users.
+        """
+        self._safe_add_column(conn, "users", "eval_daily_budget_usd", "REAL NOT NULL DEFAULT 5.0")
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS eval_rubrics (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id             INTEGER NOT NULL,
+                name                TEXT    NOT NULL,
+                preset_key          TEXT,
+                criteria_json       TEXT    NOT NULL,
+                reference_required  INTEGER NOT NULL DEFAULT 0,
+                created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS eval_runs (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id                  INTEGER NOT NULL,
+                status                   TEXT    NOT NULL,
+                mode                     TEXT    NOT NULL,
+                prompt_a_text            TEXT    NOT NULL,
+                prompt_a_hash            TEXT    NOT NULL,
+                prompt_a_library_id      INTEGER,
+                prompt_a_library_version INTEGER,
+                prompt_b_text            TEXT,
+                prompt_b_hash            TEXT,
+                prompt_b_library_id      INTEGER,
+                prompt_b_library_version INTEGER,
+                task_input               TEXT    NOT NULL,
+                reference_answer         TEXT,
+                target_model_id          TEXT    NOT NULL,
+                judge_model_id           TEXT    NOT NULL,
+                embedding_model_id       TEXT    NOT NULL,
+                rubric_id                INTEGER,
+                rubric_snapshot_json     TEXT    NOT NULL,
+                n_runs                   INTEGER NOT NULL,
+                parallelism              INTEGER NOT NULL DEFAULT 4,
+                temperature              REAL    NOT NULL,
+                top_p                    REAL,
+                pair_judge_samples       INTEGER DEFAULT 5,
+                cost_preview_usd         REAL    NOT NULL,
+                cost_preview_tokens      INTEGER NOT NULL,
+                cost_actual_usd          REAL,
+                cost_actual_tokens       INTEGER,
+                duration_ms              INTEGER,
+                diversity_score          REAL,
+                agg_overall_p50          REAL,
+                agg_overall_p10          REAL,
+                agg_overall_p90          REAL,
+                agg_overall_var          REAL,
+                pair_winner              TEXT,
+                pair_winner_confidence   REAL,
+                error                    TEXT,
+                created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                finished_at              TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS eval_results (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                   INTEGER NOT NULL,
+                prompt_side              TEXT    NOT NULL,
+                run_index                INTEGER NOT NULL,
+                output_text              TEXT    NOT NULL,
+                output_tokens            INTEGER NOT NULL,
+                input_tokens             INTEGER NOT NULL,
+                latency_ms               INTEGER,
+                status                   TEXT    NOT NULL,
+                error                    TEXT,
+                embedding_blob           BLOB,
+                judge_overall            REAL,
+                judge_overall_secondary  REAL,
+                judge_reasoning          TEXT,
+                parsed_as_json           INTEGER NOT NULL DEFAULT 0,
+                parsed_top_fields_json   TEXT,
+                created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (run_id) REFERENCES eval_runs(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS eval_judge_scores (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                result_id       INTEGER NOT NULL,
+                criterion_key   TEXT    NOT NULL,
+                score           REAL    NOT NULL,
+                reasoning       TEXT,
+                FOREIGN KEY (result_id) REFERENCES eval_results(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS eval_user_daily_usage (
+                user_id     INTEGER NOT NULL,
+                date_utc    TEXT    NOT NULL,
+                dollars     REAL    NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, date_utc),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_eval_runs_user
+                ON eval_runs(user_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_eval_runs_lib_a
+                ON eval_runs(prompt_a_library_id);
+            CREATE INDEX IF NOT EXISTS idx_eval_runs_lib_b
+                ON eval_runs(prompt_b_library_id);
+            CREATE INDEX IF NOT EXISTS idx_eval_results_run
+                ON eval_results(run_id);
             """
         )
 
