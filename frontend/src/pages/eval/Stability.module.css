@@ -443,6 +443,41 @@
   background: rgba(56, 189, 248, 0.12);
 }
 
+.metaPipelineDetails {
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .metaPipelineDetails {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.metaPipelineSummary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  user-select: none;
+}
+
+.metaPipelineBody {
+  margin-top: 10px;
+}
+
+.metaPipelineBlock {
+  margin-bottom: 12px;
+}
+
+.metaPipelineList {
+  margin: 4px 0 0;
+  padding-left: 1.1rem;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .seriesTable {
   width: 100%;
   border-collapse: collapse;

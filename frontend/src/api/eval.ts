@@ -131,11 +131,23 @@ export interface EvalSynthesisReport {
   criteria_weak_spots?: Array<{ criterion_key: string; note: string; hypothesis_id?: string }>
 }
 
+export interface EvalMetaCluster {
+  cluster_id?: number
+  members?: Array<{ result_id?: number; run_index?: number; judge_primary?: number; excerpt?: string }>
+}
+
+export interface EvalVerifiedHypothesis {
+  id?: string
+  pattern?: string
+  cluster_ids?: unknown[]
+  evidence?: EvalEvidenceSpan[]
+}
+
 export interface EvalMetaPipeline {
   schema_version?: number
-  clusters?: unknown[]
+  clusters?: EvalMetaCluster[]
   hypotheses_raw?: unknown[]
-  verified_hypotheses?: unknown[]
+  verified_hypotheses?: EvalVerifiedHypothesis[]
   synthesis_raw?: unknown
 }
 

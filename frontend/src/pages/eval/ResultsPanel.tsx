@@ -1,5 +1,11 @@
 import { useMemo } from 'react'
-import { downloadEvalRunMarkdown, type EvalRunDetail, type EvalResultRow } from '../../api/eval'
+import {
+  downloadEvalRunMarkdown,
+  type EvalMetaCluster,
+  type EvalRunDetail,
+  type EvalResultRow,
+  type EvalVerifiedHypothesis,
+} from '../../api/eval'
 import css from './Stability.module.css'
 
 interface Props {
@@ -167,6 +173,46 @@ export default function ResultsPanel({ detail }: Props) {
         <div className={css.errorBox} style={{ marginBottom: 12 }}>
           Мета-анализ не удался: {run.synthesis_error}
         </div>
+      )}
+
+      {run.meta_pipeline && run.meta_pipeline.schema_version === 2 && (
+        <details className={css.metaPipelineDetails}>
+          <summary className={css.metaPipelineSummary}>
+            Технический разбор мета-цепочки (кластеры и проверенные гипотезы)
+          </summary>
+          <div className={css.metaPipelineBody}>
+            {Array.isArray(run.meta_pipeline.clusters) && run.meta_pipeline.clusters.length > 0 && (
+              <div className={css.metaPipelineBlock}>
+                <div className={css.synthesisSub}>Кластеры по эмбеддингам</div>
+                <ul className={css.metaPipelineList}>
+                  {(run.meta_pipeline.clusters as EvalMetaCluster[]).map((c, i) => (
+                    <li key={i}>
+                      #{c.cluster_id ?? i}:{' '}
+                      {(c.members || []).length} ответ(ов), id:{' '}
+                      {(c.members || [])
+                        .map(m => m.result_id)
+                        .filter(Boolean)
+                        .join(', ')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {Array.isArray(run.meta_pipeline.verified_hypotheses) &&
+              run.meta_pipeline.verified_hypotheses.length > 0 && (
+                <div className={css.metaPipelineBlock}>
+                  <div className={css.synthesisSub}>После проверки цитат</div>
+                  <ul className={css.metaPipelineList}>
+                    {(run.meta_pipeline.verified_hypotheses as EvalVerifiedHypothesis[]).map((h, i) => (
+                      <li key={i}>
+                        <b>{h.id || '—'}</b>: {h.pattern || '—'} ({(h.evidence || []).length} цитат)
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+          </div>
+        </details>
       )}
 
       {run.mode === 'pair' && run.pair_winner && (
