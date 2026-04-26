@@ -49,6 +49,10 @@ _FALLBACK_PRICING: dict[str, float] = {"input": 1.0 / _K, "output": 3.0 / _K}
 _JUDGE_SYSTEM_OVERHEAD_TOKENS = 600
 _JUDGE_OUTPUT_TOKENS = 250
 _PAIR_JUDGE_OUTPUT_TOKENS = 200
+_SYNTH_SYSTEM_OVERHEAD = 900
+_SYNTH_OUTPUT_TOKENS = 1400
+# Per-output excerpt (~chars) counted into synthesis input (aligned with services.eval.synthesis).
+_SYNTH_EXCERPT_CHARS = 2800
 
 
 def _tokens(text: str, model_id: str) -> int:
@@ -77,6 +81,9 @@ def estimate_run_cost(
     prompt_b_text: str | None = None,
     reference_answer: str | None = None,
     pair_judge_samples: int = 0,
+    judge_secondary_model_id: str | None = None,
+    run_synthesis: bool = True,
+    synthesis_model_id: str | None = None,
 ) -> dict:
     """Estimate token usage and USD for a stability run.
 
@@ -89,8 +96,19 @@ def estimate_run_cost(
 
     target_pricing, target_exact = _pricing_for(target_model_id)
     judge_pricing, judge_exact = _pricing_for(judge_model_id)
+    sec_model = (judge_secondary_model_id or "").strip()
+    use_secondary = bool(sec_model and sec_model != (judge_model_id or "").strip())
+    synth_model = (synthesis_model_id or judge_model_id).strip()
+    judge2_pricing, judge2_exact = _pricing_for(sec_model) if use_secondary else (judge_pricing, judge_exact)
+    synth_pricing, synth_exact = _pricing_for(synth_model)
     embed_pricing, embed_exact = _pricing_for(embedding_model_id)
-    is_exact = target_exact and judge_exact and embed_exact
+    is_exact = (
+        target_exact
+        and judge_exact
+        and embed_exact
+        and (not use_secondary or judge2_exact)
+        and (not run_synthesis or synth_exact)
+    )
 
     # ── Target generation ───────────────────────────────────────────────
     a_in = _tokens(prompt_a_text, target_model_id) + _tokens(task_input, target_model_id)
@@ -115,10 +133,27 @@ def estimate_run_cost(
         + ref_in
         + _JUDGE_SYSTEM_OVERHEAD_TOKENS
     )
-    judge_input_tokens = per_call_judge_input * judge_calls
-    judge_output_tokens = _JUDGE_OUTPUT_TOKENS * judge_calls
+    pri_in = per_call_judge_input * judge_calls
+    pri_out = _JUDGE_OUTPUT_TOKENS * judge_calls
+
+    sec_in = 0
+    sec_out = 0
+    judge_secondary_usd = 0.0
+    if use_secondary:
+        per_b = (
+            _tokens(prompt_a_text, sec_model)
+            + _tokens(task_input, sec_model)
+            + expected_output_tokens
+            + ref_in
+            + _JUDGE_SYSTEM_OVERHEAD_TOKENS
+        )
+        sec_in = per_b * judge_calls
+        sec_out = _JUDGE_OUTPUT_TOKENS * judge_calls
+        judge_secondary_usd = sec_in * judge2_pricing["input"] + sec_out * judge2_pricing["output"]
 
     # ── Pair-judge (A-vs-B comparisons, sampled) ───────────────────────
+    pair_in = 0
+    pair_out = 0
     if is_pair and pair_judge_samples > 0:
         per_pair_input = (
             _tokens(prompt_a_text, judge_model_id)
@@ -127,13 +162,43 @@ def estimate_run_cost(
             + 2 * expected_output_tokens
             + _JUDGE_SYSTEM_OVERHEAD_TOKENS
         )
-        judge_input_tokens += per_pair_input * pair_judge_samples
-        judge_output_tokens += _PAIR_JUDGE_OUTPUT_TOKENS * pair_judge_samples
+        pair_in = per_pair_input * pair_judge_samples
+        pair_out = _PAIR_JUDGE_OUTPUT_TOKENS * pair_judge_samples
+
+    judge_input_tokens = pri_in + sec_in + pair_in
+    judge_output_tokens = pri_out + sec_out + pair_out
 
     judge_usd = (
-        judge_input_tokens * judge_pricing["input"]
-        + judge_output_tokens * judge_pricing["output"]
+        pri_in * judge_pricing["input"]
+        + pri_out * judge_pricing["output"]
+        + pair_in * judge_pricing["input"]
+        + pair_out * judge_pricing["output"]
     )
+    if use_secondary:
+        judge_usd += judge_secondary_usd
+
+    synthesis_usd = 0.0
+    synthesis_input_tokens = 0
+    synthesis_output_tokens = 0
+    if run_synthesis:
+        n_out = target_calls_a + target_calls_b
+        excerpt_tok = max(1, int(_SYNTH_EXCERPT_CHARS // 3))
+        synth_in = (
+            _tokens(task_input, synth_model)
+            + _tokens(prompt_a_text, synth_model)
+            + _tokens(prompt_b_text or "", synth_model)
+            + _tokens(reference_answer or "", synth_model)
+            + n_out * excerpt_tok
+            + _SYNTH_SYSTEM_OVERHEAD
+        )
+        # Meta pipeline uses two LLM JSON calls (hypothesize + final report), ~similar token load each.
+        synthesis_input_tokens = synth_in * 2
+        synthesis_output_tokens = _SYNTH_OUTPUT_TOKENS * 2
+        one_call_usd = (
+            synth_in * synth_pricing["input"]
+            + _SYNTH_OUTPUT_TOKENS * synth_pricing["output"]
+        )
+        synthesis_usd = one_call_usd * 2
 
     # ── Embeddings (one per output) ────────────────────────────────────
     embedding_input_tokens = expected_output_tokens * (target_calls_a + target_calls_b)
@@ -145,8 +210,10 @@ def estimate_run_cost(
         + judge_input_tokens
         + judge_output_tokens
         + embedding_input_tokens
+        + synthesis_input_tokens
+        + synthesis_output_tokens
     )
-    total_usd = target_usd + judge_usd + embedding_usd
+    total_usd = target_usd + judge_usd + embedding_usd + synthesis_usd
 
     return {
         "target": {
@@ -158,6 +225,11 @@ def estimate_run_cost(
             "input_tokens": judge_input_tokens,
             "output_tokens": judge_output_tokens,
             "usd": round(judge_usd, 6),
+        },
+        "synthesis": {
+            "input_tokens": synthesis_input_tokens,
+            "output_tokens": synthesis_output_tokens,
+            "usd": round(synthesis_usd, 6),
         },
         "embedding": {
             "input_tokens": embedding_input_tokens,
