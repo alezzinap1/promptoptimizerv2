@@ -9,6 +9,9 @@ import EvalRunsHistory from './EvalRunsHistory'
 import pageStyles from '../../styles/PageShell.module.css'
 import css from './Stability.module.css'
 
+/** Перенос промптов из A/B Сравнение → Стабильность (sessionStorage, одноразово). */
+export const STABILITY_PREFILL_STORAGE_KEY = 'metaprompt-stability-prefill-v1'
+
 export type StabilityDeepLink = {
   libraryIdA?: number
   libraryIdB?: number
@@ -84,6 +87,28 @@ export default function StabilityTab({
     })
   }, [deepLink])
 
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(STABILITY_PREFILL_STORAGE_KEY)
+      if (!raw) return
+      sessionStorage.removeItem(STABILITY_PREFILL_STORAGE_KEY)
+      const p = JSON.parse(raw) as { task_input?: string; prompt_a?: string; prompt_b?: string }
+      const a = typeof p.prompt_a === 'string' ? p.prompt_a : ''
+      const b = typeof p.prompt_b === 'string' ? p.prompt_b : ''
+      const t = typeof p.task_input === 'string' ? p.task_input : ''
+      if (!a.trim() && !t.trim()) return
+      setValue(v => ({
+        ...v,
+        prompt_a_text: a.trim() ? a : v.prompt_a_text,
+        prompt_b_text: b.trim() ? b : v.prompt_b_text,
+        task_input: t.trim() ? t : v.task_input,
+        is_pair: Boolean(b.trim()),
+      }))
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   const previewPayload: PreviewCostRequest | null = useMemo(() => {
     if (!value.prompt_a_text.trim() || !value.task_input.trim()) return null
     return {
@@ -100,6 +125,7 @@ export default function StabilityTab({
       run_synthesis: value.run_synthesis,
       expected_output_tokens: value.expected_output_tokens,
       pair_judge_samples: value.is_pair ? value.pair_judge_samples : 0,
+      meta_synthesis_mode: value.meta_synthesis_mode,
     }
   }, [value])
 
@@ -175,15 +201,21 @@ export default function StabilityTab({
     <div className={css.root}>
       <div className={`${pageStyles.panel} ${css.stabilityIntroPanel}`}>
         <div className={css.stabilityHead}>
-          <div>
+          <div className={css.stabilityTitleRow}>
             <h2 className={pageStyles.panelTitle}>Стабильность</h2>
-            <p className={pageStyles.panelSubtitle} style={{ marginTop: 6 }}>
-              N прогонов, судья, диверсити и (опционально) синтез. Заполните задачу и промпт — затем смотрите прогресс и отчёт ниже.
-            </p>
+            <details className={css.stabilityHelp}>
+              <summary className={css.stabilityHelpSum} aria-label="Справка по стабильности">
+                ?
+              </summary>
+              <p className={css.stabilityHelpBody}>
+                Несколько прогонов одного или пары промптов, оценка судьёй и метрики. Прогресс и отчёт — ниже после
+                запуска.
+              </p>
+            </details>
           </div>
           <div className={css.stabilityHeadActions}>
-            <Link to="/eval" className={css.stabilityStudioLink}>
-              Eval Studio
+            <Link to="/eval" className={css.stabilityStudioLink} title="Лидерборд и архив отчётов">
+              История прогонов
             </Link>
             <button type="button" className={css.ghostBtn} onClick={() => setHistoryOpen(true)}>
               История
@@ -192,13 +224,15 @@ export default function StabilityTab({
         </div>
       </div>
 
-      <StabilityComposer
-        value={value}
-        onChange={setValue}
-        onRun={startRun}
-        disabled={busy || (runId !== null && !result)}
-        generationModels={generationModels}
-      />
+      <div className={css.composerNarrowWrap}>
+        <StabilityComposer
+          value={value}
+          onChange={setValue}
+          onRun={startRun}
+          disabled={busy || (runId !== null && !result)}
+          generationModels={generationModels}
+        />
+      </div>
 
       <CostPreview payload={previewPayload} />
 

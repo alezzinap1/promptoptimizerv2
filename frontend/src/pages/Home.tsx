@@ -24,6 +24,7 @@ import WorkspacePicker from '../components/WorkspacePicker'
 import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
 import HomeOnboardingHints from '../components/HomeOnboardingHints'
 import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
+import LibraryPickButton from '../components/LibraryPickButton'
 import { pushRecentSession } from '../lib/recentSessions'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { clearAgentDraftV2, loadAgentDraftV2, saveAgentDraftV2 } from '../lib/agentDraft'
@@ -83,6 +84,53 @@ const HOME_AGENT_SPLIT_KEY = 'prompt-engineer-home-agent-split'
 function normalizeClientGenerateResult(res: GenerateResult): GenerateResult {
   if (!res.has_prompt) return res
   return { ...res, has_questions: false, questions: [] }
+}
+
+/** Строка из prompt_sessions → обновить result справа (полнота, токены, техники совпадают с версией). */
+function mergeSessionVersionIntoResult(
+  prev: GenerateResult | null,
+  row: Record<string, unknown>,
+  sessionId: string,
+): GenerateResult {
+  const techniqueIds = (Array.isArray(row.techniques_used) ? row.techniques_used : []) as string[]
+  const rawM = row.metrics
+  const rowMetrics =
+    typeof rawM === 'object' && rawM !== null ? (rawM as Record<string, unknown>) : null
+  const metrics =
+    rowMetrics && Object.keys(rowMetrics).length > 0 ? rowMetrics : (prev?.metrics ?? {})
+
+  const base: GenerateResult =
+    prev ??
+    ({
+      prompt_block: '',
+      reasoning: '',
+      has_prompt: true,
+      has_questions: false,
+      techniques: [],
+      technique_ids: [],
+      task_types: [],
+      complexity: 'medium',
+      gen_model: '',
+      target_model: 'unknown',
+      metrics: {},
+      session_id: sessionId,
+    } as GenerateResult)
+
+  return {
+    ...base,
+    prompt_block: String(row.final_prompt || base.prompt_block),
+    reasoning: String(row.reasoning ?? base.reasoning),
+    has_prompt: true,
+    has_questions: false,
+    techniques: techniqueIds.map((id) => ({ id, name: id })),
+    technique_ids: techniqueIds,
+    task_types: (Array.isArray(row.task_types) ? row.task_types : base.task_types) as string[],
+    complexity: String(row.complexity || base.complexity),
+    gen_model: String(row.gen_model || base.gen_model),
+    target_model: String(row.target_model || base.target_model),
+    metrics,
+    session_id: sessionId || base.session_id,
+  }
 }
 
 function pickPromptTitle(res: GenerateResult | null, taskFallback: string): string {
@@ -885,21 +933,13 @@ export default function Home() {
           const latest = items[items.length - 1] as Record<string, unknown>
           const finalPrompt = String(latest.final_prompt || '')
           if (finalPrompt) {
-            const techniqueIds = (Array.isArray(latest.techniques_used) ? latest.techniques_used : []) as string[]
-            setResult({
-              prompt_block: finalPrompt,
-              reasoning: String(latest.reasoning || ''),
-              has_prompt: true,
-              has_questions: false,
-              techniques: techniqueIds.map((id) => ({ id, name: id })),
-              technique_ids: techniqueIds,
-              task_types: (Array.isArray(latest.task_types) ? latest.task_types : []) as string[],
-              complexity: String(latest.complexity || 'medium'),
-              gen_model: String(latest.gen_model || ''),
-              target_model: String(latest.target_model || 'unknown'),
-              metrics: (typeof latest.metrics === 'object' && latest.metrics ? latest.metrics : {}) as Record<string, unknown>,
-              session_id: sessionId,
-            })
+            setResult((prev) =>
+              mergeSessionVersionIntoResult(
+                prev?.session_id === sessionId ? prev : null,
+                latest,
+                sessionId,
+              ),
+            )
             const ti = String(latest.task_input || '')
             if (ti) {
               setTaskInput(ti)
@@ -1297,7 +1337,7 @@ export default function Home() {
       return
     }
     if (item.action === 'nav_compare') {
-      navigate('/compare', { state: { taskInput: taskRef } })
+      navigate({ pathname: '/compare', search: '?mode=techniques' }, { state: { taskInput: taskRef } })
       pushAssistant('Открыта страница **Сравнение** с подставленной задачей.')
     }
   }
@@ -1316,25 +1356,7 @@ export default function Home() {
       setVersions(items)
       const latest = items.length ? (items[items.length - 1] as Record<string, unknown>) : null
       if (latest) {
-        const fp = String(latest.final_prompt || '')
-        const techniqueIds = (Array.isArray(latest.techniques_used) ? latest.techniques_used : []) as string[]
-        setResult((prev) =>
-          prev
-            ? {
-                ...prev,
-                prompt_block: fp,
-                has_prompt: true,
-                has_questions: false,
-                techniques: techniqueIds.map((id) => ({ id, name: id })),
-                technique_ids: techniqueIds,
-                reasoning: String(latest.reasoning || prev.reasoning),
-                metrics:
-                  typeof latest.metrics === 'object' && latest.metrics
-                    ? (latest.metrics as Record<string, unknown>)
-                    : prev.metrics,
-              }
-            : null,
-        )
+        setResult((prev) => (prev ? mergeSessionVersionIntoResult(prev, latest, sid) : prev))
       }
       setChatMessages((prev) => prev.filter((x) => x.id !== msgId))
     } catch (e) {
@@ -1754,7 +1776,7 @@ export default function Home() {
             return
           }
           if (plan.type === 'nav_compare') {
-            navigate('/compare', { state: { taskInput: taskRef } })
+            navigate({ pathname: '/compare', search: '?mode=techniques' }, { state: { taskInput: taskRef } })
             pushAssistant('Открыта страница **Сравнение** с подставленной задачей.')
             return
           }
@@ -2418,6 +2440,7 @@ export default function Home() {
                     setValue={(v) => setResult({ ...result, prompt_block: v })}
                     kind={promptType === 'skill' ? 'skill' : 'prompt'}
                     compact
+                    cacheResetKey={result.session_id}
                     title="Перевести промпт RU↔EN (одной кнопкой)"
                   />
                   {promptType === 'text' && (
@@ -2565,7 +2588,18 @@ export default function Home() {
                 </p>
               )}
               <div className={styles.actions}>
-                <button type="button" className="btn-secondary" onClick={() => navigate('/compare', { state: { taskInput: result.task_input || taskInput } })}>Сравнить</button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() =>
+                    navigate(
+                      { pathname: '/compare', search: '?mode=techniques' },
+                      { state: { taskInput: result.task_input || taskInput } },
+                    )
+                  }
+                >
+                  Сравнить
+                </button>
                 <button
                   type="button"
                   className={`${styles.libraryBtn} btn-secondary`}
@@ -2616,9 +2650,9 @@ export default function Home() {
                       const scores = versions.map((v) => {
                         const m = ((v as Record<string, unknown>).metrics || {}) as Record<string, unknown>
                         return Number(m.completeness_score ?? m.quality_score ?? 0)
-                      }).filter((s) => s > 0)
+                      })
                       if (scores.length < 2) return null
-                      const max = Math.max(...scores, 100)
+                      const max = Math.max(100, ...scores)
                       const w = 72
                       const h = 20
                       const step = w / (scores.length - 1)
@@ -2643,7 +2677,13 @@ export default function Home() {
                           type="button"
                           className={`${styles.versionPill} ${isCurrent ? styles.versionPillActive : ''}`}
                           title={`v${String(v.version)} · ${String(v.created_at || '')}${score ? ` · ${score}%` : ''}${tok ? ` · ≈${tok} tok` : ''}`}
-                          onClick={() => setResult((prev) => prev ? { ...prev, prompt_block: String(v.final_prompt || '') } : prev)}
+                          onClick={() =>
+                            setResult((prev) =>
+                              prev && sessionId
+                                ? mergeSessionVersionIntoResult(prev, v, sessionId)
+                                : prev,
+                            )
+                          }
                         >
                           <span className={styles.versionPillNum}>v{String(v.version)}</span>
                           {score > 0 && <span className={styles.versionPillScore}>{score}%</span>}
@@ -3781,8 +3821,16 @@ export default function Home() {
                 type="button"
                 className={`${styles.primaryAction} btn-primary`}
                 onClick={() => {
-                  const snap = versionRestoreConfirm.prompt
-                  setResult((prev) => (prev ? { ...prev, prompt_block: snap } : prev))
+                  const { version: ver, prompt: snap } = versionRestoreConfirm
+                  const row = versions.find(
+                    (it) => Number((it as Record<string, unknown>).version) === ver,
+                  ) as Record<string, unknown> | undefined
+                  const sid = (sessionId || result?.session_id || '').trim()
+                  setResult((prev) => {
+                    if (!prev) return prev
+                    if (row && sid) return mergeSessionVersionIntoResult(prev, row, sid)
+                    return { ...prev, prompt_block: snap }
+                  })
                   setVersionRestoreConfirm(null)
                 }}
               >
@@ -3843,28 +3891,37 @@ export default function Home() {
                   )}
                 </div>
                 <div className={styles.skillSandboxComposer}>
-                  <AutoTextarea
-                    className={styles.skillSandboxTextarea}
-                    value={promptPlaygroundInput}
-                    onChange={(e) => setPromptPlaygroundInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        if (!promptPlaygroundBusy && promptPlaygroundInput.trim()) void sendPromptPlaygroundMessage()
-                      }
-                    }}
-                    minHeightPx={44}
-                    maxHeightPx={120}
-                    placeholder="Тестовый ввод (как от пользователя)…"
-                  />
-                  <button
-                    type="button"
-                    className={styles.skillSandboxSend}
-                    disabled={promptPlaygroundBusy || !promptPlaygroundInput.trim() || !result?.prompt_block?.trim()}
-                    onClick={() => void sendPromptPlaygroundMessage()}
-                  >
-                    {promptPlaygroundBusy ? '…' : 'Отправить'}
-                  </button>
+                  <div className={styles.skillSandboxPickRow}>
+                    <LibraryPickButton
+                      applyMode="user_turn"
+                      onApply={setPromptPlaygroundInput}
+                      disabled={promptPlaygroundBusy}
+                    />
+                  </div>
+                  <div className={styles.skillSandboxComposerRow}>
+                    <AutoTextarea
+                      className={styles.skillSandboxTextarea}
+                      value={promptPlaygroundInput}
+                      onChange={(e) => setPromptPlaygroundInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          if (!promptPlaygroundBusy && promptPlaygroundInput.trim()) void sendPromptPlaygroundMessage()
+                        }
+                      }}
+                      minHeightPx={44}
+                      maxHeightPx={120}
+                      placeholder="Тестовый ввод (как от пользователя)…"
+                    />
+                    <button
+                      type="button"
+                      className={styles.skillSandboxSend}
+                      disabled={promptPlaygroundBusy || !promptPlaygroundInput.trim() || !result?.prompt_block?.trim()}
+                      onClick={() => void sendPromptPlaygroundMessage()}
+                    >
+                      {promptPlaygroundBusy ? '…' : 'Отправить'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>,
@@ -3923,28 +3980,37 @@ export default function Home() {
                   )}
                 </div>
                 <div className={styles.skillSandboxComposer}>
-                  <AutoTextarea
-                    className={styles.skillSandboxTextarea}
-                    value={skillSandboxInput}
-                    onChange={(e) => setSkillSandboxInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        if (!skillSandboxBusy && skillSandboxInput.trim()) void sendSkillSandboxMessage()
-                      }
-                    }}
-                    minHeightPx={44}
-                    maxHeightPx={120}
-                    placeholder="Сообщение для модели…"
-                  />
-                  <button
-                    type="button"
-                    className={styles.skillSandboxSend}
-                    disabled={skillSandboxBusy || !skillSandboxInput.trim()}
-                    onClick={() => void sendSkillSandboxMessage()}
-                  >
-                    {skillSandboxBusy ? '…' : 'Отправить'}
-                  </button>
+                  <div className={styles.skillSandboxPickRow}>
+                    <LibraryPickButton
+                      applyMode="user_turn"
+                      onApply={setSkillSandboxInput}
+                      disabled={skillSandboxBusy}
+                    />
+                  </div>
+                  <div className={styles.skillSandboxComposerRow}>
+                    <AutoTextarea
+                      className={styles.skillSandboxTextarea}
+                      value={skillSandboxInput}
+                      onChange={(e) => setSkillSandboxInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          if (!skillSandboxBusy && skillSandboxInput.trim()) void sendSkillSandboxMessage()
+                        }
+                      }}
+                      minHeightPx={44}
+                      maxHeightPx={120}
+                      placeholder="Сообщение для модели…"
+                    />
+                    <button
+                      type="button"
+                      className={styles.skillSandboxSend}
+                      disabled={skillSandboxBusy || !skillSandboxInput.trim()}
+                      onClick={() => void sendSkillSandboxMessage()}
+                    >
+                      {skillSandboxBusy ? '…' : 'Отправить'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>,

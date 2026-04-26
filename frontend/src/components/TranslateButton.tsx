@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   compact?: boolean
   title?: string
   disabled?: boolean
+  /** Смена ключа сбрасывает кэш пары (например id сессии / карточки). */
+  cacheResetKey?: string | number
 }
 
 export default function TranslateButton({
@@ -22,18 +24,39 @@ export default function TranslateButton({
   compact,
   title,
   disabled,
+  cacheResetKey,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  /** Исходник до перевода и результат API — переключение без второго запроса. */
+  const [pair, setPair] = useState<{ source: string; translated: string } | null>(null)
+
+  useEffect(() => {
+    setPair(null)
+  }, [cacheResetKey])
 
   const run = async () => {
     const text = getValue().trim()
     if (!text) return
-    setBusy(true)
     setErr(null)
+
+    if (pair) {
+      if (text === pair.translated) {
+        setValue(pair.source)
+        return
+      }
+      if (text === pair.source) {
+        setValue(pair.translated)
+        return
+      }
+    }
+
+    setBusy(true)
     try {
       const r = await api.translate({ text, direction, kind })
-      setValue(r.translated)
+      const out = (r.translated || '').trim()
+      setPair({ source: text, translated: out })
+      setValue(out)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Ошибка перевода')
     } finally {
@@ -41,13 +64,23 @@ export default function TranslateButton({
     }
   }
 
+  const canToggle = Boolean(
+    pair && (getValue().trim() === pair.source || getValue().trim() === pair.translated),
+  )
+
   return (
     <>
       <button
         type="button"
         onClick={() => void run()}
         disabled={busy || disabled}
-        title={title || 'Перевести RU↔EN (одной кнопкой)'}
+        title={
+          title
+            ? `${title}${canToggle ? ' (повторное нажатие — вернуть другой язык без нового перевода)' : ''}`
+            : canToggle
+              ? 'Переключить RU/EN (из кэша, без запроса)'
+              : 'Перевести RU↔EN (одной кнопкой)'
+        }
         aria-label="Перевести текст"
         style={{
           padding: compact ? '3px 9px' : '5px 12px',

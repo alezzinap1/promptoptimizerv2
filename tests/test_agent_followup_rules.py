@@ -23,6 +23,13 @@ class AgentFollowupRulesTests(unittest.TestCase):
     def test_apply_tip_variants(self) -> None:
         self.assertTrue(looks_like_apply_tip_directive("Примени совет: добавь ограничения"))
         self.assertTrue(looks_like_apply_tip_directive("apply tip: foo"))
+        self.assertTrue(
+            looks_like_apply_tip_directive("Учти по очереди советы судьи:\n1. добавь пример вывода")
+        )
+        self.assertTrue(
+            looks_like_apply_tip_directive("Учти и примени советы по очереди:\n1. сократи вступление")
+        )
+        self.assertTrue(looks_like_apply_tip_directive("Учти совет судьи: укажи язык ответа"))
         self.assertFalse(looks_like_apply_tip_directive("как работает библиотека"))
 
     def test_strong_edit_commands(self) -> None:
@@ -62,7 +69,24 @@ class AgentFollowupRulesTests(unittest.TestCase):
 
     def test_semantic_chat_override_apply_tip(self) -> None:
         self.assertTrue(semantic_chat_should_be_iterate("chat", "Примени совет: x"))
+        self.assertTrue(
+            semantic_chat_should_be_iterate(
+                "chat",
+                "Учти по очереди советы судьи:\n1. уточни объём",
+            )
+        )
         self.assertFalse(semantic_chat_should_be_iterate("chat", "как работает библиотека"))
+
+    def test_judge_hints_bulk_not_product_help(self) -> None:
+        """Тело совета может содержать «версии», «полноту» и т.д. — не должно уходить в product_help."""
+        text = (
+            "Учти по очереди советы судьи:\n"
+            "1. проверь версии требований\n"
+            "2. оцени полноту критериев"
+        )
+        r = classify_agent_follow_up_api_response(text, "text")
+        self.assertEqual(r["action"], "iterate")
+        self.assertEqual(r["data"]["feedback"], text)
 
 
 class ResolveHasPromptActionTests(unittest.TestCase):
@@ -107,6 +131,13 @@ class ResolveHasPromptActionTests(unittest.TestCase):
         )
         self.assertEqual(r["action"], "chat")
         self.assertIn("Версии", r["data"]["message"])
+
+    def test_judge_hints_override_semantic_chat(self) -> None:
+        r = self._resolve(
+            "Учти по очереди советы судьи:\n1. добавь пример",
+            {"intent": "chat", "confidence": 0.99, "margin": 0.5},
+        )
+        self.assertEqual(r["action"], "iterate")
 
     def test_nav_compare_explicit_action(self) -> None:
         r = self._resolve(

@@ -52,6 +52,10 @@ export function looksLikeApplyTipDirective(t: string): boolean {
   // Не используем \b у кириллицы: в JS граница слова только для [A-Za-z0-9_].
   if (/примени(ть)?\s+совет/i.test(head)) return true
   if (/apply\s+tip/i.test(head)) return true
+  // Home.tsx: кнопки после LLM-судьи / блока «Что можно улучшить» (иначе семантика бьёт в chat → product_help)
+  if (/^учти\s+и\s+примени\s+советы\s+по\s+очереди\s*:/.test(low)) return true
+  if (/^учти\s+по\s+очереди\s+советы\s+судьи\s*:/.test(low)) return true
+  if (/^учти\s+совет\s+судьи\s*:/.test(low)) return true
   return false
 }
 

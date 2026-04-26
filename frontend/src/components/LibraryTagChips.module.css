@@ -39,3 +39,16 @@
 [data-theme='light'] .chip:hover {
   background: rgba(15, 23, 42, 0.05);
 }
+
+.chipStatic {
+  cursor: default;
+  pointer-events: none;
+}
+
+.chipStatic:hover {
+  background: transparent;
+}
+
+[data-theme='light'] .chipStatic:hover {
+  background: transparent;
+}

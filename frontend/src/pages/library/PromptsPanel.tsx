@@ -7,6 +7,7 @@ import SelectDropdown from '../../components/SelectDropdown'
 import { CopyIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
+import { libraryUserTurnFromCard } from '../../lib/libraryPickText'
 import { useT } from '../../i18n'
 import { getStartersForGoal, type StarterGoal } from '../../lib/starterPrompts'
 import EvalBadge from '../eval/EvalBadge'
@@ -61,13 +62,6 @@ const IMAGE_SIGNALS = ['image', 'картинк', 'изображен', 'midjour
 function isImagePrompt(item: LibraryItem): boolean {
   const text = `${item.title} ${item.tags.join(' ')} ${item.task_type} ${item.prompt.slice(0, 300)}`.toLowerCase()
   return IMAGE_SIGNALS.some((s) => text.includes(s))
-}
-
-function defaultStabilityTaskInput(item: LibraryItem): string {
-  return (
-    (item.notes || '').trim() ||
-    'Следуй инструкциям промпта и ответь на типичный запрос в рамках этой задачи. Контекст можно уточнить в поле «Задача».'
-  )
 }
 
 type Props = {
@@ -421,7 +415,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                                   libraryIdB: bItem.id,
                                   promptA: tA,
                                   promptB: tB,
-                                  taskInput: defaultStabilityTaskInput(pairStabilityA),
+                                  taskInput: libraryUserTurnFromCard(pairStabilityA),
                                 },
                               },
                             },
@@ -702,7 +696,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                               stability: {
                                 libraryIdA: item.id,
                                 promptA: promptText,
-                                taskInput: defaultStabilityTaskInput(item),
+                                taskInput: libraryUserTurnFromCard(item),
                               },
                             },
                           },

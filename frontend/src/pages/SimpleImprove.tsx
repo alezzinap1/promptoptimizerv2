@@ -11,6 +11,7 @@ import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import TierSelector, { loadTier, persistTier, type TierValue } from '../components/TierSelector'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import LibraryPickButton from '../components/LibraryPickButton'
 import { TryExternalChatButton } from '../components/TryExternalChatButton'
 import SimpleLineDiff from '../components/SimpleLineDiff'
 import cb from '../styles/ComposerBar.module.css'
@@ -165,7 +166,10 @@ export default function SimpleImprove() {
               <h2 className={styles.colTitle}>Запрос</h2>
               <p className={styles.colHint}>Исходный текст промпта</p>
             </div>
-            {promptText.trim() ? <CopyIconButton text={promptText} title="Копировать исходный промпт" /> : null}
+            <span className={styles.colHeadActions}>
+              <LibraryPickButton applyMode="prompt" onApply={setPromptText} disabled={loading} />
+              {promptText.trim() ? <CopyIconButton text={promptText} title="Копировать исходный промпт" /> : null}
+            </span>
           </div>
           <div className={cb.composer}>
             <AutoTextarea

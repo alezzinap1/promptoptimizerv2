@@ -3,7 +3,6 @@ import { evalApi, type EvalCostBreakdown, type PreviewCostRequest } from '../../
 import css from './Stability.module.css'
 
 interface Props {
-  // Stable JSON-serializable input. Re-runs the preview when this changes.
   payload: PreviewCostRequest | null
   debounceMs?: number
 }
@@ -16,6 +15,8 @@ export default function CostPreview({ payload, debounceMs = 400 }: Props) {
   useEffect(() => {
     if (!payload) {
       setData(null)
+      setLoading(false)
+      setErr(null)
       return
     }
     let cancelled = false
@@ -40,7 +41,19 @@ export default function CostPreview({ payload, debounceMs = 400 }: Props) {
     }
   }, [payload && JSON.stringify(payload), debounceMs])
 
-  if (!payload) return null
+  if (!payload) {
+    return (
+      <div className={`${css.previewBlock} ${css.costPreviewPlaceholder}`}>
+        <span className={css.previewKey} style={{ textTransform: 'none', letterSpacing: 'normal' }}>
+          Прогноз стоимости
+        </span>
+        <span className={css.muted} style={{ fontSize: 13 }}>
+          Заполните <strong>системный промпт</strong> и <strong>тестовый запрос (user)</strong> — здесь появится ориентировочная
+          сумма в USD, токены и остаток дневного бюджета.
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className={`${css.previewBlock} ${data?.over_daily_budget ? css.previewWarn : ''}`}>
@@ -49,17 +62,24 @@ export default function CostPreview({ payload, debounceMs = 400 }: Props) {
       {err && <span style={{ color: 'rgb(239, 68, 68)' }}>Ошибка: {err}</span>}
       {data && !loading && (
         <>
-          <span><b>${data.total_usd.toFixed(4)}</b> {data.pricing_status === 'approximate' && <span className={css.muted}>(≈)</span>}</span>
-          <span><b>{data.total_tokens.toLocaleString()}</b> tokens</span>
+          <span>
+            <b>${data.total_usd.toFixed(4)}</b>{' '}
+            {data.pricing_status === 'approximate' && <span className={css.muted}>(≈)</span>}
+          </span>
+          <span>
+            <b>{data.total_tokens.toLocaleString()}</b> tokens
+          </span>
           <span className={css.muted}>
             генер. ${data.target.usd.toFixed(4)} · судья ${data.judge.usd.toFixed(4)}
             {data.synthesis && data.synthesis.usd > 0 ? ` · мета ${data.synthesis.usd.toFixed(4)}` : ''}
             {' '}· embed ${data.embedding.usd.toFixed(4)}
           </span>
-          <span className={css.muted}>дн. бюджет: ${data.daily_remaining_usd.toFixed(2)} / ${data.daily_budget_usd.toFixed(2)}</span>
+          <span className={css.muted}>
+            дн. бюджет: ${data.daily_remaining_usd.toFixed(2)} / ${data.daily_budget_usd.toFixed(2)}
+          </span>
           {data.over_daily_budget && (
             <span style={{ color: 'rgb(245, 158, 11)', fontWeight: 700 }}>
-              ⚠ превышает остаток бюджета
+              превышает остаток бюджета
             </span>
           )}
         </>

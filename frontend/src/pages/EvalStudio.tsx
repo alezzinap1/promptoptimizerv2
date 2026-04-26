@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   evalApi,
@@ -11,6 +11,17 @@ import ResultsPanel from './eval/ResultsPanel'
 import pageStyles from '../styles/PageShell.module.css'
 import css from './eval/Stability.module.css'
 
+function formatSyncAgo(ts: number | null): string | null {
+  if (ts == null) return null
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 8) return 'только что'
+  if (s < 60) return `${s} с назад`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} мин назад`
+  const h = Math.floor(m / 60)
+  return `${h} ч назад`
+}
+
 export default function EvalStudio() {
   const [runs, setRuns] = useState<EvalRunSummary[]>([])
   const [detail, setDetail] = useState<EvalRunDetail | null>(null)
@@ -18,19 +29,42 @@ export default function EvalStudio() {
   const [err, setErr] = useState<string | null>(null)
   const [seriesData, setSeriesData] = useState<EvalRunSeriesResponse | null>(null)
   const [seriesGroupByModel, setSeriesGroupByModel] = useState(false)
+  const [lastSync, setLastSync] = useState<number | null>(null)
+  const [, setTick] = useState(0)
 
-  const refresh = () => {
-    setLoading(true)
-    setErr(null)
+  const refresh = useCallback((silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setErr(null)
+    }
     evalApi
       .listRuns(120)
-      .then(r => setRuns(r.runs))
-      .catch(e => setErr(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false))
-  }
+      .then(r => {
+        setRuns(r.runs)
+        setLastSync(Date.now())
+      })
+      .catch(e => {
+        if (!silent) setErr(e instanceof Error ? e.message : String(e))
+      })
+      .finally(() => {
+        if (!silent) setLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
-    refresh()
+    refresh(false)
+  }, [refresh])
+
+  useEffect(() => {
+    const active = runs.some(r => r.status === 'running' || r.status === 'queued')
+    if (!active) return
+    const id = window.setInterval(() => refresh(true), 5000)
+    return () => clearInterval(id)
+  }, [runs, refresh])
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick(t => t + 1), 8000)
+    return () => clearInterval(id)
   }, [])
 
   const leaderboard = useMemo(
@@ -86,20 +120,44 @@ export default function EvalStudio() {
     }
   }, [detail, seriesGroupByModel])
 
+  const syncLabel = formatSyncAgo(lastSync)
+
   return (
     <div className={`${pageStyles.page} ${css.evalStudioPage}`}>
       <div className={pageStyles.panelHeader}>
         <div>
-          <h1 className="pageTitleGradient">Eval Studio</h1>
+          <div className={css.evalStudioHeaderRow}>
+            <h1 className="pageTitleGradient">Eval Studio</h1>
+            {syncLabel && (
+              <span className={css.evalStudioSync} title="Время последней синхронизации списка">
+                Обновлено: {syncLabel}
+                {runs.some(r => r.status === 'running' || r.status === 'queued') ? ' · авто' : ''}
+              </span>
+            )}
+          </div>
           <p className={pageStyles.panelSubtitle}>
-            История прогонов стабильности, мини-лидерборд по p50 и открытие отчёта. Запуск новых — во вкладке{' '}
-            <Link to="/compare">Сравнение → Стабильность</Link>.
+            Лидерборд и история прогонов стабильности. Новый эксперимент запускается на странице{' '}
+            <Link to="/compare?mode=stability">Сравнение → Стабильность</Link>
+            {' — '}кнопка ниже ведёт туда же.
           </p>
         </div>
-        <button type="button" className={css.btnGhost} onClick={refresh} disabled={loading}>
-          Обновить
+        <button type="button" className={css.btnGhost} onClick={() => refresh(false)} disabled={loading}>
+          {loading ? 'Загрузка…' : 'Обновить сейчас'}
         </button>
       </div>
+
+      {!loading && leaderboard.length === 0 && (
+        <div className={css.evalStudioCta}>
+          <div className={css.evalStudioCtaTitle}>Запустите первый прогон стабильности</div>
+          <p className={css.evalStudioCtaLead}>
+            N итераций одного или двух промптов, оценка судьёй и метрики разброса. Отчёты и серии похожих
+            экспериментов появятся здесь после завершения.
+          </p>
+          <Link to="/compare?mode=stability" className={css.evalStudioCtaBtn}>
+            Запустить прогон →
+          </Link>
+        </div>
+      )}
 
       {err && <div className={css.errorBox}>{err}</div>}
 
@@ -107,12 +165,12 @@ export default function EvalStudio() {
         <section className={pageStyles.panel}>
           <h2 className={`${pageStyles.panelTitle} ${css.evalStudioH2}`}>Лидерборд (completed, по p50)</h2>
           <p className={css.muted} style={{ fontSize: 12, marginBottom: 8 }}>
-            MVP-3-lite: сортировка последних завершённых прогонов по медианной оценке первого судьи.
+            Сортировка завершённых прогонов по медианной оценке первого судьи (p50).
           </p>
           {loading ? (
             <p className={css.muted}>Загрузка…</p>
           ) : leaderboard.length === 0 ? (
-            <p className={css.muted}>Пока нет завершённых прогонов.</p>
+            <p className={css.muted}>Пока нет завершённых прогонов с оценкой p50.</p>
           ) : (
             <div className={css.leaderTable}>
               <div className={`${css.leaderRow} ${css.leaderHead}`}>

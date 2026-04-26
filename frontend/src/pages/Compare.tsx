@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
@@ -6,13 +14,14 @@ import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
 import SimpleLineDiff from '../components/SimpleLineDiff'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
+import LibraryPickButton from '../components/LibraryPickButton'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
 import cb from '../styles/ComposerBar.module.css'
 import { EXPERT_GENERATION_TEMPERATURE_CAP } from '../lib/expertLevelPresets'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
-import StabilityTab, { type StabilityDeepLink } from './eval/StabilityTab'
+import StabilityTab, { STABILITY_PREFILL_STORAGE_KEY, type StabilityDeepLink } from './eval/StabilityTab'
 
 type CompareLocationState = {
   taskInput?: string
@@ -20,6 +29,68 @@ type CompareLocationState = {
   promptB?: string
   stability?: StabilityDeepLink
 } | null
+
+type Mode = 'techniques' | 'prompts' | 'stability' | 'models'
+
+const COMPARE_TECHNIQUES_SPLIT_KEY = 'metaprompt-compare-techniques-split'
+
+function clampTechSplit(n: number) {
+  return Math.min(0.68, Math.max(0.28, n))
+}
+
+function loadTechniquesSplit(): number {
+  try {
+    const raw = localStorage.getItem(COMPARE_TECHNIQUES_SPLIT_KEY)
+    if (raw) {
+      const x = parseFloat(raw)
+      if (!Number.isNaN(x)) return clampTechSplit(x)
+    }
+  } catch {
+    /* ignore */
+  }
+  return 0.52
+}
+
+function modeFromSearch(sp: URLSearchParams): Mode | null {
+  const m = (sp.get('mode') || '').toLowerCase()
+  if (m === 'stability') return 'stability'
+  if (m === 'models') return 'models'
+  if (m === 'techniques') return 'techniques'
+  if (m === 'prompts') return 'prompts'
+  return null
+}
+
+function initialCompareMode(): Mode {
+  if (typeof window === 'undefined') return 'prompts'
+  return modeFromSearch(new URLSearchParams(window.location.search)) ?? 'prompts'
+}
+
+function CompareHint({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  return (
+    <span className={styles.hintWrap} ref={wrapRef}>
+      <button
+        type="button"
+        className={styles.hintBtn}
+        aria-label={label}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ?
+      </button>
+      {open ? <div className={styles.hintPopover}>{children}</div> : null}
+    </span>
+  )
+}
 
 /*
  * Compare v2 — three-mode side-by-side workspace.
@@ -37,8 +108,6 @@ type CompareLocationState = {
  *
  * Spec: docs/superpowers/specs/2026-04-16-product-ux-visual-design.md §9.
  */
-
-type Mode = 'techniques' | 'prompts' | 'stability' | 'models'
 
 interface VariantCore {
   prompt: string
@@ -77,23 +146,13 @@ function tokenEstimate(metrics: Record<string, unknown> | undefined, fallback: s
   return Math.max(1, Math.round(fallback.length / 4))
 }
 
-function modeFromSearch(sp: URLSearchParams): Mode | null {
-  return sp.get('mode') === 'stability' ? 'stability' : null
-}
-
 export default function Compare() {
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Shared
-  const [mode, setMode] = useState<Mode>(() => {
-    if (typeof window !== 'undefined') {
-      const fromUrl = modeFromSearch(new URLSearchParams(window.location.search))
-      if (fromUrl) return fromUrl
-    }
-    return 'techniques'
-  })
+  const [mode, setMode] = useState<Mode>(initialCompareMode)
   const [modelsMap, setModelsMap] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
   const [preferredTargetModels, setPreferredTargetModels] = useState<string[]>(['unknown'])
@@ -116,6 +175,15 @@ export default function Compare() {
   // Prompts mode
   const [pastedA, setPastedA] = useState('')
   const [pastedB, setPastedB] = useState('')
+
+  const [modelCompareSystem, setModelCompareSystem] = useState('')
+  const [modelCompareUser, setModelCompareUser] = useState('')
+  const [modelCompareA, setModelCompareA] = useState('')
+  const [modelCompareB, setModelCompareB] = useState('')
+  const [modelCompareMeta, setModelCompareMeta] = useState<{ labelA: string; labelB: string } | null>(null)
+
+  const [techniquesSplit, setTechniquesSplit] = useState(loadTechniquesSplit)
+  const techniquesSplitRootRef = useRef<HTMLDivElement>(null)
 
   // Shared result + outputs + judge
   const [workspace, setWorkspace] = useState<CompareWorkspace | null>(null)
@@ -195,6 +263,17 @@ export default function Compare() {
     [targetModelSelectOptions],
   )
 
+  useEffect(() => {
+    if (concreteTargetOptions.length === 0) return
+    setModelCompareA((prev) => (prev && concreteTargetOptions.some((o) => o.value === prev) ? prev : concreteTargetOptions[0].value))
+    setModelCompareB((prev) => {
+      if (prev && concreteTargetOptions.some((o) => o.value === prev)) return prev
+      const second = concreteTargetOptions[1]?.value ?? concreteTargetOptions[0].value
+      const first = concreteTargetOptions[0].value
+      return second !== first ? second : first
+    })
+  }, [concreteTargetOptions])
+
   const techById = useMemo(
     () => Object.fromEntries(techniques.map((t) => [t.id, t.name])),
     [techniques],
@@ -224,7 +303,44 @@ export default function Compare() {
     setOutputsError(null)
     setJudgeResult(null)
     setJudgeError(null)
+    setModelCompareMeta(null)
   }
+
+  const startTechniquesSplitDrag = useCallback(
+    (e: ReactMouseEvent) => {
+      e.preventDefault()
+      const root = techniquesSplitRootRef.current
+      if (!root) return
+      const w = Math.max(root.getBoundingClientRect().width, 1)
+      const startX = e.clientX
+      const s0 = techniquesSplit
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX
+        const dFrac = dx / w
+        setTechniquesSplit(clampTechSplit(s0 + dFrac))
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        document.body.style.removeProperty('cursor')
+        document.body.style.removeProperty('user-select')
+        setTechniquesSplit((cur) => {
+          try {
+            localStorage.setItem(COMPARE_TECHNIQUES_SPLIT_KEY, String(cur))
+          } catch {
+            /* ignore */
+          }
+          return cur
+        })
+      }
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [techniquesSplit],
+  )
 
   const handleCompareTechniques = async () => {
     if (!taskInput.trim()) return
@@ -292,6 +408,71 @@ export default function Compare() {
     })
   }
 
+  const handleModelCompareRun = async () => {
+    const sys = modelCompareSystem.trim()
+    if (!sys) {
+      setError('Введите системный промпт (инструкцию).')
+      return
+    }
+    const ma = modelCompareA.trim()
+    const mb = modelCompareB.trim()
+    if (!ma || !mb) {
+      setError('Выберите обе модели.')
+      return
+    }
+    if (ma === mb) {
+      setError('Выберите две разные модели.')
+      return
+    }
+    setError(null)
+    resetResults()
+    setRunningOutputs(true)
+    setOutputsError(null)
+    try {
+      const userTurn = modelCompareUser.trim()
+      const [aRes, bRes] = await Promise.all([
+        api.compareRunOnTarget({
+          prompt: sys,
+          target_model: ma,
+          task_input: userTurn,
+          temperature,
+          top_p: topP,
+        }),
+        api.compareRunOnTarget({
+          prompt: sys,
+          target_model: mb,
+          task_input: userTurn,
+          temperature,
+          top_p: topP,
+        }),
+      ])
+      const labelA = shortGenerationModelLabel(modelsMap[ma] || ma)
+      const labelB = shortGenerationModelLabel(modelsMap[mb] || mb)
+      setModelCompareMeta({ labelA, labelB })
+      setWorkspace({
+        a: { prompt: sys },
+        b: { prompt: sys },
+        winner: 'tie',
+        source: 'models',
+      })
+      setOutputs({
+        a: aRes.output,
+        b: bRes.output,
+        targetModel: `${ma} · ${mb}`,
+        tokensA: aRes.tokens_used,
+        tokensB: bRes.tokens_used,
+        costUsd: aRes.cost_usd + bRes.cost_usd,
+      })
+      setJudgeOn('outputs')
+      setJudgeResult(null)
+      setJudgeError(null)
+    } catch (e) {
+      setOutputsError(e instanceof Error ? e.message : 'Не удалось выполнить сравнение моделей.')
+    } finally {
+      setRunningOutputs(false)
+    }
+  }
+
   const handleRunOnTarget = async () => {
     if (!workspace) return
     if (!targetModel || targetModel === 'unknown') {
@@ -305,14 +486,14 @@ export default function Compare() {
         api.compareRunOnTarget({
           prompt: workspace.a.prompt,
           target_model: targetModel,
-          task_input: mode === 'techniques' ? taskInput : '',
+          task_input: mode === 'techniques' ? taskInput : mode === 'models' ? modelCompareUser : '',
           temperature,
           top_p: topP,
         }),
         api.compareRunOnTarget({
           prompt: workspace.b.prompt,
           target_model: targetModel,
-          task_input: mode === 'techniques' ? taskInput : '',
+          task_input: mode === 'techniques' ? taskInput : mode === 'models' ? modelCompareUser : '',
           temperature,
           top_p: topP,
         }),
@@ -344,9 +525,11 @@ export default function Compare() {
     const taskForJudge =
       mode === 'techniques'
         ? taskInput.trim()
-        : useOutputs
-          ? 'Сравните два ответа модели по качеству: уместность, полнота, структура, отсутствие лишнего.'
-          : 'Сравните два промпта: какой лучше по уместности, полноте и структуре?'
+        : mode === 'models' && useOutputs
+          ? 'Сравните два ответа разных моделей на одну и ту же инструкцию: качество, точность, стиль.'
+          : useOutputs
+            ? 'Сравните два ответа модели по качеству: уместность, полнота, структура, отсутствие лишнего.'
+            : 'Сравните два промпта: какой лучше по уместности, полноте и структуре?'
     setJudgeLoading(true)
     setJudgeError(null)
     try {
@@ -382,9 +565,12 @@ export default function Compare() {
     if (!workspace) return
     const which = winner === 'tie' ? 'a' : winner
     const prompt = which === 'a' ? workspace.a.prompt : workspace.b.prompt
-    const title = mode === 'techniques'
-      ? `Compare · ${taskInput.slice(0, 60) || 'задача'}`
-      : `Compare · paste · ${new Date().toISOString().slice(0, 10)}`
+    const title =
+      mode === 'techniques'
+        ? `Compare · ${taskInput.slice(0, 60) || 'задача'}`
+        : mode === 'models'
+          ? `Compare · models · ${new Date().toISOString().slice(0, 10)}`
+          : `Compare · paste · ${new Date().toISOString().slice(0, 10)}`
     try {
       await api.saveToLibrary({
         title,
@@ -399,14 +585,58 @@ export default function Compare() {
     }
   }
 
+  const goStabilityFromCompare = () => {
+    if (!workspace) return
+    try {
+      sessionStorage.setItem(
+        STABILITY_PREFILL_STORAGE_KEY,
+        JSON.stringify({
+          task_input: mode === 'techniques' ? taskInput.trim() : mode === 'models' ? modelCompareUser.trim() : '',
+          prompt_a: workspace.a.prompt,
+          prompt_b: workspace.b.prompt,
+        }),
+      )
+    } catch {
+      /* ignore */
+    }
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev)
+        next.set('mode', 'stability')
+        return next
+      },
+      { replace: true },
+    )
+    setMode('stability')
+    setError(null)
+  }
+
   const renderModeTabs = () => (
     <div className={styles.modeTabs} role="tablist" aria-label="Режим сравнения">
-      {([
-        { id: 'techniques' as const, label: 'Техники', hint: 'одна задача, два набора техник' },
-        { id: 'prompts' as const, label: 'Промпты', hint: 'вставьте два готовых промпта' },
-        { id: 'stability' as const, label: 'Стабильность', hint: 'N-runs + LLM-судья, оценка надёжности' },
-        { id: 'models' as const, label: 'Модели', hint: 'coming soon' },
-      ]).map((m) => (
+      {(
+        [
+          {
+            id: 'prompts' as const,
+            label: 'Промпты',
+            hint: 'Два разных промпта, затем прогон на одной модели и судья.',
+          },
+          {
+            id: 'stability' as const,
+            label: 'Стабильность',
+            hint: 'Много прогонов одного или пары промптов, метрики надёжности.',
+          },
+          {
+            id: 'models' as const,
+            label: 'Модели',
+            hint: 'Один промпт и пользовательский ввод — два ответа разных моделей.',
+          },
+          {
+            id: 'techniques' as const,
+            label: 'Техники',
+            hint: 'Одна задача, система генерирует два промпта с разными наборами техник.',
+          },
+        ] as const
+      ).map((m) => (
         <button
           key={m.id}
           type="button"
@@ -414,13 +644,11 @@ export default function Compare() {
           aria-selected={mode === m.id}
           className={mode === m.id ? styles.modeTabActive : styles.modeTab}
           onClick={() => {
-            if (m.id === 'models') return
             setMode(m.id)
             setSearchParams(
               (prev) => {
                 const next = new URLSearchParams(prev)
-                if (m.id === 'stability') next.set('mode', 'stability')
-                else next.delete('mode')
+                next.set('mode', m.id)
                 return next
               },
               { replace: true },
@@ -428,11 +656,9 @@ export default function Compare() {
             resetResults()
             setError(null)
           }}
-          disabled={m.id === 'models'}
           title={m.hint}
         >
           <span className={styles.modeTabLabel}>{m.label}</span>
-          <span className={styles.modeTabHint}>{m.hint}</span>
         </button>
       ))}
     </div>
@@ -440,184 +666,20 @@ export default function Compare() {
 
   return (
     <div className={`${pageStyles.page} ${styles.compare}`}>
-      <div className={pageStyles.panelHeader}>
-        <div>
+      <div className={`${pageStyles.panelHeader} ${styles.compareHeader}`}>
+        <div className={styles.compareTitleRow}>
           <h1 className="pageTitleGradient">A/B Сравнение</h1>
-          <p className={pageStyles.panelSubtitle}>
-            {mode === 'stability'
-              ? 'Многократный прогон одного или пары промптов, LLM-судья и метрики стабильности. История и отчёты — в Eval Studio.'
-              : 'Режимы: техники, готовые промпты и (скоро) модели. После генерации — прогон на целевой модели, diff и судья.'}
-          </p>
+          <CompareHint label="Справка по странице сравнения">
+            <p className={styles.hintP}>
+              Промпты — два текста и один прогон. Стабильность — оценка повторяемости. Модели — одна инструкция, две
+              модели. Техники — генерация двух промптов из одной задачи.
+            </p>
+          </CompareHint>
         </div>
         {(loading || runningOutputs) && <span className={pageStyles.infoBadge}>Работаю…</span>}
       </div>
 
       {renderModeTabs()}
-
-      {mode === 'stability' && (
-        <StabilityTab
-          generationModels={generationOptions}
-          initialPromptA={pastedA || (workspace?.a.prompt ?? '')}
-          initialPromptB={pastedB || (workspace?.b.prompt ?? '')}
-          deepLink={(location.state as CompareLocationState)?.stability ?? null}
-        />
-      )}
-
-      {mode === 'techniques' && (
-        <>
-          <div className={styles.taskComposerBlock}>
-            <div className={styles.fieldLabelRow}>
-              <label>Задача (одна для обоих вариантов)</label>
-              {taskInput.trim() ? <CopyIconButton text={taskInput} title="Копировать задачу" /> : null}
-            </div>
-            <div className={cb.composer}>
-              <AutoTextarea
-                className={cb.composerTextarea}
-                value={taskInput}
-                onChange={(e) => setTaskInput(e.target.value)}
-                placeholder="Нужен промпт для извлечения ключевых метрик из финансового отчёта…"
-                minHeightPx={80}
-                maxHeightPx={400}
-                spellCheck
-              />
-              <div className={cb.composerFooter}>
-                <div className={cb.composerFooterRow}>
-                  <div className={cb.composerFooterMid} style={{ flex: 1 }}>
-                    <SelectDropdown
-                      value={genModel}
-                      options={genModelSelectOptions}
-                      onChange={setGenModel}
-                      aria-label="Модель генерации"
-                      variant="composer"
-                      footerLink={{ to: '/models', label: 'Добавить модель' }}
-                    />
-                    <SelectDropdown
-                      value={targetModel}
-                      options={targetModelSelectOptions}
-                      onChange={setTargetModel}
-                      aria-label="Целевая модель"
-                      variant="composer"
-                      footerLink={{ to: '/models', label: 'Каталог моделей' }}
-                    />
-                    <button
-                      type="button"
-                      className={`${cb.composerGhostBtn} btn-ghost`}
-                      onClick={() => setShowCompareAdv((v) => !v)}
-                    >
-                      {showCompareAdv ? 'Меньше' : 'Т° / Top-P'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {showCompareAdv && (
-                <div className={cb.composerInset}>
-                  <div className={styles.compareAdvRow}>
-                    <label className={styles.compareAdvField}>
-                      Температура {temperature}
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={EXPERT_GENERATION_TEMPERATURE_CAP}
-                        step={0.05}
-                        value={Math.min(temperature, EXPERT_GENERATION_TEMPERATURE_CAP)}
-                        onChange={(e) =>
-                          setTemperature(Math.min(parseFloat(e.target.value), EXPERT_GENERATION_TEMPERATURE_CAP))
-                        }
-                      />
-                    </label>
-                    <label className={styles.compareAdvField}>
-                      Top-P {topP.toFixed(2)}
-                      <input type="range" min={0} max={1} step={0.05} value={topP} onChange={(e) => setTopP(parseFloat(e.target.value))} />
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className={styles.generateRow}>
-            <button
-              type="button"
-              className={`${styles.generateBothBtn} btn-primary`}
-              onClick={handleCompareTechniques}
-              disabled={!taskInput.trim() || loading}
-            >
-              {loading ? 'Генерирую…' : 'Сгенерировать оба'}
-            </button>
-          </div>
-
-          <p className={styles.modeExplainerHint}>
-            Режим техник задаётся в каждом столбце. Наведите на «Авто»/«Вручную» — полная подсказка.
-          </p>
-
-          <div className={styles.results}>
-            <div className={`${styles.column} ${styles.columnVariantA}`}>
-              <h3 className={styles.columnTitleA}>Вариант A</h3>
-              <div className={styles.badgeRow} aria-label="Техники варианта A">
-                {renderTechBadges(techsAMode, techsAManual)}
-              </div>
-              <div className={`${styles.radioRow} ${styles.radioRowA}`}>
-                <label title="Авто: техники подбираются по типу задачи.">
-                  <input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто
-                </label>
-                <label title="Вручную: в промпт попадут только отмеченные ниже техники.">
-                  <input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную
-                </label>
-              </div>
-              {techsAMode === 'manual' && (
-                <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта A">
-                  {techniques.map((t) => (
-                    <label key={t.id} className={checkboxList.optionCheck}>
-                      <input
-                        type="checkbox"
-                        checked={techsAManual.includes(t.id)}
-                        onChange={() =>
-                          setTechsAManual((prev) =>
-                            prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                          )
-                        }
-                      />
-                      <span>{t.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className={`${styles.column} ${styles.columnVariantB}`}>
-              <h3 className={styles.columnTitleB}>Вариант B</h3>
-              <div className={styles.badgeRow} aria-label="Техники варианта B">
-                {renderTechBadges(techsBMode, techsBManual)}
-              </div>
-              <div className={`${styles.radioRow} ${styles.radioRowB}`}>
-                <label title="Авто: техники подбираются по типу задачи.">
-                  <input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто
-                </label>
-                <label title="Вручную: в промпт попадут только отмеченные ниже техники.">
-                  <input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную
-                </label>
-              </div>
-              {techsBMode === 'manual' && (
-                <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта B">
-                  {techniques.map((t) => (
-                    <label key={t.id} className={checkboxList.optionCheck}>
-                      <input
-                        type="checkbox"
-                        checked={techsBManual.includes(t.id)}
-                        onChange={() =>
-                          setTechsBManual((prev) =>
-                            prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                          )
-                        }
-                      />
-                      <span>{t.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
 
       {mode === 'prompts' && (
         <div className={styles.pastedBlock}>
@@ -625,7 +687,10 @@ export default function Compare() {
             <div>
               <div className={styles.fieldLabelRow}>
                 <label htmlFor="paste-a">Промпт A</label>
-                {pastedA.trim() ? <CopyIconButton text={pastedA} title="Копировать A" /> : null}
+                <span className={styles.fieldLabelActions}>
+                  <LibraryPickButton applyMode="prompt" onApply={setPastedA} />
+                  {pastedA.trim() ? <CopyIconButton text={pastedA} title="Копировать A" /> : null}
+                </span>
               </div>
               <AutoTextarea
                 id="paste-a"
@@ -633,15 +698,18 @@ export default function Compare() {
                 value={pastedA}
                 onChange={(e) => setPastedA(e.target.value)}
                 placeholder="Вставьте текст промпта A…"
-                minHeightPx={160}
-                maxHeightPx={440}
+                minHeightPx={168}
+                maxHeightPx={480}
                 spellCheck
               />
             </div>
             <div>
               <div className={styles.fieldLabelRow}>
                 <label htmlFor="paste-b">Промпт B</label>
-                {pastedB.trim() ? <CopyIconButton text={pastedB} title="Копировать B" /> : null}
+                <span className={styles.fieldLabelActions}>
+                  <LibraryPickButton applyMode="prompt" onApply={setPastedB} />
+                  {pastedB.trim() ? <CopyIconButton text={pastedB} title="Копировать B" /> : null}
+                </span>
               </div>
               <AutoTextarea
                 id="paste-b"
@@ -649,8 +717,8 @@ export default function Compare() {
                 value={pastedB}
                 onChange={(e) => setPastedB(e.target.value)}
                 placeholder="Вставьте текст промпта B…"
-                minHeightPx={160}
-                maxHeightPx={440}
+                minHeightPx={168}
+                maxHeightPx={480}
                 spellCheck
               />
             </div>
@@ -676,15 +744,257 @@ export default function Compare() {
         </div>
       )}
 
+      {mode === 'stability' && (
+        <StabilityTab
+          generationModels={generationOptions}
+          initialPromptA={pastedA || (workspace?.a.prompt ?? '')}
+          initialPromptB={pastedB || (workspace?.b.prompt ?? '')}
+          deepLink={(location.state as CompareLocationState)?.stability ?? null}
+        />
+      )}
+
       {mode === 'models' && (
-        <div className={styles.comingSoonCard}>
-          <div className={styles.comingSoonEyebrow}>В разработке</div>
-          <div className={styles.comingSoonTitle}>Сравнение моделей</div>
-          <p className={styles.comingSoonBody}>
-            Одна задача, один набор техник, две разные модели или тира (Fast / Mid / Advanced). Добавим следующим апдейтом.
-            Пока используйте режим «Промпты»: сгенерируйте версию на каждой модели в Studio и вставьте сюда как A и B.
-          </p>
+        <div className={styles.modelComparePanel}>
+          <div className={styles.modelCompareRow}>
+            <label className={styles.modelCompareLabel}>
+              Системный промпт
+              <CompareHint label="Системный промпт">
+                Уходит в API как system: инструкция для модели. Ниже — опционально сообщение пользователя (user).
+              </CompareHint>
+            </label>
+            <LibraryPickButton applyMode="prompt" onApply={setModelCompareSystem} disabled={runningOutputs} />
+          </div>
+          <textarea
+            className={styles.modelCompareTextarea}
+            value={modelCompareSystem}
+            onChange={(e) => setModelCompareSystem(e.target.value)}
+            placeholder="Инструкция, общая для обеих моделей…"
+            rows={6}
+          />
+          <div className={styles.modelCompareRow}>
+            <label className={styles.modelCompareLabel}>Сообщение пользователя (опционально)</label>
+            <LibraryPickButton applyMode="user_turn" onApply={setModelCompareUser} disabled={runningOutputs} />
+          </div>
+          <textarea
+            className={styles.modelCompareTextareaSm}
+            value={modelCompareUser}
+            onChange={(e) => setModelCompareUser(e.target.value)}
+            placeholder="Если пусто — модель получит нейтральный запрос «Выполни инструкцию выше»."
+            rows={3}
+          />
+          <div className={styles.modelComparePickers}>
+            <SelectDropdown
+              value={modelCompareA}
+              options={concreteTargetOptions.length ? concreteTargetOptions : targetModelSelectOptions}
+              onChange={setModelCompareA}
+              aria-label="Модель A"
+              variant="composer"
+              footerLink={{ to: '/models', label: 'Каталог моделей' }}
+            />
+            <SelectDropdown
+              value={modelCompareB}
+              options={concreteTargetOptions.length ? concreteTargetOptions : targetModelSelectOptions}
+              onChange={setModelCompareB}
+              aria-label="Модель B"
+              variant="composer"
+              footerLink={{ to: '/models', label: 'Каталог моделей' }}
+            />
+          </div>
+          <div className={styles.modelCompareActions}>
+            <button
+              type="button"
+              className={`${styles.generateBothBtn} btn-primary`}
+              onClick={() => void handleModelCompareRun()}
+              disabled={runningOutputs || !modelCompareSystem.trim()}
+            >
+              {runningOutputs ? 'Запрос…' : 'Сравнить модели'}
+            </button>
+          </div>
         </div>
+      )}
+
+      {mode === 'techniques' && (
+        <>
+          <div ref={techniquesSplitRootRef} className={styles.techniquesSplitRoot}>
+            <section
+              className={styles.techniquesComposerPane}
+              style={{ flex: `${techniquesSplit} 1 0%`, minWidth: 0 }}
+              aria-label="Задача для генерации"
+            >
+              <div className={styles.techniquesPaneHead}>
+                <label className={styles.techniquesPaneTitle} htmlFor="compare-task-input">
+                  Задача (одна для обоих вариантов)
+                </label>
+                {taskInput.trim() ? <CopyIconButton text={taskInput} title="Копировать задачу" /> : null}
+              </div>
+              <div className={`${cb.composer} ${styles.techniquesComposerShell}`}>
+                <AutoTextarea
+                  id="compare-task-input"
+                  className={cb.composerTextarea}
+                  value={taskInput}
+                  onChange={(e) => setTaskInput(e.target.value)}
+                  placeholder="Нужен промпт для извлечения ключевых метрик из финансового отчёта…"
+                  minHeightPx={120}
+                  maxHeightPx={340}
+                  spellCheck
+                />
+                <div className={cb.composerFooter}>
+                  <div className={cb.composerFooterRow}>
+                    <div
+                      className={cb.composerFooterMid}
+                      style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 10px' }}
+                    >
+                      <LibraryPickButton applyMode="prompt" onApply={setTaskInput} disabled={loading} />
+                      <SelectDropdown
+                        value={genModel}
+                        options={genModelSelectOptions}
+                        onChange={setGenModel}
+                        aria-label="Модель генерации"
+                        variant="composer"
+                        footerLink={{ to: '/models', label: 'Добавить модель' }}
+                      />
+                      <SelectDropdown
+                        value={targetModel}
+                        options={targetModelSelectOptions}
+                        onChange={setTargetModel}
+                        aria-label="Целевая модель"
+                        variant="composer"
+                        footerLink={{ to: '/models', label: 'Каталог моделей' }}
+                      />
+                      <button
+                        type="button"
+                        className={`${cb.composerGhostBtn} btn-ghost`}
+                        onClick={() => setShowCompareAdv((v) => !v)}
+                      >
+                        {showCompareAdv ? 'Меньше' : 'Т° / Top-P'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {showCompareAdv && (
+                  <div className={cb.composerInset}>
+                    <div className={styles.compareAdvRow}>
+                      <label className={styles.compareAdvField}>
+                        Температура {temperature}
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={EXPERT_GENERATION_TEMPERATURE_CAP}
+                          step={0.05}
+                          value={Math.min(temperature, EXPERT_GENERATION_TEMPERATURE_CAP)}
+                          onChange={(e) =>
+                            setTemperature(Math.min(parseFloat(e.target.value), EXPERT_GENERATION_TEMPERATURE_CAP))
+                          }
+                        />
+                      </label>
+                      <label className={styles.compareAdvField}>
+                        Top-P {topP.toFixed(2)}
+                        <input type="range" min={0} max={1} step={0.05} value={topP} onChange={(e) => setTopP(parseFloat(e.target.value))} />
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className={styles.techniquesGenerateWrap}>
+                <button
+                  type="button"
+                  className={`${styles.generateBothBtn} btn-primary ${styles.techniquesGenerateBtn}`}
+                  onClick={handleCompareTechniques}
+                  disabled={!taskInput.trim() || loading}
+                >
+                  {loading ? 'Генерирую…' : 'Сгенерировать оба'}
+                </button>
+              </div>
+            </section>
+
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Изменить ширину колонок"
+              className={styles.techniquesSplitGutter}
+              onMouseDown={startTechniquesSplitDrag}
+            />
+
+            <aside
+              className={styles.techniquesVariantsPane}
+              style={{ flex: `${1 - techniquesSplit} 1 0%`, minWidth: 0 }}
+              aria-label="Наборы техник A и B"
+            >
+              <div className={styles.techniquesVariantsHead}>
+                <span className={styles.techniquesVariantsHeadTitle}>Варианты A и B</span>
+                <CompareHint label="Про наборы техник">
+                  В каждом блоке — Авто (подбор по задаче) или Вручную (только отмеченные техники).
+                </CompareHint>
+              </div>
+              <div className={styles.techniquesVariantsStack}>
+                <div className={`${styles.column} ${styles.columnVariantA} ${styles.techniquesVariantCard}`}>
+                  <h3 className={styles.columnTitleA}>Вариант A</h3>
+                  <div className={styles.badgeRow} aria-label="Техники варианта A">
+                    {renderTechBadges(techsAMode, techsAManual)}
+                  </div>
+                  <div className={`${styles.radioRow} ${styles.radioRowA}`}>
+                    <label title="Авто: техники подбираются по типу задачи.">
+                      <input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто
+                    </label>
+                    <label title="Вручную: в промпт попадут только отмеченные ниже техники.">
+                      <input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную
+                    </label>
+                  </div>
+                  {techsAMode === 'manual' && (
+                    <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта A">
+                      {techniques.map((t) => (
+                        <label key={t.id} className={checkboxList.optionCheck}>
+                          <input
+                            type="checkbox"
+                            checked={techsAManual.includes(t.id)}
+                            onChange={() =>
+                              setTechsAManual((prev) =>
+                                prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                              )
+                            }
+                          />
+                          <span>{t.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className={`${styles.column} ${styles.columnVariantB} ${styles.techniquesVariantCard}`}>
+                  <h3 className={styles.columnTitleB}>Вариант B</h3>
+                  <div className={styles.badgeRow} aria-label="Техники варианта B">
+                    {renderTechBadges(techsBMode, techsBManual)}
+                  </div>
+                  <div className={`${styles.radioRow} ${styles.radioRowB}`}>
+                    <label title="Авто: техники подбираются по типу задачи.">
+                      <input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто
+                    </label>
+                    <label title="Вручную: в промпт попадут только отмеченные ниже техники.">
+                      <input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную
+                    </label>
+                  </div>
+                  {techsBMode === 'manual' && (
+                    <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта B">
+                      {techniques.map((t) => (
+                        <label key={t.id} className={checkboxList.optionCheck}>
+                          <input
+                            type="checkbox"
+                            checked={techsBManual.includes(t.id)}
+                            onChange={() =>
+                              setTechsBManual((prev) =>
+                                prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                              )
+                            }
+                          />
+                          <span>{t.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+        </>
       )}
 
       {error && <p className={styles.error}>{error}</p>}
@@ -695,60 +1005,77 @@ export default function Compare() {
             <p className={styles.heuristicNote}>{workspace.winnerNote}</p>
           )}
 
-          {/* Prompts side by side + diff */}
-          <div className={styles.results}>
-            <div className={`${styles.column} ${styles.columnVariantA}`}>
-              <h3 className={styles.columnTitleA}>Промпт A</h3>
-              {workspace.a.techniques && workspace.a.techniques.length > 0 && (
-                <p className={styles.meta}>{workspace.a.techniques.map((t) => t.name).join(' + ')}</p>
-              )}
-              {workspace.a.reasoning && (
-                <details>
-                  <summary>Пояснение A</summary>
-                  <div className={styles.copyRow}>
-                    <CopyIconButton text={workspace.a.reasoning} title="Копировать пояснение A" />
-                  </div>
-                  <div className={styles.promptMarkdownWrap}>
-                    <MarkdownOutput>{workspace.a.reasoning}</MarkdownOutput>
-                  </div>
-                </details>
-              )}
-              <div className={styles.copyRow}>
-                <CopyIconButton text={workspace.a.prompt} title="Копировать промпт A" />
-              </div>
-              <div className={styles.promptMarkdownWrap}>
-                <MarkdownOutput>{workspace.a.prompt}</MarkdownOutput>
+          {workspace.source === 'models' ? (
+            <div className={styles.results}>
+              <div className={`${styles.column} ${styles.columnVariantA} ${styles.modelComparePromptSpan}`}>
+                <h3 className={styles.columnTitleA}>Системный промпт (общий)</h3>
+                <div className={styles.copyRow}>
+                  <CopyIconButton text={workspace.a.prompt} title="Копировать промпт" />
+                </div>
+                <div className={styles.promptMarkdownWrap}>
+                  <MarkdownOutput>{workspace.a.prompt}</MarkdownOutput>
+                </div>
               </div>
             </div>
-            <div className={`${styles.column} ${styles.columnVariantB}`}>
-              <h3 className={styles.columnTitleB}>Промпт B</h3>
-              {workspace.b.techniques && workspace.b.techniques.length > 0 && (
-                <p className={styles.meta}>{workspace.b.techniques.map((t) => t.name).join(' + ')}</p>
-              )}
-              {workspace.b.reasoning && (
-                <details>
-                  <summary>Пояснение B</summary>
+          ) : (
+            <>
+              <div className={styles.results}>
+                <div className={`${styles.column} ${styles.columnVariantA}`}>
+                  <h3 className={styles.columnTitleA}>Промпт A</h3>
+                  {workspace.a.techniques && workspace.a.techniques.length > 0 && (
+                    <p className={styles.meta}>{workspace.a.techniques.map((t) => t.name).join(' + ')}</p>
+                  )}
+                  {workspace.a.reasoning && (
+                    <details>
+                      <summary>Пояснение A</summary>
+                      <div className={styles.copyRow}>
+                        <CopyIconButton text={workspace.a.reasoning} title="Копировать пояснение A" />
+                      </div>
+                      <div className={styles.promptMarkdownWrap}>
+                        <MarkdownOutput>{workspace.a.reasoning}</MarkdownOutput>
+                      </div>
+                    </details>
+                  )}
                   <div className={styles.copyRow}>
-                    <CopyIconButton text={workspace.b.reasoning} title="Копировать пояснение B" />
+                    <CopyIconButton text={workspace.a.prompt} title="Копировать промпт A" />
                   </div>
                   <div className={styles.promptMarkdownWrap}>
-                    <MarkdownOutput>{workspace.b.reasoning}</MarkdownOutput>
+                    <MarkdownOutput>{workspace.a.prompt}</MarkdownOutput>
                   </div>
-                </details>
-              )}
-              <div className={styles.copyRow}>
-                <CopyIconButton text={workspace.b.prompt} title="Копировать промпт B" />
+                </div>
+                <div className={`${styles.column} ${styles.columnVariantB}`}>
+                  <h3 className={styles.columnTitleB}>Промпт B</h3>
+                  {workspace.b.techniques && workspace.b.techniques.length > 0 && (
+                    <p className={styles.meta}>{workspace.b.techniques.map((t) => t.name).join(' + ')}</p>
+                  )}
+                  {workspace.b.reasoning && (
+                    <details>
+                      <summary>Пояснение B</summary>
+                      <div className={styles.copyRow}>
+                        <CopyIconButton text={workspace.b.reasoning} title="Копировать пояснение B" />
+                      </div>
+                      <div className={styles.promptMarkdownWrap}>
+                        <MarkdownOutput>{workspace.b.reasoning}</MarkdownOutput>
+                      </div>
+                    </details>
+                  )}
+                  <div className={styles.copyRow}>
+                    <CopyIconButton text={workspace.b.prompt} title="Копировать промпт B" />
+                  </div>
+                  <div className={styles.promptMarkdownWrap}>
+                    <MarkdownOutput>{workspace.b.prompt}</MarkdownOutput>
+                  </div>
+                </div>
               </div>
-              <div className={styles.promptMarkdownWrap}>
-                <MarkdownOutput>{workspace.b.prompt}</MarkdownOutput>
-              </div>
-            </div>
-          </div>
 
-          <details className={styles.diffBlock}>
-            <summary className={styles.diffSummary}>Diff промптов A vs B</summary>
-            <SimpleLineDiff before={workspace.a.prompt} after={workspace.b.prompt} />
-          </details>
+              {workspace.a.prompt !== workspace.b.prompt ? (
+                <details className={styles.diffBlock}>
+                  <summary className={styles.diffSummary}>Diff промптов A vs B</summary>
+                  <SimpleLineDiff before={workspace.a.prompt} after={workspace.b.prompt} />
+                </details>
+              ) : null}
+            </>
+          )}
 
           {/* Metrics row */}
           {(workspace.a.metrics || workspace.b.metrics) && (
@@ -760,40 +1087,47 @@ export default function Compare() {
             </div>
           )}
 
-          {/* Run on target */}
-          <div className={styles.runOnTargetBar}>
-            <div className={styles.runOnTargetTitle}>Прогнать на целевой модели</div>
-            <SelectDropdown
-              value={targetModel}
-              options={concreteTargetOptions.length > 0 ? concreteTargetOptions : targetModelSelectOptions}
-              onChange={setTargetModel}
-              aria-label="Целевая модель для прогона"
-              variant="composer"
-              footerLink={{ to: '/models', label: 'Каталог моделей' }}
-            />
-            <button
-              type="button"
-              className={`${styles.secondaryBtn} btn-secondary`}
-              onClick={handleRunOnTarget}
-              disabled={runningOutputs || targetModel === 'unknown'}
-              title={targetModel === 'unknown' ? 'Выберите конкретную модель' : 'Запустить оба промпта на этой модели'}
-            >
-              {runningOutputs ? 'Прогоняю…' : 'Запустить A и B'}
-            </button>
-          </div>
+          {workspace.source !== 'models' ? (
+            <div className={styles.runOnTargetBar}>
+              <div className={styles.runOnTargetTitle}>Прогнать на целевой модели</div>
+              <SelectDropdown
+                value={targetModel}
+                options={concreteTargetOptions.length > 0 ? concreteTargetOptions : targetModelSelectOptions}
+                onChange={setTargetModel}
+                aria-label="Целевая модель для прогона"
+                variant="composer"
+                footerLink={{ to: '/models', label: 'Каталог моделей' }}
+              />
+              <button
+                type="button"
+                className={`${styles.secondaryBtn} btn-secondary`}
+                onClick={handleRunOnTarget}
+                disabled={runningOutputs || targetModel === 'unknown'}
+                title={targetModel === 'unknown' ? 'Выберите конкретную модель' : 'Запустить оба промпта на этой модели'}
+              >
+                {runningOutputs ? 'Прогоняю…' : 'Запустить A и B'}
+              </button>
+            </div>
+          ) : null}
           {outputsError && <p className={styles.error}>{outputsError}</p>}
 
           {outputs && (
             <>
               <div className={styles.outputsHeader}>
-                <span className={styles.outputsTitle}>Ответы модели {outputs.targetModel}</span>
+                <span className={styles.outputsTitle}>
+                  {workspace.source === 'models' && modelCompareMeta
+                    ? `Ответы: ${modelCompareMeta.labelA} · ${modelCompareMeta.labelB}`
+                    : `Ответы модели ${outputs.targetModel}`}
+                </span>
                 <span className={styles.outputsCost}>
                   ≈{(outputs.tokensA + outputs.tokensB).toLocaleString()} токенов · ${outputs.costUsd.toFixed(4)}
                 </span>
               </div>
               <div className={styles.results}>
                 <div className={`${styles.column} ${styles.columnVariantA}`}>
-                  <h3 className={styles.columnTitleA}>Ответ A</h3>
+                  <h3 className={styles.columnTitleA}>
+                    {workspace.source === 'models' && modelCompareMeta ? `Ответ · ${modelCompareMeta.labelA}` : 'Ответ A'}
+                  </h3>
                   <div className={styles.copyRow}>
                     <CopyIconButton text={outputs.a} title="Копировать ответ A" />
                   </div>
@@ -802,7 +1136,9 @@ export default function Compare() {
                   </div>
                 </div>
                 <div className={`${styles.column} ${styles.columnVariantB}`}>
-                  <h3 className={styles.columnTitleB}>Ответ B</h3>
+                  <h3 className={styles.columnTitleB}>
+                    {workspace.source === 'models' && modelCompareMeta ? `Ответ · ${modelCompareMeta.labelB}` : 'Ответ B'}
+                  </h3>
                   <div className={styles.copyRow}>
                     <CopyIconButton text={outputs.b} title="Копировать ответ B" />
                   </div>
@@ -825,6 +1161,12 @@ export default function Compare() {
                 type="button"
                 className={judgeOn === 'prompts' ? styles.judgeToggleActive : styles.judgeToggleBtn}
                 onClick={() => setJudgeOn('prompts')}
+                disabled={workspace.source === 'models'}
+                title={
+                  workspace.source === 'models'
+                    ? 'Для сравнения моделей промпты совпадают — судья сравнивает ответы'
+                    : undefined
+                }
               >
                 Судить промпты
               </button>
@@ -912,6 +1254,21 @@ export default function Compare() {
               Сохранить в библиотеку
             </button>
           </div>
+
+          {(mode === 'techniques' || mode === 'prompts' || mode === 'models') && (
+            <div className={styles.compareNextStep}>
+              <div className={styles.compareNextStepHead}>
+                <span className={styles.compareNextStepLabel}>Следующий шаг</span>
+                <button type="button" className={styles.compareNextStepBtn} onClick={goStabilityFromCompare}>
+                  Проверить стабильность →
+                </button>
+                <CompareHint label="Стабильность">
+                  Вкладка «Стабильность» с подставленными промптами A/B
+                  {mode === 'techniques' ? ' и задачей' : mode === 'models' ? ' и пользовательским сообщением' : ''}.
+                </CompareHint>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

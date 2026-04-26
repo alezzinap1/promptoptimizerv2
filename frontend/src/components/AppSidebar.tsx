@@ -133,12 +133,12 @@ export default function AppSidebar({
             <NavLink
               to="/eval"
               className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title="Eval Studio — стабильность и отчёты"
+              title="История прогонов стабильности, лидерборд и отчёты (Eval Studio)"
             >
               <span className={styles.icon} aria-hidden>
                 <EvalIcon />
               </span>
-              <span className={styles.label}>Eval Studio</span>
+              <span className={styles.label}>История прогонов</span>
             </NavLink>
           </div>
 

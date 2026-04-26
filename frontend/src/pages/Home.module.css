@@ -647,9 +647,20 @@
 
 .skillSandboxComposer {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 12px 12px;
   border-top: 1px solid var(--stroke);
+}
+
+.skillSandboxPickRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.skillSandboxComposerRow {
+  display: flex;
+  gap: 8px;
   align-items: flex-end;
 }
 

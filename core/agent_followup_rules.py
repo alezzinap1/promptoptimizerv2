@@ -37,6 +37,13 @@ def looks_like_apply_tip_directive(t: str) -> bool:
         return True
     if re.search(r"apply\s+tip", head, re.I):
         return True
+    # Home.tsx: «Всё в чат» / «В чат» после LLM-судьи и «Применить всё» по improvement_tips
+    if re.match(r"^учти\s+и\s+примени\s+советы\s+по\s+очереди\s*:", low):
+        return True
+    if re.match(r"^учти\s+по\s+очереди\s+советы\s+судьи\s*:", low):
+        return True
+    if re.match(r"^учти\s+совет\s+судьи\s*:", low):
+        return True
     return False
 
 

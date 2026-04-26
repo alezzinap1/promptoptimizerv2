@@ -5,9 +5,11 @@ import styles from './LibraryTagChips.module.css'
 type Props = {
   tags: string[]
   className?: string
+  /** Без выбора цвета — только отображение (модалки, превью). */
+  displayOnly?: boolean
 }
 
-export default function LibraryTagChips({ tags, className = '' }: Props) {
+export default function LibraryTagChips({ tags, className = '', displayOnly = false }: Props) {
   const colorInputRef = useRef<HTMLInputElement>(null)
   const pendingTagRef = useRef<string | null>(null)
 
@@ -30,6 +32,32 @@ export default function LibraryTagChips({ tags, className = '' }: Props) {
 
   const list = useMemo(() => tags.map((t) => t.trim()).filter(Boolean), [tags])
   if (list.length === 0) return null
+
+  if (displayOnly) {
+    return (
+      <div className={`${styles.row} ${className}`.trim()}>
+        {list.map((tag) => {
+          const accent = getTagAccent(tag)
+          return (
+            <span
+              key={tag}
+              className={`${styles.chip} ${styles.chipStatic}`}
+              style={
+                accent
+                  ? {
+                      borderColor: accent,
+                      color: accent,
+                    }
+                  : undefined
+              }
+            >
+              {tag}
+            </span>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <div className={`${styles.row} ${className}`.trim()}>

@@ -1,0 +1,245 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 650;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--stroke));
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--primary) 22%, transparent),
+    color-mix(in srgb, var(--primary) 8%, transparent)
+  );
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.2;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.07) inset,
+    0 2px 12px color-mix(in srgb, var(--primary) 14%, transparent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, transform 0.12s ease;
+}
+
+.triggerIcon {
+  flex-shrink: 0;
+  opacity: 0.92;
+  color: color-mix(in srgb, var(--primary) 75%, var(--text));
+}
+
+[data-theme='light'] .trigger {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--primary) 18%, rgba(255, 255, 255, 0.94)),
+    color-mix(in srgb, var(--primary) 6%, rgba(255, 255, 255, 0.88))
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.trigger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 65%, var(--stroke));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 4px 18px color-mix(in srgb, var(--primary) 22%, transparent);
+  filter: brightness(1.04);
+}
+
+.trigger:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+  box-shadow: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal {
+  width: min(1180px, 100%);
+  max-height: min(92vh, 880px);
+  display: flex;
+  flex-direction: column;
+  background: var(--modal-surface, var(--panel-strong));
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.head {
+  padding: 0.9rem 1.1rem 0.55rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.82;
+  line-height: 1.45;
+}
+
+.search {
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.search input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+[data-theme='light'] .search input {
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.pickModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Заголовок на обложке / без обложки: не кнопка, клик обрабатывает карточка */
+.pickCardTitleStatic {
+  cursor: inherit;
+}
+
+article.pickCardWrap {
+  cursor: pointer;
+  text-align: left;
+  /* Выше специфичность, чем у .card / .cardWithCover — не обрезать карточку по высоте ряда */
+  overflow: visible;
+  min-height: min-content;
+}
+
+/* index.css: button { overflow: hidden } — иначе многострочный заголовок обрезается */
+article.pickCardWrap :is(button) {
+  overflow: visible;
+}
+
+.modalPreview {
+  max-height: 120px;
+  overflow-y: auto;
+  text-overflow: unset;
+}
+
+.pickNotes {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.pickNotesLabel {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--primary) 75%, var(--muted));
+  margin-bottom: 4px;
+}
+
+.pickNotesText {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.empty {
+  column-span: all;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.err {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.8rem;
+  color: #f87171;
+}
+
+.foot {
+  padding: 0.7rem 1.1rem;
+  border-top: 1px solid var(--stroke);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.foot a {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--primary) 85%, var(--text));
+  text-decoration: none;
+}
+
+.foot a:hover {
+  text-decoration: underline;
+}
+
+.closeGhost {
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 9px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.closeGhost:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 520px) {
+  .modal {
+    border-radius: 12px;
+  }
+}

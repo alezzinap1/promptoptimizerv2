@@ -470,6 +470,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
                   kind="skill"
                   compact
                   disabled={!draft.body.trim()}
+                  cacheResetKey={showModal ? (editingId ?? '__new__') : '__closed__'}
                   title="Перевести тело скилла RU↔EN"
                 />
               </span>
