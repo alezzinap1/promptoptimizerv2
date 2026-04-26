@@ -1,41 +1,109 @@
 """End-to-end run_executor test with a mocked LLMClient."""
 from __future__ import annotations
 
+import json
 import tempfile
 import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from db.manager import DBManager
 from services.auth_service import hash_password
 from services.eval.event_bus import BUS
 from services.eval.run_executor import EXECUTOR_REGISTRY, cancel_run, start_eval_run
-
-
 class _FakeEmb:
     def __init__(self, vec: list[float]) -> None:
         self.embedding = vec
 
 
+def _meta_json_from_kw(kw: object) -> dict | None:
+    """Shared mock responses for meta_pipeline LLM steps."""
+    sp = str(kw.get("system_prompt") or "")
+    uc = str(kw.get("user_content") or "")
+    if "META_HYPOTHESIZE_V1" in sp:
+        first_rid = 1
+        try:
+            data = json.loads(uc)
+            for cl in data.get("clusters") or []:
+                for m in cl.get("members") or []:
+                    if m.get("result_id") is not None:
+                        first_rid = int(m["result_id"])
+                        raise StopIteration
+        except (json.JSONDecodeError, StopIteration, TypeError, ValueError):
+            pass
+        return {
+            "hypotheses": [
+                {
+                    "id": "t1",
+                    "pattern": "Тестовый паттерн",
+                    "cluster_ids": [0],
+                    "evidence_candidates": [{"result_id": first_rid, "quote": "OUTPUT"}],
+                }
+            ]
+        }
+    if "META_SYNTHESIZE_V2" in sp:
+        rid = 1
+        try:
+            data = json.loads(uc)
+            for h in data.get("verified_hypotheses") or []:
+                for e in h.get("evidence") or []:
+                    if e.get("result_id") is not None:
+                        rid = int(e["result_id"])
+                        raise StopIteration
+        except (json.JSONDecodeError, StopIteration, TypeError, ValueError):
+            pass
+        return {
+            "summary": "Сводка мета-анализа v2",
+            "failure_modes": [
+                {
+                    "hypothesis_id": "t1",
+                    "pattern": "Паттерн",
+                    "severity": 2,
+                    "evidence": [{"result_id": rid, "excerpt": "OUTPUT"}],
+                }
+            ],
+            "prompt_fixes": ["Уточнить формат"],
+            "criteria_weak_spots": [],
+        }
+    return None
+
+
 def _make_client(generation_text: str = "OUTPUT") -> MagicMock:
     c = MagicMock()
     c.generate.side_effect = lambda **kw: f"{generation_text} for {kw.get('user_content', '')[:20]}"
-    c.generate_json.return_value = {
-        "scores": {
-            "accuracy": {"score": 4, "reasoning": "ok"},
-            "completeness": {"score": 5, "reasoning": "good"},
-            "clarity": {"score": 4, "reasoning": "fine"},
-            "instruction_following": {"score": 4, "reasoning": "ok"},
-            "conciseness": {"score": 4, "reasoning": "ok"},
-        },
-        "overall": 4.2,
-        "reasoning": "solid",
-    }
+
+    def _default_gj(**kw: object) -> dict:
+        meta = _meta_json_from_kw(kw)
+        if meta is not None:
+            return meta
+        return {
+            "scores": {
+                "accuracy": {"score": 4, "reasoning": "ok"},
+                "completeness": {"score": 5, "reasoning": "good"},
+                "clarity": {"score": 4, "reasoning": "fine"},
+                "instruction_following": {"score": 4, "reasoning": "ok"},
+                "conciseness": {"score": 4, "reasoning": "ok"},
+            },
+            "overall": 4.2,
+            "reasoning": "solid",
+        }
+
+    c.generate_json.side_effect = _default_gj
     c.embed.side_effect = lambda texts, provider: [[1.0, 0.0] for _ in texts]
     return c
 
 
-def _seed_run(db: DBManager, uid: int, *, mode: str = "single", n_runs: int = 3) -> int:
+def _seed_run(
+    db: DBManager,
+    uid: int,
+    *,
+    mode: str = "single",
+    n_runs: int = 3,
+    judge_secondary_model_id: str | None = None,
+    run_synthesis: bool = True,
+) -> int:
     return db.create_eval_run(
         user_id=uid,
         mode=mode,
@@ -68,6 +136,8 @@ def _seed_run(db: DBManager, uid: int, *, mode: str = "single", n_runs: int = 3)
         cost_preview_usd=0.01,
         cost_preview_tokens=500,
         pair_judge_samples=3 if mode == "pair" else 0,
+        judge_secondary_model_id=judge_secondary_model_id,
+        run_synthesis=run_synthesis,
     )
 
 
@@ -89,6 +159,14 @@ def test_run_executor_completes_single_mode() -> None:
     assert run["finished_at"] is not None
     # Diversity = 0 because all embeddings identical
     assert run["diversity_score"] == 0.0
+    assert run.get("synthesis_report_json")
+    syn = json.loads(run["synthesis_report_json"])
+    assert "summary" in syn
+    assert syn.get("meta_schema_version") == 2
+    assert run.get("meta_pipeline_json")
+    pipe = json.loads(run["meta_pipeline_json"])
+    assert pipe.get("schema_version") == 2
+    assert "clusters" in pipe
 
     rows = db.list_eval_results_for_run(run_id)
     assert len(rows) == 3
@@ -103,6 +181,56 @@ def test_run_executor_completes_single_mode() -> None:
     assert "started" in types_seen
     assert "done" in types_seen
     assert any(t == "progress" for t in types_seen)
+
+
+def test_run_executor_secondary_judge_sets_agreement() -> None:
+    tmp = tempfile.mkdtemp()
+    db = DBManager(str(Path(tmp) / "x2.db"))
+    db.init()
+    uid = int(db.create_user("u_sec", hash_password("password12345")))
+    run_id = _seed_run(
+        db,
+        uid,
+        mode="single",
+        n_runs=2,
+        judge_secondary_model_id="google/gemini-2.0-flash-001",
+    )
+
+    _single_a = {
+        "scores": {
+            "accuracy": {"score": 4, "reasoning": "ok"},
+            "completeness": {"score": 5, "reasoning": "good"},
+            "clarity": {"score": 4, "reasoning": "fine"},
+            "instruction_following": {"score": 4, "reasoning": "ok"},
+            "conciseness": {"score": 4, "reasoning": "ok"},
+        },
+        "overall": 4.2,
+        "reasoning": "solid",
+    }
+    _single_b = {**_single_a, "overall": 3.0, "reasoning": "alt"}
+
+    client = MagicMock()
+    client.generate.side_effect = lambda **kw: "OUT"
+    client.embed.side_effect = lambda texts, provider: [[1.0, 0.0] for _ in texts]
+
+    def _gj(**kw):
+        meta = _meta_json_from_kw(kw)
+        if meta is not None:
+            return meta
+        if kw.get("provider") == "google/gemini-2.0-flash-001":
+            return _single_b
+        return _single_a
+
+    client.generate_json.side_effect = _gj
+
+    fut = start_eval_run(db, client, run_id)
+    fut.result(timeout=20)
+
+    run = db.get_eval_run(run_id, uid)
+    assert run["status"] == "completed"
+    assert run.get("judge_agreement_mean_abs") == pytest.approx(1.2, abs=0.05)
+    rows = db.list_eval_results_for_run(run_id)
+    assert rows[0].get("judge_overall_secondary") == 3.0
 
 
 def test_run_executor_pair_mode_produces_winner() -> None:
@@ -126,7 +254,10 @@ def test_run_executor_pair_mode_produces_winner() -> None:
     }
 
     def _gen_json(**kwargs):
-        sp = kwargs.get("system_prompt", "")
+        meta = _meta_json_from_kw(kwargs)
+        if meta is not None:
+            return meta
+        sp = str(kwargs.get("system_prompt", ""))
         return pair_response if "winner" in sp.lower() else single_response
 
     client.generate_json.side_effect = _gen_json

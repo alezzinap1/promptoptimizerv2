@@ -34,6 +34,7 @@ Cost accounting in MVP:
 """
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -48,6 +49,7 @@ from services.eval.aggregator import (
 from services.eval.diversity import diversity_summary
 from services.eval.event_bus import BUS
 from services.eval.judge_runner import judge_one, judge_pair
+from services.eval.meta_pipeline import run_meta_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +225,7 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
             _finalize_cancelled(db, run_id, started_mono)
             return
 
-        # ── PHASE 2: judge per output (skip errored generations) ─────
+        # ── PHASE 2: primary judge per output (skip errored generations) ─
         judge_results: dict[tuple[str, int], dict] = {}
         with ThreadPoolExecutor(max_workers=parallelism, thread_name_prefix=f"eval-{run_id}-judge") as pool:
             jf = []
@@ -261,6 +263,66 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
                         "judge_overall": r.get("overall"),
                     },
                 )
+
+        # ── PHASE 2b: secondary judge (MVP-1.5) ─────────────────────────
+        sec_model = (run.get("judge_secondary_model_id") or "").strip()
+        if (
+            sec_model
+            and sec_model != (run.get("judge_model_id") or "").strip()
+            and not cancel.is_set()
+        ):
+            with ThreadPoolExecutor(
+                max_workers=parallelism, thread_name_prefix=f"eval-{run_id}-judge2"
+            ) as pool:
+                jf2 = []
+                for side in sides:
+                    prompt = run["prompt_a_text"] if side == "A" else run["prompt_b_text"]
+                    for o in outputs[side]:
+                        if o["status"] != "ok":
+                            continue
+                        if cancel.is_set():
+                            break
+                        jf2.append(
+                            pool.submit(
+                                _judge_one_safe,
+                                client=client,
+                                judge_model=sec_model,
+                                rubric=rubric,
+                                prompt=prompt,
+                                task_input=run["task_input"],
+                                output_text=o["output_text"],
+                                reference=run.get("reference_answer"),
+                                side=side,
+                                run_index=o["run_index"],
+                            )
+                        )
+                for f in jf2:
+                    r2 = f.result()
+                    key = (r2["side"], r2["run_index"])
+                    base = judge_results.get(key) or {}
+                    base["secondary_overall"] = r2.get("overall")
+                    base["secondary_reasoning"] = r2.get("reasoning")
+                    judge_results[key] = base
+                    BUS.publish(
+                        run_id,
+                        {
+                            "type": "progress",
+                            "phase": "judge_secondary",
+                            "side": r2["side"],
+                            "run_index": r2["run_index"],
+                            "judge_secondary_overall": r2.get("overall"),
+                        },
+                    )
+
+        agreement_mean: float | None = None
+        diffs: list[float] = []
+        for _k, jr in judge_results.items():
+            a = jr.get("overall")
+            b = jr.get("secondary_overall")
+            if a is not None and b is not None:
+                diffs.append(abs(float(a) - float(b)))
+        if diffs:
+            agreement_mean = round(sum(diffs) / len(diffs), 4)
 
         if cancel.is_set():
             _finalize_cancelled(db, run_id, started_mono)
@@ -302,7 +364,9 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
                     status=o["status"],
                     embedding=emb,
                     judge_overall=j.get("overall") if j else None,
+                    judge_overall_secondary=j.get("secondary_overall") if j else None,
                     judge_reasoning=j.get("reasoning") if j else None,
+                    judge_reasoning_secondary=j.get("secondary_reasoning") if j else None,
                     error=o.get("error"),
                 )
                 if j and j.get("scores"):
@@ -333,9 +397,53 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
                 run_id=run_id,
             )
 
+        # ── PHASE 6b: meta-synthesis (all outputs + prompt → one report) ─
+        synthesis_report: dict | None = None
+        synthesis_error: str | None = None
+        meta_pipeline_str: str | None = None
+        run_synth = bool(run.get("run_synthesis", True))
+        if run_synth and not cancel.is_set():
+            try:
+                synth_model = (run.get("synthesis_model_id") or run["judge_model_id"] or "").strip()
+                syn_summaries = {
+                    s: {
+                        "stats": side_summaries[s]["stats"],
+                        "diversity": side_summaries[s]["diversity"],
+                    }
+                    for s in sides
+                }
+                result_rows = db.list_eval_results_for_run(run_id)
+                syn, meta_blob, syn_err = run_meta_pipeline(
+                    client=client,
+                    synthesis_model_id=synth_model,
+                    task_input=run["task_input"],
+                    prompt_a_text=run["prompt_a_text"],
+                    prompt_b_text=run.get("prompt_b_text"),
+                    rubric_snapshot=rubric,
+                    side_summaries=syn_summaries,
+                    result_rows=result_rows,
+                )
+                meta_pipeline_str = json.dumps(meta_blob, ensure_ascii=False) if meta_blob else None
+                if syn_err:
+                    synthesis_error = syn_err
+                if syn and isinstance(syn, dict) and (
+                    (syn.get("summary") or "").strip()
+                    or syn.get("failure_modes")
+                    or syn.get("prompt_fixes")
+                ):
+                    synthesis_report = syn
+                elif not synthesis_error:
+                    synthesis_error = "synthesis_empty_or_invalid"
+                BUS.publish(run_id, {"type": "progress", "phase": "synthesis", "ok": not synthesis_error})
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("run %s synthesis failed: %s", run_id, exc)
+                synthesis_error = str(exc)
+                BUS.publish(run_id, {"type": "progress", "phase": "synthesis", "error": synthesis_error})
+
         # ── PHASE 7: finalize ────────────────────────────────────────
         primary = side_summaries["A"]["stats"]
         duration_ms = int((time.monotonic() - started_mono) * 1000)
+
         db.finalize_eval_run(
             run_id,
             status="completed",
@@ -349,6 +457,12 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
             agg_overall_var=primary["var"],
             pair_winner=(pair_summary or {}).get("winner"),
             pair_winner_confidence=(pair_summary or {}).get("confidence"),
+            judge_agreement_mean_abs=agreement_mean,
+            synthesis_report_json=json.dumps(synthesis_report, ensure_ascii=False)
+            if synthesis_report
+            else None,
+            synthesis_error=synthesis_error,
+            meta_pipeline_json=meta_pipeline_str,
         )
 
         BUS.publish(

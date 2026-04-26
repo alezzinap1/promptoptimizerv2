@@ -184,6 +184,8 @@ class DBManager:
             self._migrate_phase18_onboarding_profile(conn)
             self._migrate_phase19_llm_review_cache(conn)
             self._migrate_phase20_eval_stability(conn)
+            self._migrate_phase21_eval_synthesis_dual_judge(conn)
+            self._migrate_phase22_eval_lineage_meta(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -591,6 +593,35 @@ class DBManager:
                 ON eval_runs(prompt_b_library_id);
             CREATE INDEX IF NOT EXISTS idx_eval_results_run
                 ON eval_results(run_id);
+            """
+        )
+
+    def _migrate_phase21_eval_synthesis_dual_judge(self, conn: sqlite3.Connection) -> None:
+        """Second judge (MVP-1.5), meta-synthesis report, per-output secondary reasoning."""
+        self._safe_add_column(conn, "eval_runs", "judge_secondary_model_id", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "run_synthesis", "INTEGER NOT NULL DEFAULT 1")
+        self._safe_add_column(conn, "eval_runs", "synthesis_model_id", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "synthesis_report_json", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "synthesis_error", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "judge_agreement_mean_abs", "REAL")
+        self._safe_add_column(conn, "eval_results", "judge_reasoning_secondary", "TEXT")
+
+    def _migrate_phase22_eval_lineage_meta(self, conn: sqlite3.Connection) -> None:
+        """Lineage fingerprints (C1/C2 trends) + persisted meta-analysis pipeline."""
+        self._safe_add_column(conn, "eval_runs", "prompt_fingerprint", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "task_fingerprint", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "rubric_fingerprint", "TEXT")
+        self._safe_add_column(conn, "eval_runs", "meta_pipeline_json", "TEXT")
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_eval_runs_lineage
+                ON eval_runs(
+                    user_id,
+                    prompt_fingerprint,
+                    task_fingerprint,
+                    rubric_fingerprint,
+                    created_at DESC
+                )
             """
         )
 
@@ -2481,6 +2512,12 @@ class DBManager:
         top_p: float | None = None,
         pair_judge_samples: int = 5,
         status: str = "queued",
+        judge_secondary_model_id: str | None = None,
+        run_synthesis: bool = True,
+        synthesis_model_id: str | None = None,
+        prompt_fingerprint: str | None = None,
+        task_fingerprint: str | None = None,
+        rubric_fingerprint: str | None = None,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
@@ -2493,7 +2530,9 @@ class DBManager:
                     target_model_id, judge_model_id, embedding_model_id,
                     rubric_id, rubric_snapshot_json,
                     n_runs, parallelism, temperature, top_p, pair_judge_samples,
-                    cost_preview_usd, cost_preview_tokens
+                    cost_preview_usd, cost_preview_tokens,
+                    judge_secondary_model_id, run_synthesis, synthesis_model_id,
+                    prompt_fingerprint, task_fingerprint, rubric_fingerprint
                 ) VALUES (
                     ?, ?, ?,
                     ?, ?, ?, ?,
@@ -2502,7 +2541,9 @@ class DBManager:
                     ?, ?, ?,
                     ?, ?,
                     ?, ?, ?, ?, ?,
-                    ?, ?
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?
                 )
                 """,
                 (
@@ -2514,6 +2555,12 @@ class DBManager:
                     rubric_id, json.dumps(rubric_snapshot, ensure_ascii=False),
                     int(n_runs), int(parallelism), float(temperature), top_p, int(pair_judge_samples),
                     float(cost_preview_usd), int(cost_preview_tokens),
+                    judge_secondary_model_id,
+                    1 if run_synthesis else 0,
+                    synthesis_model_id,
+                    prompt_fingerprint,
+                    task_fingerprint,
+                    rubric_fingerprint,
                 ),
             )
             return int(cur.lastrowid)  # type: ignore[return-value]
@@ -2526,6 +2573,11 @@ class DBManager:
             d["rubric_snapshot"] = json.loads(snap) if snap else {}
         except Exception:
             d["rubric_snapshot"] = {}
+        if "run_synthesis" in d:
+            try:
+                d["run_synthesis"] = bool(int(d["run_synthesis"]))
+            except (TypeError, ValueError):
+                d["run_synthesis"] = True
         return d
 
     def get_eval_run(self, run_id: int, user_id: int | None = None) -> dict | None:
@@ -2564,6 +2616,10 @@ class DBManager:
         pair_winner: str | None = None,
         pair_winner_confidence: float | None = None,
         error: str | None = None,
+        judge_agreement_mean_abs: float | None = None,
+        synthesis_report_json: str | None = None,
+        synthesis_error: str | None = None,
+        meta_pipeline_json: str | None = None,
     ) -> None:
         with self._conn() as conn:
             conn.execute(
@@ -2581,6 +2637,10 @@ class DBManager:
                     pair_winner = COALESCE(?, pair_winner),
                     pair_winner_confidence = COALESCE(?, pair_winner_confidence),
                     error = COALESCE(?, error),
+                    judge_agreement_mean_abs = COALESCE(?, judge_agreement_mean_abs),
+                    synthesis_report_json = COALESCE(?, synthesis_report_json),
+                    synthesis_error = COALESCE(?, synthesis_error),
+                    meta_pipeline_json = COALESCE(?, meta_pipeline_json),
                     finished_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
@@ -2591,6 +2651,10 @@ class DBManager:
                     agg_overall_p50, agg_overall_p10, agg_overall_p90, agg_overall_var,
                     pair_winner, pair_winner_confidence,
                     error,
+                    judge_agreement_mean_abs,
+                    synthesis_report_json,
+                    synthesis_error,
+                    meta_pipeline_json,
                     int(run_id),
                 ),
             )
@@ -2615,6 +2679,94 @@ class DBManager:
                 (int(library_id), int(library_id), max(1, limit)),
             ).fetchall()
         return [self._run_row_to_dict(r) for r in rows]
+
+    def list_eval_runs_series(
+        self,
+        user_id: int,
+        *,
+        prompt_fingerprint: str,
+        task_fingerprint: str,
+        rubric_fingerprint: str,
+        target_model_id: str | None = None,
+        status: str = "completed",
+        limit: int = 80,
+    ) -> list[dict]:
+        """Runs comparable on the same lineage key (C1/C2 trends)."""
+        lim = max(1, min(200, int(limit)))
+        with self._conn() as conn:
+            if target_model_id:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM eval_runs
+                    WHERE user_id = ? AND status = ?
+                      AND prompt_fingerprint = ? AND task_fingerprint = ? AND rubric_fingerprint = ?
+                      AND target_model_id = ?
+                    ORDER BY created_at ASC, id ASC
+                    LIMIT ?
+                    """,
+                    (
+                        int(user_id),
+                        status,
+                        prompt_fingerprint,
+                        task_fingerprint,
+                        rubric_fingerprint,
+                        target_model_id,
+                        lim,
+                    ),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM eval_runs
+                    WHERE user_id = ? AND status = ?
+                      AND prompt_fingerprint = ? AND task_fingerprint = ? AND rubric_fingerprint = ?
+                    ORDER BY created_at ASC, id ASC
+                    LIMIT ?
+                    """,
+                    (
+                        int(user_id),
+                        status,
+                        prompt_fingerprint,
+                        task_fingerprint,
+                        rubric_fingerprint,
+                        lim,
+                    ),
+                ).fetchall()
+        return [self._run_row_to_dict(r) for r in rows]
+
+    def backfill_eval_run_lineage(self, run_id: int) -> bool:
+        """Compute and store fingerprints if missing. Returns True if row updated."""
+        from services.eval.lineage import fingerprints_for_stored_run
+
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM eval_runs WHERE id = ?", (int(run_id),)).fetchone()
+            if not row:
+                return False
+            d = self._run_row_to_dict(row)
+            if d.get("prompt_fingerprint") and d.get("task_fingerprint") and d.get("rubric_fingerprint"):
+                return False
+            pfp, tfp, rfp = fingerprints_for_stored_run(d)
+            conn.execute(
+                """
+                UPDATE eval_runs
+                SET prompt_fingerprint = ?, task_fingerprint = ?, rubric_fingerprint = ?
+                WHERE id = ?
+                """,
+                (pfp, tfp, rfp, int(run_id)),
+            )
+            return True
+
+    def delete_eval_run(self, run_id: int, *, user_id: int | None = None) -> bool:
+        """Delete an eval run (results + judge scores cascade). Returns True on hit."""
+        with self._conn() as conn:
+            if user_id is None:
+                cur = conn.execute("DELETE FROM eval_runs WHERE id = ?", (int(run_id),))
+            else:
+                cur = conn.execute(
+                    "DELETE FROM eval_runs WHERE id = ? AND user_id = ?",
+                    (int(run_id), int(user_id)),
+                )
+            return bool(cur.rowcount)
 
     def mark_running_runs_failed(self, reason: str = "server restart") -> int:
         """Mark all currently 'running' runs as failed. Used on server startup recovery."""
@@ -2648,6 +2800,7 @@ class DBManager:
         judge_overall: float | None = None,
         judge_overall_secondary: float | None = None,
         judge_reasoning: str | None = None,
+        judge_reasoning_secondary: str | None = None,
         parsed_as_json: bool = False,
         parsed_top_fields: dict | None = None,
         error: str | None = None,
@@ -2663,14 +2816,16 @@ class DBManager:
                     output_text, output_tokens, input_tokens, latency_ms,
                     status, error, embedding_blob,
                     judge_overall, judge_overall_secondary, judge_reasoning,
+                    judge_reasoning_secondary,
                     parsed_as_json, parsed_top_fields_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     int(run_id), prompt_side, int(run_index),
                     output_text, int(output_tokens), int(input_tokens), latency_ms,
                     status, error, emb_blob,
                     judge_overall, judge_overall_secondary, judge_reasoning,
+                    judge_reasoning_secondary,
                     1 if parsed_as_json else 0,
                     json.dumps(parsed_top_fields, ensure_ascii=False) if parsed_top_fields else None,
                 ),
@@ -2756,4 +2911,21 @@ class DBManager:
                     dollars = dollars + excluded.dollars
                 """,
                 (int(user_id), date_utc, float(dollars)),
+            )
+
+    def get_user_eval_budget(self, user_id: int) -> float:
+        """Return the user's daily eval budget (USD)."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT eval_daily_budget_usd FROM users WHERE id = ?",
+                (int(user_id),),
+            ).fetchone()
+        return float(row["eval_daily_budget_usd"]) if row else 0.0
+
+    def update_user_eval_budget(self, user_id: int, dollars: float) -> None:
+        """Set the user's daily eval budget (USD)."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE users SET eval_daily_budget_usd = ? WHERE id = ?",
+                (float(dollars), int(user_id)),
             )
