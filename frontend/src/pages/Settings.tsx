@@ -62,6 +62,7 @@ export default function Settings() {
   const [clsMode, setClsMode] = useState<'heuristic' | 'llm'>('heuristic')
   const [clsModel, setClsModel] = useState('')
   const [imageTryModel, setImageTryModel] = useState('')
+  const [evalBudget, setEvalBudget] = useState<number>(5)
 
   useEffect(() => {
     api
@@ -79,6 +80,7 @@ export default function Settings() {
     setClsMode(settings.task_classification_mode === 'llm' ? 'llm' : 'heuristic')
     setClsModel(settings.task_classifier_model ?? '')
     setImageTryModel(settings.image_try_model ?? '')
+    if (typeof settings.eval_daily_budget_usd === 'number') setEvalBudget(settings.eval_daily_budget_usd)
   }, [settings])
 
   const handleSaveApiKey = async () => {
@@ -139,6 +141,20 @@ export default function Settings() {
       })
       setSettings(updated)
       setMessage({ type: 'ok', text: 'Классификация: сохранена' })
+    } catch (e) {
+      setMessage({ type: 'err', text: (e as Error).message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveEvalBudget = async () => {
+    setSaving(true)
+    setMessage(null)
+    try {
+      const updated = await api.updateSettings({ eval_daily_budget_usd: evalBudget })
+      setSettings(updated)
+      setMessage({ type: 'ok', text: 'Eval-бюджет: сохранено' })
     } catch (e) {
       setMessage({ type: 'err', text: (e as Error).message })
     } finally {
@@ -337,6 +353,34 @@ export default function Settings() {
               Сохранить
             </button>
           </LabelWithHint>
+        </section>
+
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Stability eval</h2>
+          <p className={styles.cardLead}>
+            Дневной лимит трат на запуски в режиме «Стабильность» (вкладка <Link to="/compare">A/B Сравнение</Link>).
+          </p>
+          <label className={styles.fieldStack}>
+            <span className={styles.labelText}>Бюджет, USD/день (макс. 50)</span>
+            <input
+              className={styles.input}
+              type="number"
+              min={0}
+              max={50}
+              step={0.25}
+              value={evalBudget}
+              onChange={(e) => setEvalBudget(Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
+              autoComplete="off"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={handleSaveEvalBudget}
+            disabled={saving || loading}
+            className={`${styles.btnPrimary} btn-primary`}
+          >
+            Сохранить
+          </button>
         </section>
 
         <section className={`${styles.card} ${styles.cardWide}`}>

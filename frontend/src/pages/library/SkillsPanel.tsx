@@ -196,7 +196,7 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
     persist(items.filter((it) => it.id !== id))
   }
 
-  const gridClass = gridCols === 4 ? styles.grid4 : styles.grid3
+  const masonryClass = gridCols === 4 ? `${libStyles.masonry} ${libStyles.masonry4}` : libStyles.masonry
   const chipTags = (it: SkillItem) => [...it.tags, ...it.frameworks]
 
   return (
@@ -346,9 +346,9 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
       ) : filtered.length === 0 ? (
         <p className={styles.empty}>Ничего не найдено — измените запрос.</p>
       ) : (
-        <div key={tagPaintTick} className={`${styles.grid} ${gridClass}`}>
+        <div key={tagPaintTick} className={masonryClass}>
           {sorted.map((it) => (
-            <div key={it.id} className={styles.card}>
+            <div key={it.id} className={`${styles.card} ${libStyles.cardMasonry}`}>
               <h3>{it.title}</h3>
               {it.description ? <p className={styles.desc}>{it.description}</p> : null}
               {chipTags(it).length > 0 ? <LibraryTagChips tags={chipTags(it)} /> : null}

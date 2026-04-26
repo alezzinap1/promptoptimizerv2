@@ -41,6 +41,36 @@ function tokenizeForDiff(line: string): string[] {
   return m ?? (line ? [line] : [])
 }
 
+function wordTokensOnly(line: string): string[] {
+  return tokenizeForDiff(line).filter((t) => /\S/.test(t))
+}
+
+/**
+ * Токенный LCS между двумя строками даёт читаемый результат только когда строки
+ * короткие и похожи (правка формулировок). При большом переписывании LCS «цепляется»
+ * за отдельные совпадения — в UI получается по одному слову в строке.
+ */
+const TOKEN_REFINE_MAX_CHARS = 200
+const TOKEN_REFINE_MAX_WORDS = 40
+const TOKEN_REFINE_MIN_WORD_OVERLAP = 0.45
+
+function shouldRefineDelInsPairWithTokens(oldLine: string, newLine: string): boolean {
+  if (oldLine.length > TOKEN_REFINE_MAX_CHARS || newLine.length > TOKEN_REFINE_MAX_CHARS) {
+    return false
+  }
+  const ta = wordTokensOnly(oldLine)
+  const tb = wordTokensOnly(newLine)
+  if (ta.length === 0 || tb.length === 0) return false
+  if (ta.length > TOKEN_REFINE_MAX_WORDS || tb.length > TOKEN_REFINE_MAX_WORDS) return false
+  const setB = new Set(tb.map((w) => w.toLowerCase()))
+  let common = 0
+  for (const w of ta) {
+    if (setB.has(w.toLowerCase())) common++
+  }
+  const overlap = common / Math.max(ta.length, tb.length)
+  return overlap >= TOKEN_REFINE_MIN_WORD_OVERLAP
+}
+
 function mergeAdjacentSameKind(ops: LineDiffOp[]): LineDiffOp[] {
   const out: LineDiffOp[] = []
   for (const op of ops) {
@@ -108,7 +138,7 @@ export function computeLineDiffOps(a: string, b: string): LineDiffOp[] {
 
 /**
  * Сначала построчный LCS, затем пары «одна удалённая / одна добавленная строка» без `\n` внутри
- * уточняются по токенам — меньше дублирования длинных абзацев в превью правок.
+ * при необходимости уточняются по токенам (только для коротких похожих строк — см. shouldRefine…).
  */
 export function computeRefinedLineDiffOps(a: string, b: string): LineDiffOp[] {
   const base = computeLineDiffOps(a, b)
@@ -118,7 +148,11 @@ export function computeRefinedLineDiffOps(a: string, b: string): LineDiffOp[] {
     const cur = base[k]!
     const nxt = base[k + 1]
     if (cur.kind === 'del' && nxt?.kind === 'ins' && !cur.text.includes('\n') && !nxt.text.includes('\n')) {
-      merged.push(...computeTokenDiffOps(cur.text, nxt.text))
+      if (shouldRefineDelInsPairWithTokens(cur.text, nxt.text)) {
+        merged.push(...computeTokenDiffOps(cur.text, nxt.text))
+      } else {
+        merged.push(cur, nxt)
+      }
       k += 2
     } else {
       merged.push(cur)

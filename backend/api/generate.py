@@ -39,7 +39,7 @@ from services.api_key_resolver import resolve_openrouter_api_key
 from core.context_gap import compute_context_gap, gap_missing_summary, get_questions_policy
 from core.task_classifier import classify_task, heuristic_classification_confidence
 from core.task_llm_classifier import classify_task_with_llm
-from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS, resolve_openrouter_model_id
 from services.model_router import resolve as tier_resolve
 from services.openrouter_models import get_model_pricing, completion_price_per_m
 from services.prompt_workflow import (
@@ -422,15 +422,6 @@ def _build_answers_text(question_answers: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _get_openrouter_model_id(provider: str) -> str:
-    """Resolve provider short name to OpenRouter model id."""
-    if provider in PROVIDER_MODELS:
-        return PROVIDER_MODELS[provider]
-    if "/" in provider:
-        return provider
-    return provider
-
-
 _VALID_TIERS = {"auto", "fast", "mid", "advanced"}
 
 
@@ -598,7 +589,7 @@ def _estimate_generation_input(
         task_classification=classification,
     )
 
-    gen_model_id = _get_openrouter_model_id(req.gen_model)
+    gen_model_id = resolve_openrouter_model_id(req.gen_model)
     main_tokens = count_tokens(system_prompt + "\n\n" + user_content, gen_model_id)["tokens"]
     input_token_estimate = main_tokens + scene_extra_tokens
 
@@ -682,7 +673,7 @@ def generate_prompt(
                 402,
                 f"Пробный лимит ({lim:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках для продолжения.",
             )
-        model_id = _get_openrouter_model_id(req.gen_model)
+        model_id = resolve_openrouter_model_id(req.gen_model)
         comp_per_m = completion_price_per_m(model_id)
         if comp_per_m > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(
@@ -721,13 +712,13 @@ def generate_prompt(
         if cls_mode == "llm":
             cls_provider = cls_model_pref or PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
             if using_host_key:
-                cmid = _get_openrouter_model_id(cls_provider)
+                cmid = resolve_openrouter_model_id(cls_provider)
                 if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
                     cls_provider = PROVIDER_MODELS.get("gemini_flash", "google/gemini-flash-1.5")
             classification = classify_task_with_llm(llm, cls_provider, req.task_input)
             if using_host_key:
                 c_raw = len(req.task_input) + 400
-                model_id = _get_openrouter_model_id(cls_provider)
+                model_id = resolve_openrouter_model_id(cls_provider)
                 pr, cp = get_model_pricing(model_id)
                 db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
         else:
@@ -832,7 +823,7 @@ def generate_prompt(
         scene_user = _scene_analysis_user_text(req.task_input, clarification_answers_text, req.feedback)
         spa = _scene_analysis_provider(using_host_key)
         if using_host_key:
-            cmid = _get_openrouter_model_id(spa)
+            cmid = resolve_openrouter_model_id(spa)
             if completion_price_per_m(cmid) > TRIAL_MAX_COMPLETION_PER_M:
                 spa = "gemini_flash"
         # Несколько провайдеров: старая модель на OpenRouter может отвалиться → не роняем весь /generate
@@ -859,7 +850,7 @@ def generate_prompt(
             )
         if using_host_key and raw_scene:
             c_raw = len(SCENE_ANALYSIS_SYSTEM) + len(scene_user) + len(raw_scene) + 200
-            model_id = _get_openrouter_model_id(used_sp)
+            model_id = resolve_openrouter_model_id(used_sp)
             pr, cp = get_model_pricing(model_id)
             db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
 
@@ -919,7 +910,7 @@ def generate_prompt(
         task_classification=classification,
     )
 
-    gen_model_id = _get_openrouter_model_id(req.gen_model)
+    gen_model_id = resolve_openrouter_model_id(req.gen_model)
     input_token_estimate = count_tokens(system_prompt + "\n\n" + user_content, gen_model_id)["tokens"]
 
     started_at = time.perf_counter()
@@ -945,7 +936,7 @@ def generate_prompt(
     ):
         q_provider = _scene_analysis_provider(using_host_key)
         if using_host_key:
-            cmid_q = _get_openrouter_model_id(q_provider)
+            cmid_q = resolve_openrouter_model_id(q_provider)
             if completion_price_per_m(cmid_q) > TRIAL_MAX_COMPLETION_PER_M:
                 q_provider = "gemini_flash"
         max_q = int(questions_policy.get("max_questions") or 2)
@@ -1018,7 +1009,7 @@ def generate_prompt(
                 questions_enforced = True
                 if using_host_key:
                     c_raw = len(contract_sys) + len(contract_user) + len(q_pass) + 120
-                    model_id = _get_openrouter_model_id(q_provider)
+                    model_id = resolve_openrouter_model_id(q_provider)
                     pr, cp = get_model_pricing(model_id)
                     db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
         except Exception:
@@ -1061,7 +1052,7 @@ def generate_prompt(
         prompt_tokens = int(metrics.get("token_estimate", 0) or 0)
         completion_tokens = max(0, len(full_text) // 4)
         total_tokens = prompt_tokens + completion_tokens
-        model_id = _get_openrouter_model_id(req.gen_model)
+        model_id = resolve_openrouter_model_id(req.gen_model)
         prompt_price, comp_price = get_model_pricing(model_id)
         cost = (prompt_tokens * prompt_price) + (completion_tokens * comp_price)
         db.add_user_usage(user_id, total_tokens, cost)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
 import MarkdownOutput from '../components/MarkdownOutput'
@@ -12,6 +12,14 @@ import { EXPERT_GENERATION_TEMPERATURE_CAP } from '../lib/expertLevelPresets'
 import { shortGenerationModelLabel } from '../utils/generationModelLabel'
 import styles from './Compare.module.css'
 import pageStyles from '../styles/PageShell.module.css'
+import StabilityTab, { type StabilityDeepLink } from './eval/StabilityTab'
+
+type CompareLocationState = {
+  taskInput?: string
+  promptA?: string
+  promptB?: string
+  stability?: StabilityDeepLink
+} | null
 
 /*
  * Compare v2 — three-mode side-by-side workspace.
@@ -30,7 +38,7 @@ import pageStyles from '../styles/PageShell.module.css'
  * Spec: docs/superpowers/specs/2026-04-16-product-ux-visual-design.md §9.
  */
 
-type Mode = 'techniques' | 'prompts' | 'models'
+type Mode = 'techniques' | 'prompts' | 'stability' | 'models'
 
 interface VariantCore {
   prompt: string
@@ -69,12 +77,23 @@ function tokenEstimate(metrics: Record<string, unknown> | undefined, fallback: s
   return Math.max(1, Math.round(fallback.length / 4))
 }
 
+function modeFromSearch(sp: URLSearchParams): Mode | null {
+  return sp.get('mode') === 'stability' ? 'stability' : null
+}
+
 export default function Compare() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Shared
-  const [mode, setMode] = useState<Mode>('techniques')
+  const [mode, setMode] = useState<Mode>(() => {
+    if (typeof window !== 'undefined') {
+      const fromUrl = modeFromSearch(new URLSearchParams(window.location.search))
+      if (fromUrl) return fromUrl
+    }
+    return 'techniques'
+  })
   const [modelsMap, setModelsMap] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
   const [preferredTargetModels, setPreferredTargetModels] = useState<string[]>(['unknown'])
@@ -110,9 +129,14 @@ export default function Compare() {
   const [judgeError, setJudgeError] = useState<string | null>(null)
   const [judgeOn, setJudgeOn] = useState<'prompts' | 'outputs'>('prompts')
 
+  useEffect(() => {
+    const fromUrl = modeFromSearch(searchParams)
+    if (fromUrl) setMode(fromUrl)
+  }, [searchParams])
+
   // Bootstrap: settings, models, techniques
   useEffect(() => {
-    const state = location.state as { taskInput?: string; promptA?: string; promptB?: string } | null
+    const state = location.state as CompareLocationState
     if (state?.taskInput) setTaskInput(state.taskInput)
     if (state?.promptA) setPastedA(state.promptA)
     if (state?.promptB) setPastedB(state.promptB)
@@ -380,6 +404,7 @@ export default function Compare() {
       {([
         { id: 'techniques' as const, label: 'Техники', hint: 'одна задача, два набора техник' },
         { id: 'prompts' as const, label: 'Промпты', hint: 'вставьте два готовых промпта' },
+        { id: 'stability' as const, label: 'Стабильность', hint: 'N-runs + LLM-судья, оценка надёжности' },
         { id: 'models' as const, label: 'Модели', hint: 'coming soon' },
       ]).map((m) => (
         <button
@@ -391,6 +416,15 @@ export default function Compare() {
           onClick={() => {
             if (m.id === 'models') return
             setMode(m.id)
+            setSearchParams(
+              (prev) => {
+                const next = new URLSearchParams(prev)
+                if (m.id === 'stability') next.set('mode', 'stability')
+                else next.delete('mode')
+                return next
+              },
+              { replace: true },
+            )
             resetResults()
             setError(null)
           }}
@@ -410,13 +444,24 @@ export default function Compare() {
         <div>
           <h1 className="pageTitleGradient">A/B Сравнение</h1>
           <p className={pageStyles.panelSubtitle}>
-            Три режима: по техникам, по готовым промптам, по моделям. После генерации — прогон на целевой модели, diff и судья.
+            {mode === 'stability'
+              ? 'Многократный прогон одного или пары промптов, LLM-судья и метрики стабильности. История и отчёты — в Eval Studio.'
+              : 'Режимы: техники, готовые промпты и (скоро) модели. После генерации — прогон на целевой модели, diff и судья.'}
           </p>
         </div>
         {(loading || runningOutputs) && <span className={pageStyles.infoBadge}>Работаю…</span>}
       </div>
 
       {renderModeTabs()}
+
+      {mode === 'stability' && (
+        <StabilityTab
+          generationModels={generationOptions}
+          initialPromptA={pastedA || (workspace?.a.prompt ?? '')}
+          initialPromptB={pastedB || (workspace?.b.prompt ?? '')}
+          deepLink={(location.state as CompareLocationState)?.stability ?? null}
+        />
+      )}
 
       {mode === 'techniques' && (
         <>

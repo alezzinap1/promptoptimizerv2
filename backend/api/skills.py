@@ -11,18 +11,13 @@ from config.settings import TRIAL_MAX_COMPLETION_PER_M
 from backend.deps import check_user_rate_limit, get_current_user, get_db, get_session_id
 from services.trial_budget import effective_trial_tokens_limit
 from db.manager import DBManager
-from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS, resolve_openrouter_model_id
 from services.api_key_resolver import resolve_openrouter_api_key
 from services.openrouter_models import completion_price_per_m, get_model_pricing
 from services.user_preferences import get_user_preferences_payload
 
 router = APIRouter()
 
-
-def _get_openrouter_model_id(provider: str) -> str:
-    if provider in PROVIDER_MODELS:
-        return PROVIDER_MODELS[provider]
-    return provider if "/" in provider else provider
 
 SKILL_GEN_SYSTEM_PROMPT = """You are a senior prompt engineer who designs reusable "skills" for AI assistants (ChatGPT, Claude, Cursor, custom agents).
 
@@ -252,7 +247,7 @@ def skill_sandbox_chat(
     gen_list = payload.get("preferred_generation_models") or []
     gen_model = (req.gen_model or "").strip() or (gen_list[0] if gen_list else DEFAULT_PROVIDER)
     if using_host_key:
-        model_id = _get_openrouter_model_id(gen_model)
+        model_id = resolve_openrouter_model_id(gen_model)
         if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(
                 403,
@@ -278,7 +273,7 @@ def skill_sandbox_chat(
         prompt_tokens = int(len(body + msg) // 4) + 80
         completion_tokens = max(0, len(reply) // 4)
         total_tokens = prompt_tokens + completion_tokens
-        mid = _get_openrouter_model_id(gen_model)
+        mid = resolve_openrouter_model_id(gen_model)
         pp, cp = get_model_pricing(mid)
         cost = (prompt_tokens * pp) + (completion_tokens * cp)
         db.add_user_usage(user_id, total_tokens, cost)

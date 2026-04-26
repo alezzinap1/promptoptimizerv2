@@ -1,14 +1,18 @@
 """Settings API — get/update app settings (API key, etc.)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from backend.deps import get_current_user, get_db
 from db.manager import DBManager
 from services.user_preferences import update_user_preferences_payload, get_user_preferences_payload
 
 router = APIRouter()
+
+# Hard cap so a typo doesn't authorize a runaway $1000 spend. Users with real
+# need can still bump this in the DB directly.
+EVAL_DAILY_BUDGET_MAX_USD = 50.0
 
 
 @router.get("/settings")
@@ -17,7 +21,9 @@ def get_settings(
     db: DBManager = Depends(get_db),
 ):
     """Return current settings (masked). Per-user API key."""
-    return get_user_preferences_payload(db, int(user["id"]))
+    payload = get_user_preferences_payload(db, int(user["id"]))
+    payload["eval_daily_budget_usd"] = float(db.get_user_eval_budget(int(user["id"])))
+    return payload
 
 
 class SettingsUpdate(BaseModel):
@@ -34,6 +40,7 @@ class SettingsUpdate(BaseModel):
     image_try_model: str | None = None  # OpenRouter id (e.g. google/gemini-2.5-flash-image) or short key
     user_goal: str | None = None  # work | study | own | '' (from 3-step onboarding)
     default_tier: str | None = None  # auto | fast | mid | advanced | ''
+    eval_daily_budget_usd: float | None = Field(None, ge=0.0, le=EVAL_DAILY_BUDGET_MAX_USD)
 
 
 @router.patch("/settings")
@@ -45,6 +52,8 @@ def update_settings(
     """Update settings. openrouter_api_key is per-user."""
     if req.openrouter_api_key is not None:
         db.set_user_openrouter_api_key(int(user["id"]), req.openrouter_api_key)
+    if req.eval_daily_budget_usd is not None:
+        db.update_user_eval_budget(int(user["id"]), float(req.eval_daily_budget_usd))
     prefs = update_user_preferences_payload(
         db,
         int(user["id"]),
@@ -61,4 +70,5 @@ def update_settings(
         user_goal=req.user_goal,
         default_tier=req.default_tier,
     )
+    prefs["eval_daily_budget_usd"] = float(db.get_user_eval_budget(int(user["id"])))
     return prefs

@@ -314,6 +314,46 @@
   }
 }
 
+/* Промпты: лента как в Сообществе — masonry, без «ровных рядов» */
+.masonry {
+  column-count: 3;
+  column-gap: 16px;
+}
+
+.masonry4 {
+  column-count: 4;
+}
+
+@media (max-width: 1280px) {
+  .masonry4 {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .masonry,
+  .masonry4 {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .masonry,
+  .masonry4 {
+    column-count: 1;
+  }
+}
+
+.cardMasonry {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 16px;
+  width: 100%;
+  display: inline-block;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
 .card {
   padding: 20px;
   background: var(--panel);
@@ -323,6 +363,82 @@
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+}
+
+.cardWithCover {
+  padding: 0;
+  overflow: hidden;
+}
+
+.libHero {
+  position: relative;
+  min-height: 160px;
+  max-height: 280px;
+  width: 100%;
+}
+
+.libHeroImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.libHeroGrad {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.88) 0%,
+    rgba(0, 0, 0, 0.45) 40%,
+    transparent 72%
+  );
+}
+
+.libHeroOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 12px 14px 10px;
+}
+
+.libHeroTitle {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+}
+
+.libHeroTitle:hover {
+  color: color-mix(in srgb, #fff 92%, var(--primary));
+}
+
+.libCardBody {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Обёртка без визуального эффекта: контент карточки остается прямым ребёнком .card */
+.cardBodyFlat {
+  display: contents;
 }
 
 .card::before {

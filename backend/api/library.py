@@ -14,7 +14,7 @@ from core.quality_metrics import analyze_prompt
 from db.manager import DBManager
 from services import translator
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS, resolve_openrouter_model_id
 from services.llm_review_hints import extract_llm_review_hints
 from services.openrouter_models import completion_price_per_m, get_model_pricing
 
@@ -107,9 +107,7 @@ def update_library(
 
 
 def _or_model_id(provider: str) -> str:
-    if provider in PROVIDER_MODELS:
-        return PROVIDER_MODELS[provider]
-    return provider if "/" in provider else provider
+    return resolve_openrouter_model_id(provider)
 
 
 class LlmReviewRequest(BaseModel):

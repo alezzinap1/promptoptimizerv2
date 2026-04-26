@@ -22,18 +22,13 @@ from core.quality_metrics import analyze_prompt
 from core.task_classifier import classify_task
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS, resolve_openrouter_model_id
 from services.openrouter_models import get_model_pricing, completion_price_per_m
 
 router = APIRouter()
 
 _GENERATION_TEMPERATURE_CAP = 0.85
 
-
-def _get_openrouter_model_id(provider: str) -> str:
-    if provider in PROVIDER_MODELS:
-        return PROVIDER_MODELS[provider]
-    return provider if "/" in provider else provider
 
 def _score(metrics: dict) -> float:
     return float(metrics.get("completeness_score", metrics.get("quality_score", 0.0)))
@@ -79,7 +74,7 @@ def compare_prompts(
         lim = effective_trial_tokens_limit(usage)
         if usage["tokens_used"] >= lim:
             raise HTTPException(402, f"Пробный лимит ({lim:,} токенов) исчерпан. Введите свой API ключ в Настройках.")
-        model_id = _get_openrouter_model_id(req.gen_model)
+        model_id = resolve_openrouter_model_id(req.gen_model)
         if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(403, f"Модель недоступна в пробном режиме. Введите свой API ключ в Настройках.")
 
@@ -150,7 +145,7 @@ def compare_prompts(
     winner = "a" if score_a > score_b else "b" if score_b > score_a else "tie"
 
     if using_host_key:
-        model_id = _get_openrouter_model_id(req.gen_model)
+        model_id = resolve_openrouter_model_id(req.gen_model)
         prompt_price, comp_price = get_model_pricing(model_id)
         input_len = len(system_a) + len(system_b) + 2 * len(user_content)
         output_len = len(result_a_text) + len(result_b_text)
@@ -232,7 +227,7 @@ def compare_run_on_target(
         raise HTTPException(500, "OpenRouter API key not set. Введите свой ключ в Настройках.")
 
     using_host_key = not bool(user_key)
-    model_id = _get_openrouter_model_id(target)
+    model_id = resolve_openrouter_model_id(target)
     if using_host_key:
         usage = db.get_user_usage(user_id)
         lim = effective_trial_tokens_limit(usage)
@@ -313,7 +308,7 @@ def compare_llm_judge(
         lim = effective_trial_tokens_limit(usage)
         if usage["tokens_used"] >= lim:
             raise HTTPException(402, "Пробный лимит токенов исчерпан. Введите свой API ключ.")
-        mid = _get_openrouter_model_id(judge)
+        mid = resolve_openrouter_model_id(judge)
         if completion_price_per_m(mid) > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(403, "Модель судьи недоступна в пробном режиме. Укажите дешёвую модель или свой ключ.")
 
@@ -327,7 +322,7 @@ def compare_llm_judge(
     )
 
     if using_host_key:
-        model_id = _get_openrouter_model_id(judge)
+        model_id = resolve_openrouter_model_id(judge)
         inp = len(req.task_input) + len(req.prompt_a) + len(req.prompt_b) + 2000
         out = len(result.get("reasoning") or "") + 200
         pr, cp = get_model_pricing(model_id)

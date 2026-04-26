@@ -14,7 +14,7 @@ from services.trial_budget import effective_trial_tokens_limit
 from db.manager import DBManager
 from prompts import load_prompt
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS, resolve_openrouter_model_id
 from services.openrouter_models import completion_price_per_m
 from services.user_preferences import get_user_preferences_payload
 
@@ -22,12 +22,6 @@ router = APIRouter()
 
 PREVIEW_EDIT_SYSTEM = load_prompt("backend/preview_edit_system.txt")
 PREVIEW_EDIT_MAX_OUT = 8192
-
-
-def _get_openrouter_model_id(provider: str) -> str:
-    if provider in PROVIDER_MODELS:
-        return PROVIDER_MODELS[provider]
-    return provider if "/" in provider else provider
 
 
 def _strip_fenced_output(raw: str) -> str:
@@ -98,7 +92,7 @@ def preview_edit(
     gen_list = payload.get("preferred_generation_models") or []
     gen_model = (req.gen_model or "").strip() or (gen_list[0] if gen_list else DEFAULT_PROVIDER)
     if using_host_key:
-        model_id = _get_openrouter_model_id(gen_model)
+        model_id = resolve_openrouter_model_id(gen_model)
         if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(
                 403,
@@ -131,7 +125,7 @@ def preview_edit(
         total_tokens = prompt_tokens + completion_tokens
         from services.openrouter_models import get_model_pricing
 
-        mid = _get_openrouter_model_id(gen_model)
+        mid = resolve_openrouter_model_id(gen_model)
         pp, cp = get_model_pricing(mid)
         cost = (prompt_tokens * pp) + (completion_tokens * cp)
         db.add_user_usage(user_id, total_tokens, cost)

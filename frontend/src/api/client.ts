@@ -424,6 +424,8 @@ export interface Settings {
   user_goal?: '' | 'work' | 'study' | 'own'
   /** Тир по умолчанию для Studio/Simple Improve. Пусто — авто-логика по платформе. */
   default_tier?: '' | 'auto' | 'fast' | 'mid' | 'advanced'
+  /** Дневной бюджет на запуски Stability evaluation, USD. */
+  eval_daily_budget_usd?: number
 }
 
 export interface SimpleImproveResponse {
@@ -769,6 +771,7 @@ export const api = {
     image_try_model?: string
     user_goal?: '' | 'work' | 'study' | 'own'
     default_tier?: '' | 'auto' | 'fast' | 'mid' | 'advanced'
+    eval_daily_budget_usd?: number
   }) =>
     fetchApi<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(req) }),
 

@@ -14,7 +14,7 @@ def test_single_run_basic_breakdown() -> None:
         embedding_model_id="openai/text-embedding-3-small",
         expected_output_tokens=200,
     )
-    for key in ("target", "judge", "embedding", "total_tokens", "total_usd", "pricing_status"):
+    for key in ("target", "judge", "synthesis", "embedding", "total_tokens", "total_usd", "pricing_status"):
         assert key in out
     for sub in ("target", "judge"):
         assert {"input_tokens", "output_tokens", "usd"} <= set(out[sub].keys())
@@ -47,6 +47,7 @@ def test_more_n_runs_costs_more() -> None:
         judge_model_id="openai/gpt-4o-mini",
         embedding_model_id="openai/text-embedding-3-small",
         expected_output_tokens=100,
+        run_synthesis=False,
     )
     five = estimate_run_cost(n_runs=5, **base)
     twenty = estimate_run_cost(n_runs=20, **base)

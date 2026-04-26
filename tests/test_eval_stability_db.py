@@ -86,6 +86,12 @@ def test_phase20_eval_runs_has_required_columns() -> None:
         "error",
         "created_at",
         "finished_at",
+        "judge_secondary_model_id",
+        "run_synthesis",
+        "synthesis_model_id",
+        "synthesis_report_json",
+        "synthesis_error",
+        "judge_agreement_mean_abs",
     }
     missing = required - cols
     assert not missing, f"eval_runs is missing columns: {missing}"
@@ -109,6 +115,7 @@ def test_phase20_eval_results_has_required_columns() -> None:
         "judge_overall",
         "judge_overall_secondary",
         "judge_reasoning",
+        "judge_reasoning_secondary",
         "parsed_as_json",
         "parsed_top_fields_json",
         "created_at",

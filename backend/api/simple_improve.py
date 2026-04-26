@@ -18,18 +18,12 @@ from core.simple_improve import (
 )
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS
+from services.llm_client import LLMClient, DEFAULT_PROVIDER, PROVIDER_MODELS, resolve_openrouter_model_id
 from services.openrouter_models import get_model_pricing, completion_price_per_m
 from services.user_preferences import get_user_preferences_payload
 from services.model_router import resolve as resolve_tier_model
 
 router = APIRouter()
-
-
-def _get_openrouter_model_id(provider: str) -> str:
-    if provider in PROVIDER_MODELS:
-        return PROVIDER_MODELS[provider]
-    return provider if "/" in provider else provider
 
 
 class SimpleImproveRequest(BaseModel):
@@ -96,7 +90,7 @@ def simple_improve(
                 402,
                 f"Пробный лимит ({lim:,} токенов) исчерпан. Введите свой API ключ OpenRouter в Настройках.",
             )
-        model_id = _get_openrouter_model_id(gen_model)
+        model_id = resolve_openrouter_model_id(gen_model)
         if completion_price_per_m(model_id) > TRIAL_MAX_COMPLETION_PER_M:
             raise HTTPException(
                 403,
@@ -141,7 +135,7 @@ def simple_improve(
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
 
     if using_host_key:
-        model_id = _get_openrouter_model_id(gen_model)
+        model_id = resolve_openrouter_model_id(gen_model)
         prompt_chars = len(system_prompt) + len(user_message)
         prompt_tokens_est = max(1, prompt_chars // 4)
         completion_tokens_est = max(1, len(improved) // 4)

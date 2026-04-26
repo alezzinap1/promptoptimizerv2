@@ -90,13 +90,13 @@ export default function LibraryHub() {
     <div className={hubStyles.hub}>
       <div className={hubStyles.titleRow}>
         <h1 className={`pageTitleGradient ${hubStyles.title}`}>Библиотека</h1>
-        <div className={hubStyles.gridToggle} role="group" aria-label="Количество колонок сетки">
+        <div className={hubStyles.gridToggle} role="group" aria-label="Плотность ленты промптов и скиллов">
           <button
             type="button"
             className={gridCols === 3 ? hubStyles.gridToggleBtnActive : hubStyles.gridToggleBtn}
             aria-pressed={gridCols === 3}
             onClick={() => setGrid(3)}
-            title="Три колонки"
+            title="Лента: три колонки (masonry)"
           >
             <svg width="14" height="14" viewBox="0 0 12 12"><rect x="0" y="0" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="4.5" y="0" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="9" y="0" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="0" y="7" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="4.5" y="7" width="3" height="5" rx="0.5" fill="currentColor"/><rect x="9" y="7" width="3" height="5" rx="0.5" fill="currentColor"/></svg>
           </button>
@@ -105,7 +105,7 @@ export default function LibraryHub() {
             className={gridCols === 4 ? hubStyles.gridToggleBtnActive : hubStyles.gridToggleBtn}
             aria-pressed={gridCols === 4}
             onClick={() => setGrid(4)}
-            title="Четыре колонки"
+            title="Лента: четыре колонки (masonry)"
           >
             <svg width="14" height="14" viewBox="0 0 12 12"><rect x="0" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="3.25" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="6.5" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="9.75" y="0" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="0" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="3.25" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="6.5" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/><rect x="9.75" y="7" width="2.25" height="5" rx="0.5" fill="currentColor"/></svg>
           </button>

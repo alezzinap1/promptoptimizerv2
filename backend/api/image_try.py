@@ -18,7 +18,7 @@ from backend.deps import check_user_rate_limit, get_current_user, get_db, get_se
 from services.trial_budget import effective_trial_tokens_limit
 from db.manager import DBManager
 from services.api_key_resolver import resolve_openrouter_api_key
-from services.llm_client import PROVIDER_MODELS
+from services.llm_client import PROVIDER_MODELS, resolve_openrouter_model_id
 from services.openrouter_image import DEFAULT_IMAGE_TRY_MODEL, generate_image_data_url
 from services.openrouter_models import completion_price_per_m, get_model_pricing
 from io import BytesIO
@@ -60,9 +60,9 @@ def _resolve_image_try_model(
     if not raw_m:
         return fallback
     if raw_m in PROVIDER_MODELS:
-        return PROVIDER_MODELS[raw_m]
+        return resolve_openrouter_model_id(raw_m)
     if "/" in raw_m:
-        return raw_m
+        return resolve_openrouter_model_id(raw_m)
     return fallback
 
 

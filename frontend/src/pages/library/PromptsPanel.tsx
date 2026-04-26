@@ -9,6 +9,7 @@ import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
 import { useT } from '../../i18n'
 import { getStartersForGoal, type StarterGoal } from '../../lib/starterPrompts'
+import EvalBadge from '../eval/EvalBadge'
 import styles from '../Library.module.css'
 
 type LibraryView = 'all' | 'recent' | 'best' | 'stale' | 'untagged'
@@ -262,7 +263,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
     }
   }
 
-  const gridClass = gridCols === 4 ? styles.grid4 : styles.grid3
+  const masonryClass = gridCols === 4 ? `${styles.masonry} ${styles.masonry4}` : styles.masonry
 
   const displayPromptFor = (item: LibraryItem): { text: string; lang: string } => {
     const view = langView[item.id] || 'primary'
@@ -427,7 +428,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
       ) : items.length === 0 ? (
         <p className={styles.empty}>Нет сохранённых промптов</p>
       ) : (
-        <div key={tagPaintTick} className={`${styles.grid} ${gridClass}`}>
+        <div key={tagPaintTick} className={masonryClass}>
           {sorted.map((item) => {
             const { text: promptText, lang: promptLang } = displayPromptFor(item)
             const hasAlt = Boolean((item.prompt_alt || '').trim())
@@ -436,30 +437,58 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
               currentView === 'primary'
                 ? (item.prompt_alt_lang || '').toUpperCase()
                 : (item.prompt_lang || '').toUpperCase()
+            const hasCover = Boolean(item.cover_image_path)
             return (
-            <div key={item.id} className={styles.card}>
-              <button
-                type="button"
-                className={styles.cardTitleBtn}
-                title="Открыть на Студии с этим промптом"
-                onClick={() =>
-                  navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true } })
-                }
-              >
-                {item.title}
-              </button>
-              {item.created_at ? (
-                <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
-              ) : null}
-              {item.cover_image_path ? (
-                <div className={styles.libraryCoverWrap}>
+            <div
+              key={item.id}
+              className={`${styles.card} ${styles.cardMasonry} ${hasCover ? styles.cardWithCover : ''}`}
+            >
+              {hasCover ? (
+                <div className={styles.libHero}>
                   <img
-                    className={styles.libraryCoverImg}
-                    src={item.cover_image_path}
+                    className={styles.libHeroImg}
+                    src={item.cover_image_path!}
                     alt=""
                     loading="lazy"
                   />
+                  <div className={styles.libHeroGrad} aria-hidden />
+                  <div className={styles.libHeroOverlay}>
+                    <button
+                      type="button"
+                      className={styles.libHeroTitle}
+                      title="Открыть на Студии с этим промптом"
+                      onClick={() =>
+                        navigate('/home', {
+                          state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true },
+                        })
+                      }
+                    >
+                      {item.title}
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.cardTitleBtn}
+                    title="Открыть на Студии с этим промптом"
+                    onClick={() =>
+                      navigate('/home', {
+                        state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true },
+                      })
+                    }
+                  >
+                    {item.title}
+                  </button>
+                  {item.created_at ? (
+                    <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
+                  ) : null}
+                </>
+              )}
+              <div className={hasCover ? styles.libCardBody : styles.cardBodyFlat}>
+              {hasCover && item.created_at ? (
+                <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
               ) : null}
               <p className={styles.meta}>
                 <span className={styles.taskTypeLabel} title="Тип задачи при сохранении">
@@ -470,6 +499,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                     🎨
                   </span>
                 )}
+                <EvalBadge libraryId={item.id} />
                 {item.target_model && item.target_model !== 'unknown' && (
                   <span className={styles.modelBadge} title="Целевая модель">
                     {item.target_model}
@@ -586,6 +616,28 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                     </button>
                     <button
                       type="button"
+                      className={styles.cardMoreItem}
+                      onClick={() =>
+                        navigate(
+                          { pathname: '/compare', search: '?mode=stability' },
+                          {
+                            state: {
+                              stability: {
+                                libraryIdA: item.id,
+                                promptA: promptText,
+                                taskInput:
+                                  (item.notes || '').trim() ||
+                                  'Следуй инструкциям промпта и ответь на типичный запрос в рамках этой задачи. Контекст можно уточнить в поле «Задача».',
+                              },
+                            },
+                          },
+                        )
+                      }
+                    >
+                      Стабильность (N-runs)…
+                    </button>
+                    <button
+                      type="button"
                       className={`${styles.cardMoreItem} ${styles.cardMoreDanger}`}
                       onClick={async () => {
                         await api.deleteLibrary(item.id)
@@ -680,6 +732,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   </div>
                 </div>
               )}
+              </div>
             </div>
             )
           })}

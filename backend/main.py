@@ -34,6 +34,7 @@ from backend.api import (
     compare,
     config,
     demo,
+    eval_stability,
     generate,
     image_try,
     preview_edit,
@@ -87,6 +88,7 @@ api_app.include_router(demo.router, tags=["demo"])
 api_app.include_router(techniques.router, tags=["techniques"])
 api_app.include_router(tokenizer.router, tags=["tokenizer"])
 api_app.include_router(image_meta.router, tags=["meta"])
+api_app.include_router(eval_stability.router, tags=["eval-stability"])
 
 
 @api_app.get("/health")
@@ -114,6 +116,31 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.mount("/api", api_app)
+
+
+@app.on_event("startup")
+def _eval_recover_running_runs() -> None:
+    """Mark any 'running' eval runs as failed on server startup.
+
+    Without this, a crash mid-run leaves rows stuck in 'running' forever and
+    the SSE endpoint would wait for events that never come. Best-effort: any
+    error is logged but doesn't block startup.
+    """
+    try:
+        import config.settings as _cfg
+        from db.manager import DBManager
+
+        db = DBManager(db_path=_cfg.DB_PATH)
+        db.init()
+        n = db.mark_running_runs_failed(reason="server restart")
+        if n:
+            import logging
+
+            logging.getLogger(__name__).info("eval: recovered %d stuck running runs", n)
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).exception("eval: failed to recover running runs on startup")
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")

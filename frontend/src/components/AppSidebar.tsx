@@ -11,6 +11,13 @@ const CompareIcon = () => (
   </svg>
 )
 
+const EvalIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3v18h18" />
+    <path d="M7 16l4-6 4 4 5-9" />
+  </svg>
+)
+
 const LibraryIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -122,6 +129,16 @@ export default function AppSidebar({
                 <CompareIcon />
               </span>
               <span className={styles.label}>Сравнение A/B</span>
+            </NavLink>
+            <NavLink
+              to="/eval"
+              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              title="Eval Studio — стабильность и отчёты"
+            >
+              <span className={styles.icon} aria-hidden>
+                <EvalIcon />
+              </span>
+              <span className={styles.label}>Eval Studio</span>
             </NavLink>
           </div>
 

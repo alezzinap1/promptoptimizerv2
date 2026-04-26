@@ -20,6 +20,7 @@ import Techniques from './pages/Techniques'
 import SimpleImprove from './pages/SimpleImprove'
 import Community from './pages/Community'
 import Help from './pages/Help'
+import EvalStudio from './pages/EvalStudio'
 import Onboarding from './pages/Onboarding'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminUserDetail from './pages/admin/AdminUserDetail'
@@ -83,6 +84,7 @@ function AppShell() {
         <Route path="/admin/community" element={<RequireAuth><AdminCommunity /></RequireAuth>} />
         <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
         <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
+        <Route path="/eval" element={<RequireAuth><EvalStudio /></RequireAuth>} />
         <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
         <Route path="/community" element={<RequireAuth><Community /></RequireAuth>} />
         <Route path="/techniques" element={<RequireAuth><Techniques /></RequireAuth>} />
