@@ -1,6 +1,8 @@
 """Cost estimation for stability evaluation runs."""
 from __future__ import annotations
 
+import pytest
+
 from services.eval.cost_estimator import estimate_run_cost
 
 
@@ -81,6 +83,24 @@ def test_known_models_exact() -> None:
         expected_output_tokens=50,
     )
     assert out["pricing_status"] == "exact"
+
+
+def test_lite_meta_synthesis_halves_synthesis_bucket_vs_full() -> None:
+    base = dict(
+        prompt_a_text="A",
+        task_input="t",
+        n_runs=5,
+        target_model_id="deepseek/deepseek-v4-flash",
+        judge_model_id="openai/gpt-4o-mini",
+        embedding_model_id="openai/text-embedding-3-small",
+        expected_output_tokens=200,
+        run_synthesis=True,
+    )
+    full = estimate_run_cost(**base, meta_synthesis_mode="full")
+    lite = estimate_run_cost(**base, meta_synthesis_mode="lite")
+    assert lite["synthesis"]["input_tokens"] * 2 == full["synthesis"]["input_tokens"]
+    assert lite["synthesis"]["output_tokens"] * 2 == full["synthesis"]["output_tokens"]
+    assert lite["synthesis"]["usd"] * 2 == pytest.approx(full["synthesis"]["usd"])
 
 
 def test_reference_answer_increases_judge_input() -> None:

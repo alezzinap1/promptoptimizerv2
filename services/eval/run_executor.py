@@ -50,6 +50,7 @@ from services.eval.diversity import diversity_summary
 from services.eval.event_bus import BUS
 from services.eval.judge_runner import judge_one, judge_pair
 from services.eval.meta_pipeline import run_meta_pipeline
+from services.eval.synthesis import result_rows_to_synthesis_outputs, run_synthesis
 
 logger = logging.getLogger(__name__)
 
@@ -402,6 +403,9 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
         synthesis_error: str | None = None
         meta_pipeline_str: str | None = None
         run_synth = bool(run.get("run_synthesis", True))
+        meta_mode = str(run.get("meta_synthesis_mode") or "full").strip().lower()
+        if meta_mode not in ("full", "lite"):
+            meta_mode = "full"
         if run_synth and not cancel.is_set():
             try:
                 synth_model = (run.get("synthesis_model_id") or run["judge_model_id"] or "").strip()
@@ -413,16 +417,36 @@ def _execute(db: DBManager, client, run_id: int, cancel: threading.Event) -> Non
                     for s in sides
                 }
                 result_rows = db.list_eval_results_for_run(run_id)
-                syn, meta_blob, syn_err = run_meta_pipeline(
-                    client=client,
-                    synthesis_model_id=synth_model,
-                    task_input=run["task_input"],
-                    prompt_a_text=run["prompt_a_text"],
-                    prompt_b_text=run.get("prompt_b_text"),
-                    rubric_snapshot=rubric,
-                    side_summaries=syn_summaries,
-                    result_rows=result_rows,
-                )
+                syn: dict | None = None
+                meta_blob: dict | None = None
+                syn_err: str | None = None
+                if meta_mode == "lite":
+                    outputs = result_rows_to_synthesis_outputs(result_rows)
+                    if not outputs:
+                        syn_err = "no_ok_outputs_for_synthesis"
+                    else:
+                        syn = run_synthesis(
+                            client=client,
+                            synthesis_model_id=synth_model,
+                            task_input=run["task_input"],
+                            prompt_a_text=run["prompt_a_text"],
+                            prompt_b_text=run.get("prompt_b_text"),
+                            rubric_snapshot=rubric,
+                            side_summaries=syn_summaries,
+                            outputs=outputs,
+                        )
+                        meta_blob = {"schema_version": 1, "mode": "lite", "single_pass": True}
+                else:
+                    syn, meta_blob, syn_err = run_meta_pipeline(
+                        client=client,
+                        synthesis_model_id=synth_model,
+                        task_input=run["task_input"],
+                        prompt_a_text=run["prompt_a_text"],
+                        prompt_b_text=run.get("prompt_b_text"),
+                        rubric_snapshot=rubric,
+                        side_summaries=syn_summaries,
+                        result_rows=result_rows,
+                    )
                 meta_pipeline_str = json.dumps(meta_blob, ensure_ascii=False) if meta_blob else None
                 if syn_err:
                     synthesis_error = syn_err

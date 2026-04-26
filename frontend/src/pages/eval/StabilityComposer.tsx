@@ -20,6 +20,7 @@ export interface ComposerValue {
   preset_key: string | null
   rubric_id: number | null
   is_pair: boolean
+  meta_synthesis_mode: 'full' | 'lite'
 }
 
 const CHEAP_JUDGE_OPTIONS = [
@@ -216,6 +217,15 @@ export default function StabilityComposer({ value, onChange, onRun, disabled, ge
                 onChange={e => set('run_synthesis', e.target.checked)}
               />
               <span>После прогона — один вызов LLM: слабые места промпта и рекомендации (по всем ответам сразу)</span>
+            </label>
+            <label className={css.inlineCheck} style={{ marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={value.meta_synthesis_mode === 'lite'}
+                disabled={!value.run_synthesis}
+                onChange={e => set('meta_synthesis_mode', e.target.checked ? 'lite' : 'full')}
+              />
+              <span>Экономный мета-анализ (1× LLM вместо полного конвейера: кластеры → гипотезы → отчёт)</span>
             </label>
           </div>
         </div>

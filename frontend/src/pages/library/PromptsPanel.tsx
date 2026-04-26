@@ -63,6 +63,13 @@ function isImagePrompt(item: LibraryItem): boolean {
   return IMAGE_SIGNALS.some((s) => text.includes(s))
 }
 
+function defaultStabilityTaskInput(item: LibraryItem): string {
+  return (
+    (item.notes || '').trim() ||
+    'Следуй инструкциям промпта и ответь на типичный запрос в рамках этой задачи. Контекст можно уточнить в поле «Задача».'
+  )
+}
+
 type Props = {
   onPromptCountChanged?: () => void
   gridCols?: 3 | 4
@@ -91,6 +98,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
   const [evalLoading, setEvalLoading] = useState(false)
   const [tagPaintTick, setTagPaintTick] = useState(0)
   const [publishItem, setPublishItem] = useState<LibraryItem | null>(null)
+  const [pairStabilityA, setPairStabilityA] = useState<LibraryItem | null>(null)
   const [langView, setLangView] = useState<Record<number, 'primary' | 'alt'>>({})
   const [translating, setTranslating] = useState<Record<number, boolean>>({})
   const [translateErr, setTranslateErr] = useState<Record<number, string>>({})
@@ -371,6 +379,75 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
         />
       )}
 
+      {pairStabilityA && (
+        <div
+          className={styles.pairStabilityBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pair-stab-title"
+          onClick={() => setPairStabilityA(null)}
+        >
+          <div className={styles.pairStabilityDialog} onClick={(e) => e.stopPropagation()}>
+            <h3 id="pair-stab-title" className={styles.pairStabilityTitle}>
+              Второй промпт для пары (B)
+            </h3>
+            <p className={styles.pairStabilityHint}>
+              «{pairStabilityA.title}» — выберите карточку B для сравнения в режиме стабильности.
+            </p>
+            <div className={styles.pairStabilityList}>
+              {sorted.filter((i) => i.id !== pairStabilityA.id).length === 0 ? (
+                <p className={styles.pairStabilityHint} style={{ padding: '8px 4px' }}>
+                  Нет другой карточки в текущем списке — измените поиск или добавьте промпт.
+                </p>
+              ) : (
+                sorted
+                  .filter((i) => i.id !== pairStabilityA.id)
+                  .map((bItem) => {
+                    const bPreview = displayPromptFor(bItem).text
+                    return (
+                      <button
+                        key={bItem.id}
+                        type="button"
+                        className={styles.pairStabilityRow}
+                        onClick={() => {
+                          const tA = displayPromptFor(pairStabilityA).text
+                          const tB = displayPromptFor(bItem).text
+                          navigate(
+                            { pathname: '/compare', search: '?mode=stability' },
+                            {
+                              state: {
+                                stability: {
+                                  libraryIdA: pairStabilityA.id,
+                                  libraryIdB: bItem.id,
+                                  promptA: tA,
+                                  promptB: tB,
+                                  taskInput: defaultStabilityTaskInput(pairStabilityA),
+                                },
+                              },
+                            },
+                          )
+                          setPairStabilityA(null)
+                        }}
+                      >
+                        <span className={styles.pairStabilityRowTitle}>{bItem.title}</span>
+                        <span className={styles.pairStabilityRowMeta} title={bPreview}>
+                          {bPreview.slice(0, 120)}
+                          {bPreview.length > 120 ? '…' : ''}
+                        </span>
+                      </button>
+                    )
+                  })
+              )}
+            </div>
+            <div className={styles.pairStabilityFooter}>
+              <button type="button" className="btn-ghost" onClick={() => setPairStabilityA(null)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p>Загрузка...</p>
       ) : isTrulyEmpty ? (
@@ -625,9 +702,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                               stability: {
                                 libraryIdA: item.id,
                                 promptA: promptText,
-                                taskInput:
-                                  (item.notes || '').trim() ||
-                                  'Следуй инструкциям промпта и ответь на типичный запрос в рамках этой задачи. Контекст можно уточнить в поле «Задача».',
+                                taskInput: defaultStabilityTaskInput(item),
                               },
                             },
                           },
@@ -635,6 +710,13 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                       }
                     >
                       Стабильность (N-runs)…
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.cardMoreItem}
+                      onClick={() => setPairStabilityA(item)}
+                    >
+                      Стабильность пары A+B…
                     </button>
                     <button
                       type="button"

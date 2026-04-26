@@ -84,6 +84,7 @@ def estimate_run_cost(
     judge_secondary_model_id: str | None = None,
     run_synthesis: bool = True,
     synthesis_model_id: str | None = None,
+    meta_synthesis_mode: str = "full",
 ) -> dict:
     """Estimate token usage and USD for a stability run.
 
@@ -191,14 +192,15 @@ def estimate_run_cost(
             + n_out * excerpt_tok
             + _SYNTH_SYSTEM_OVERHEAD
         )
-        # Meta pipeline uses two LLM JSON calls (hypothesize + final report), ~similar token load each.
-        synthesis_input_tokens = synth_in * 2
-        synthesis_output_tokens = _SYNTH_OUTPUT_TOKENS * 2
+        # Full meta pipeline: two LLM JSON calls (hypothesize + final). Lite: single synthesis pass.
+        layers = 1 if str(meta_synthesis_mode).strip().lower() == "lite" else 2
+        synthesis_input_tokens = synth_in * layers
+        synthesis_output_tokens = _SYNTH_OUTPUT_TOKENS * layers
         one_call_usd = (
             synth_in * synth_pricing["input"]
             + _SYNTH_OUTPUT_TOKENS * synth_pricing["output"]
         )
-        synthesis_usd = one_call_usd * 2
+        synthesis_usd = one_call_usd * layers
 
     # ── Embeddings (one per output) ────────────────────────────────────
     embedding_input_tokens = expected_output_tokens * (target_calls_a + target_calls_b)

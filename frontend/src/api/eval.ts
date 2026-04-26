@@ -96,6 +96,7 @@ export interface EvalRunSummary {
   run_synthesis?: boolean
   synthesis_model_id?: string | null
   judge_agreement_mean_abs?: number | null
+  meta_synthesis_mode?: 'full' | 'lite'
   synthesis_error?: string | null
   synthesis_report?: EvalSynthesisReport | null
   meta_pipeline?: EvalMetaPipeline | null
@@ -206,6 +207,8 @@ export interface PreviewCostRequest {
   run_synthesis?: boolean
   expected_output_tokens?: number
   pair_judge_samples?: number
+  /** full = multi-step meta pipeline; lite = one LLM synthesis call */
+  meta_synthesis_mode?: 'full' | 'lite'
 }
 
 export interface CreateRunRequest extends PreviewCostRequest {

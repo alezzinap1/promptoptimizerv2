@@ -82,6 +82,17 @@ def test_create_pair_run_when_prompt_b_provided(env) -> None:
     assert run["pair_judge_samples"] == 3
 
 
+def test_create_run_persists_meta_synthesis_mode_lite(env) -> None:
+    r = env["client"].post(
+        "/api/eval/stability/runs",
+        headers={"X-Session-Id": env["sid"]},
+        json=_payload(meta_synthesis_mode="lite"),
+    )
+    assert r.status_code == 200, r.text
+    run = env["db"].get_eval_run(int(r.json()["run_id"]), user_id=env["uid"])
+    assert run["meta_synthesis_mode"] == "lite"
+
+
 def test_create_run_with_custom_rubric_id(env) -> None:
     rid = env["db"].create_eval_rubric(
         user_id=env["uid"],

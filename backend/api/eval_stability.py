@@ -14,7 +14,7 @@ import json
 import queue
 import time
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Any, Iterator, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -123,6 +123,7 @@ class PreviewCostRequest(BaseModel):
     run_synthesis: bool = True
     expected_output_tokens: int = Field(600, ge=1, le=MAX_EXPECTED_OUTPUT_TOKENS)
     pair_judge_samples: int = Field(0, ge=0, le=MAX_PAIR_JUDGE_SAMPLES)
+    meta_synthesis_mode: Literal["full", "lite"] = "full"
 
 
 class CreateRunRequest(BaseModel):
@@ -139,6 +140,7 @@ class CreateRunRequest(BaseModel):
     run_synthesis: bool = True
     expected_output_tokens: int = Field(600, ge=1, le=MAX_EXPECTED_OUTPUT_TOKENS)
     pair_judge_samples: int = Field(0, ge=0, le=MAX_PAIR_JUDGE_SAMPLES)
+    meta_synthesis_mode: Literal["full", "lite"] = "full"
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     top_p: float | None = Field(None, ge=0.0, le=1.0)
     parallelism: int = Field(4, ge=1, le=16)
@@ -255,6 +257,7 @@ def preview_cost(
         judge_secondary_model_id=req.judge_secondary_model_id,
         run_synthesis=req.run_synthesis,
         synthesis_model_id=req.synthesis_model_id,
+        meta_synthesis_mode=req.meta_synthesis_mode,
     )
 
     uid = int(user["id"])
@@ -321,6 +324,7 @@ def create_run(
         judge_secondary_model_id=req.judge_secondary_model_id,
         run_synthesis=req.run_synthesis,
         synthesis_model_id=req.synthesis_model_id,
+        meta_synthesis_mode=req.meta_synthesis_mode,
     )
 
     budget = db.get_user_eval_budget(uid)
@@ -386,6 +390,7 @@ def create_run(
         prompt_fingerprint=pfp,
         task_fingerprint=tfp,
         rubric_fingerprint=rfp,
+        meta_synthesis_mode=req.meta_synthesis_mode,
     )
 
     client = LLMClient(api_key)

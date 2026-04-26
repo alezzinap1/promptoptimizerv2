@@ -92,6 +92,7 @@ def test_phase20_eval_runs_has_required_columns() -> None:
         "synthesis_report_json",
         "synthesis_error",
         "judge_agreement_mean_abs",
+        "meta_synthesis_mode",
     }
     missing = required - cols
     assert not missing, f"eval_runs is missing columns: {missing}"

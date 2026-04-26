@@ -32,6 +32,24 @@ def _excerpt(text: str) -> str:
     return t[: _MAX_EXCERPT] + "\n…[truncated]"
 
 
+def result_rows_to_synthesis_outputs(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Map eval_results rows to the structure expected by ``build_synthesis_user_message``."""
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        if r.get("status") != "ok":
+            continue
+        out.append(
+            {
+                "side": r.get("prompt_side"),
+                "run_index": r.get("run_index"),
+                "judge_primary": r.get("judge_overall"),
+                "judge_secondary": r.get("judge_overall_secondary"),
+                "output_text": str(r.get("output_text") or ""),
+            }
+        )
+    return out
+
+
 def build_synthesis_user_message(
     *,
     task_input: str,

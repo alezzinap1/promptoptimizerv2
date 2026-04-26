@@ -186,6 +186,7 @@ class DBManager:
             self._migrate_phase20_eval_stability(conn)
             self._migrate_phase21_eval_synthesis_dual_judge(conn)
             self._migrate_phase22_eval_lineage_meta(conn)
+            self._migrate_phase23_eval_meta_lite(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -624,6 +625,10 @@ class DBManager:
                 )
             """
         )
+
+    def _migrate_phase23_eval_meta_lite(self, conn: sqlite3.Connection) -> None:
+        """Lite meta-synthesis: single LLM pass instead of full multi-step pipeline."""
+        self._safe_add_column(conn, "eval_runs", "meta_synthesis_mode", "TEXT NOT NULL DEFAULT 'full'")
 
     def _safe_add_column(
         self,
@@ -2518,7 +2523,11 @@ class DBManager:
         prompt_fingerprint: str | None = None,
         task_fingerprint: str | None = None,
         rubric_fingerprint: str | None = None,
+        meta_synthesis_mode: str = "full",
     ) -> int:
+        msm = (meta_synthesis_mode or "full").strip().lower()
+        if msm not in ("full", "lite"):
+            msm = "full"
         with self._conn() as conn:
             cur = conn.execute(
                 """
@@ -2532,7 +2541,8 @@ class DBManager:
                     n_runs, parallelism, temperature, top_p, pair_judge_samples,
                     cost_preview_usd, cost_preview_tokens,
                     judge_secondary_model_id, run_synthesis, synthesis_model_id,
-                    prompt_fingerprint, task_fingerprint, rubric_fingerprint
+                    prompt_fingerprint, task_fingerprint, rubric_fingerprint,
+                    meta_synthesis_mode
                 ) VALUES (
                     ?, ?, ?,
                     ?, ?, ?, ?,
@@ -2543,7 +2553,8 @@ class DBManager:
                     ?, ?, ?, ?, ?,
                     ?, ?,
                     ?, ?, ?,
-                    ?, ?, ?
+                    ?, ?, ?,
+                    ?
                 )
                 """,
                 (
@@ -2561,6 +2572,7 @@ class DBManager:
                     prompt_fingerprint,
                     task_fingerprint,
                     rubric_fingerprint,
+                    msm,
                 ),
             )
             return int(cur.lastrowid)  # type: ignore[return-value]

@@ -915,6 +915,94 @@
   background: rgba(15, 23, 42, 0.06);
 }
 
+.pairStabilityBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.pairStabilityDialog {
+  width: min(440px, 100%);
+  max-height: min(72vh, 520px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: var(--modal-surface, var(--panel-strong));
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+}
+
+.pairStabilityTitle {
+  margin: 0;
+  padding: 16px 16px 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.pairStabilityHint {
+  margin: 8px 16px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.pairStabilityList {
+  margin-top: 12px;
+  padding: 0 12px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pairStabilityRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pairStabilityRow:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.pairStabilityRowTitle {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.pairStabilityRowMeta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.pairStabilityFooter {
+  padding: 12px 16px 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 768px) {
   .toolbar {
     padding: 12px;

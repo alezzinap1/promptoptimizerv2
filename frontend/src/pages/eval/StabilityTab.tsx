@@ -35,6 +35,7 @@ const DEFAULT_VALUE: ComposerValue = {
   preset_key: 'default_g_eval',
   rubric_id: null,
   is_pair: false,
+  meta_synthesis_mode: 'full',
 }
 
 interface Props {
@@ -73,7 +74,9 @@ export default function StabilityTab({
       prompt_a_text: deepLink.promptA ?? v.prompt_a_text,
       prompt_b_text: deepLink.promptB ?? v.prompt_b_text,
       task_input: deepLink.taskInput ?? v.task_input,
-      is_pair: Boolean((deepLink.promptB || '').trim()),
+      is_pair: Boolean(
+        (deepLink.promptB || '').trim() || deepLink.libraryIdB != null,
+      ),
     }))
     setLibraryLink({
       a: deepLink.libraryIdA ?? null,
@@ -119,6 +122,7 @@ export default function StabilityTab({
         run_synthesis: value.run_synthesis,
         expected_output_tokens: value.expected_output_tokens,
         pair_judge_samples: value.is_pair ? value.pair_judge_samples : 0,
+        meta_synthesis_mode: value.meta_synthesis_mode,
         temperature: value.temperature,
         preset_key: value.preset_key,
         rubric_id: value.rubric_id,

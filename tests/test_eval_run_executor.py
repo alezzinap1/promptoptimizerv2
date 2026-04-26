@@ -13,6 +13,7 @@ from db.manager import DBManager
 from services.auth_service import hash_password
 from services.eval.event_bus import BUS
 from services.eval.run_executor import EXECUTOR_REGISTRY, cancel_run, start_eval_run
+from services.eval.synthesis import SYNTHESIS_MARKER
 class _FakeEmb:
     def __init__(self, vec: list[float]) -> None:
         self.embedding = vec
@@ -75,6 +76,14 @@ def _make_client(generation_text: str = "OUTPUT") -> MagicMock:
     c.generate.side_effect = lambda **kw: f"{generation_text} for {kw.get('user_content', '')[:20]}"
 
     def _default_gj(**kw: object) -> dict:
+        sp = str(kw.get("system_prompt") or "")
+        if SYNTHESIS_MARKER in sp:
+            return {
+                "summary": "Лайт-сводка",
+                "failure_modes": [],
+                "prompt_fixes": ["Уточнить формат"],
+                "criteria_weak_spots": [],
+            }
         meta = _meta_json_from_kw(kw)
         if meta is not None:
             return meta
@@ -103,6 +112,7 @@ def _seed_run(
     n_runs: int = 3,
     judge_secondary_model_id: str | None = None,
     run_synthesis: bool = True,
+    meta_synthesis_mode: str = "full",
 ) -> int:
     return db.create_eval_run(
         user_id=uid,
@@ -138,6 +148,7 @@ def _seed_run(
         pair_judge_samples=3 if mode == "pair" else 0,
         judge_secondary_model_id=judge_secondary_model_id,
         run_synthesis=run_synthesis,
+        meta_synthesis_mode=meta_synthesis_mode,
     )
 
 
@@ -181,6 +192,38 @@ def test_run_executor_completes_single_mode() -> None:
     assert "started" in types_seen
     assert "done" in types_seen
     assert any(t == "progress" for t in types_seen)
+
+
+def test_run_executor_meta_lite_uses_single_synthesis_pass() -> None:
+    tmp = tempfile.mkdtemp()
+    db = DBManager(str(Path(tmp) / "xlite.db"))
+    db.init()
+    uid = int(db.create_user("u_lite", hash_password("password12345")))
+    run_id = _seed_run(db, uid, mode="single", n_runs=2, meta_synthesis_mode="lite")
+
+    client = _make_client()
+    fut = start_eval_run(db, client, run_id)
+    fut.result(timeout=15)
+
+    run = db.get_eval_run(run_id, uid)
+    assert run["status"] == "completed"
+    syn = json.loads(run["synthesis_report_json"])
+    assert syn.get("summary") == "Лайт-сводка"
+    assert syn.get("meta_schema_version") != 2
+    pipe = json.loads(run["meta_pipeline_json"])
+    assert pipe.get("mode") == "lite"
+    assert pipe.get("schema_version") == 1
+
+    hyp = syn_v2 = 0
+    for call in client.generate_json.call_args_list:
+        kw = call.kwargs
+        sp = str(kw.get("system_prompt") or "")
+        if "META_HYPOTHESIZE_V1" in sp:
+            hyp += 1
+        if "META_SYNTHESIZE_V2" in sp:
+            syn_v2 += 1
+    assert hyp == 0
+    assert syn_v2 == 0
 
 
 def test_run_executor_secondary_judge_sets_agreement() -> None:
