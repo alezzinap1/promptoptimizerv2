@@ -1,6 +1,7 @@
 import { useMemo, useState, type RefObject } from 'react'
 import type { ImageStyleDef } from '../lib/imageStyles'
 import PortalDropdown from './PortalDropdown'
+import ThemedTooltip from './ThemedTooltip'
 import styles from './ImageStylePickerPopover.module.css'
 
 type FilterMode = 'all' | 'favorites'
@@ -71,35 +72,33 @@ export default function ImageStylePickerPopover({
               const isOn = sel.has(s.id)
               return (
                 <div key={s.id} className={`${styles.tileWrap} ${isOn ? styles.tileWrapOn : ''}`}>
-                  <button
-                    type="button"
-                    className={styles.tileMain}
-                    onClick={() => onToggle(s.id)}
-                    title={`${s.label}: ${s.description}`}
-                  >
-                    <div className={styles.tilePreview}>
-                      {s.thumbSrc ? (
-                        <img className={styles.tileBg} src={s.thumbSrc} alt="" loading="lazy" />
-                      ) : (
-                        <div className={styles.tileBg} style={{ background: s.preview }} />
-                      )}
-                      <div className={styles.tileScrim} aria-hidden />
-                      <span className={styles.tileName}>{s.label}</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.starBtn} ${isFav ? styles.starBtnOn : ''}`}
-                    title={isFav ? 'Убрать из избранного' : 'В избранное'}
-                    aria-pressed={isFav}
-                    aria-label={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onToggleFavorite(s.id)
-                    }}
-                  >
-                    {isFav ? '★' : '☆'}
-                  </button>
+                  <ThemedTooltip content={`${s.label}: ${s.description}`} side="top" delayMs={260}>
+                    <button type="button" className={styles.tileMain} onClick={() => onToggle(s.id)}>
+                      <div className={styles.tilePreview}>
+                        {s.thumbSrc ? (
+                          <img className={styles.tileBg} src={s.thumbSrc} alt="" loading="lazy" />
+                        ) : (
+                          <div className={styles.tileBg} style={{ background: s.preview }} />
+                        )}
+                        <div className={styles.tileScrim} aria-hidden />
+                        <span className={styles.tileName}>{s.label}</span>
+                      </div>
+                    </button>
+                  </ThemedTooltip>
+                  <ThemedTooltip content={isFav ? 'Убрать из избранного' : 'В избранное'} side="top" delayMs={200}>
+                    <button
+                      type="button"
+                      className={`${styles.starBtn} ${isFav ? styles.starBtnOn : ''}`}
+                      aria-pressed={isFav}
+                      aria-label={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleFavorite(s.id)
+                      }}
+                    >
+                      {isFav ? '★' : '☆'}
+                    </button>
+                  </ThemedTooltip>
                 </div>
               )
             })}

@@ -219,8 +219,12 @@ export default function Models() {
 
       {trialMode && (
         <div className={styles.trialBanner}>
-          <strong>Пробный режим:</strong> доступны только модели с выходом ≤$1/1M токенов. Лимит пробных токенов на пользователя.
-          Свой ключ OpenRouter — в <Link to="/settings">Настройках</Link>.
+          <strong>Пробный режим:</strong> доступны только модели с выходом ≤$
+          {typeof settings?.trial_max_completion_per_m === 'number'
+            ? settings.trial_max_completion_per_m
+            : 3}
+          /1M токенов. Лимит пробных токенов на пользователя. Свой ключ OpenRouter — в{' '}
+          <Link to="/settings">Настройках</Link>.
         </div>
       )}
 

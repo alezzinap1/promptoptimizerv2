@@ -10,9 +10,10 @@ import {
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type CompareJudgeResponse, type CompareResponse, type OpenRouterModel } from '../api/client'
 import AutoTextarea from '../components/AutoTextarea'
-import MarkdownOutput from '../components/MarkdownOutput'
+import { StreamedMarkdownOutput } from '../lib/simulatedLlmStream'
 import SelectDropdown from '../components/SelectDropdown'
 import SimpleLineDiff from '../components/SimpleLineDiff'
+import ThemedTooltip from '../components/ThemedTooltip'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import LibraryPickButton from '../components/LibraryPickButton'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
@@ -282,18 +283,18 @@ export default function Compare() {
   const renderTechBadges = (tmode: 'auto' | 'manual', manualIds: string[]) => {
     if (tmode === 'auto') {
       return (
-        <span className={styles.chipAuto} title="Техники подбираются автоматически по типу задачи">
-          Авто-подбор
-        </span>
+        <ThemedTooltip content="Техники подбираются автоматически по типу задачи" side="top" delayMs={220}>
+          <span className={styles.chipAuto}>Авто-подбор</span>
+        </ThemedTooltip>
       )
     }
     if (manualIds.length === 0) {
       return <span className={styles.chipWarn}>Выберите техники вручную</span>
     }
     return manualIds.map((id) => (
-      <span key={id} className={styles.chipTech} title={techById[id] || id}>
-        {techById[id] || id}
-      </span>
+      <ThemedTooltip key={id} content={techById[id] || id} side="top" delayMs={200}>
+        <span className={styles.chipTech}>{techById[id] || id}</span>
+      </ThemedTooltip>
     ))
   }
 
@@ -637,29 +638,29 @@ export default function Compare() {
           },
         ] as const
       ).map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          role="tab"
-          aria-selected={mode === m.id}
-          className={mode === m.id ? styles.modeTabActive : styles.modeTab}
-          onClick={() => {
-            setMode(m.id)
-            setSearchParams(
-              (prev) => {
-                const next = new URLSearchParams(prev)
-                next.set('mode', m.id)
-                return next
-              },
-              { replace: true },
-            )
-            resetResults()
-            setError(null)
-          }}
-          title={m.hint}
-        >
-          <span className={styles.modeTabLabel}>{m.label}</span>
-        </button>
+        <ThemedTooltip key={m.id} content={m.hint} side="bottom" delayMs={260}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === m.id}
+            className={mode === m.id ? styles.modeTabActive : styles.modeTab}
+            onClick={() => {
+              setMode(m.id)
+              setSearchParams(
+                (prev) => {
+                  const next = new URLSearchParams(prev)
+                  next.set('mode', m.id)
+                  return next
+                },
+                { replace: true },
+              )
+              resetResults()
+              setError(null)
+            }}
+          >
+            <span className={styles.modeTabLabel}>{m.label}</span>
+          </button>
+        </ThemedTooltip>
       ))}
     </div>
   )
@@ -933,12 +934,22 @@ export default function Compare() {
                     {renderTechBadges(techsAMode, techsAManual)}
                   </div>
                   <div className={`${styles.radioRow} ${styles.radioRowA}`}>
-                    <label title="Авто: техники подбираются по типу задачи.">
-                      <input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто
-                    </label>
-                    <label title="Вручную: в промпт попадут только отмеченные ниже техники.">
-                      <input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} /> Вручную
-                    </label>
+                    <ThemedTooltip content="Авто: техники подбираются по типу задачи." side="top" delayMs={220} block>
+                      <label>
+                        <input type="radio" checked={techsAMode === 'auto'} onChange={() => setTechsAMode('auto')} /> Авто
+                      </label>
+                    </ThemedTooltip>
+                    <ThemedTooltip
+                      content="Вручную: в промпт попадут только отмеченные ниже техники."
+                      side="top"
+                      delayMs={220}
+                      block
+                    >
+                      <label>
+                        <input type="radio" checked={techsAMode === 'manual'} onChange={() => setTechsAMode('manual')} />{' '}
+                        Вручную
+                      </label>
+                    </ThemedTooltip>
                   </div>
                   {techsAMode === 'manual' && (
                     <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта A">
@@ -965,12 +976,22 @@ export default function Compare() {
                     {renderTechBadges(techsBMode, techsBManual)}
                   </div>
                   <div className={`${styles.radioRow} ${styles.radioRowB}`}>
-                    <label title="Авто: техники подбираются по типу задачи.">
-                      <input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто
-                    </label>
-                    <label title="Вручную: в промпт попадут только отмеченные ниже техники.">
-                      <input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} /> Вручную
-                    </label>
+                    <ThemedTooltip content="Авто: техники подбираются по типу задачи." side="top" delayMs={220} block>
+                      <label>
+                        <input type="radio" checked={techsBMode === 'auto'} onChange={() => setTechsBMode('auto')} /> Авто
+                      </label>
+                    </ThemedTooltip>
+                    <ThemedTooltip
+                      content="Вручную: в промпт попадут только отмеченные ниже техники."
+                      side="top"
+                      delayMs={220}
+                      block
+                    >
+                      <label>
+                        <input type="radio" checked={techsBMode === 'manual'} onChange={() => setTechsBMode('manual')} />{' '}
+                        Вручную
+                      </label>
+                    </ThemedTooltip>
                   </div>
                   {techsBMode === 'manual' && (
                     <div className={checkboxList.gridWrap} role="group" aria-label="Техники варианта B">
@@ -1013,7 +1034,7 @@ export default function Compare() {
                   <CopyIconButton text={workspace.a.prompt} title="Копировать промпт" />
                 </div>
                 <div className={styles.promptMarkdownWrap}>
-                  <MarkdownOutput>{workspace.a.prompt}</MarkdownOutput>
+                  <StreamedMarkdownOutput source={workspace.a.prompt} suspend={false} />
                 </div>
               </div>
             </div>
@@ -1032,7 +1053,7 @@ export default function Compare() {
                         <CopyIconButton text={workspace.a.reasoning} title="Копировать пояснение A" />
                       </div>
                       <div className={styles.promptMarkdownWrap}>
-                        <MarkdownOutput>{workspace.a.reasoning}</MarkdownOutput>
+                        <StreamedMarkdownOutput source={workspace.a.reasoning ?? ''} suspend={false} />
                       </div>
                     </details>
                   )}
@@ -1040,7 +1061,7 @@ export default function Compare() {
                     <CopyIconButton text={workspace.a.prompt} title="Копировать промпт A" />
                   </div>
                   <div className={styles.promptMarkdownWrap}>
-                    <MarkdownOutput>{workspace.a.prompt}</MarkdownOutput>
+                    <StreamedMarkdownOutput source={workspace.a.prompt} suspend={false} />
                   </div>
                 </div>
                 <div className={`${styles.column} ${styles.columnVariantB}`}>
@@ -1055,7 +1076,7 @@ export default function Compare() {
                         <CopyIconButton text={workspace.b.reasoning} title="Копировать пояснение B" />
                       </div>
                       <div className={styles.promptMarkdownWrap}>
-                        <MarkdownOutput>{workspace.b.reasoning}</MarkdownOutput>
+                        <StreamedMarkdownOutput source={workspace.b.reasoning ?? ''} suspend={false} />
                       </div>
                     </details>
                   )}
@@ -1063,7 +1084,7 @@ export default function Compare() {
                     <CopyIconButton text={workspace.b.prompt} title="Копировать промпт B" />
                   </div>
                   <div className={styles.promptMarkdownWrap}>
-                    <MarkdownOutput>{workspace.b.prompt}</MarkdownOutput>
+                    <StreamedMarkdownOutput source={workspace.b.prompt} suspend={false} />
                   </div>
                 </div>
               </div>
@@ -1098,15 +1119,26 @@ export default function Compare() {
                 variant="composer"
                 footerLink={{ to: '/models', label: 'Каталог моделей' }}
               />
-              <button
-                type="button"
-                className={`${styles.secondaryBtn} btn-secondary`}
-                onClick={handleRunOnTarget}
-                disabled={runningOutputs || targetModel === 'unknown'}
-                title={targetModel === 'unknown' ? 'Выберите конкретную модель' : 'Запустить оба промпта на этой модели'}
+              <ThemedTooltip
+                content={
+                  targetModel === 'unknown'
+                    ? 'Выберите конкретную модель'
+                    : 'Запустить оба промпта на этой модели'
+                }
+                side="top"
+                delayMs={240}
               >
-                {runningOutputs ? 'Прогоняю…' : 'Запустить A и B'}
-              </button>
+                <span style={{ display: 'inline-block' }}>
+                  <button
+                    type="button"
+                    className={`${styles.secondaryBtn} btn-secondary`}
+                    onClick={handleRunOnTarget}
+                    disabled={runningOutputs || targetModel === 'unknown'}
+                  >
+                    {runningOutputs ? 'Прогоняю…' : 'Запустить A и B'}
+                  </button>
+                </span>
+              </ThemedTooltip>
             </div>
           ) : null}
           {outputsError && <p className={styles.error}>{outputsError}</p>}
@@ -1132,7 +1164,7 @@ export default function Compare() {
                     <CopyIconButton text={outputs.a} title="Копировать ответ A" />
                   </div>
                   <div className={styles.promptMarkdownWrap}>
-                    <MarkdownOutput>{outputs.a}</MarkdownOutput>
+                    <StreamedMarkdownOutput source={outputs.a} suspend={runningOutputs} />
                   </div>
                 </div>
                 <div className={`${styles.column} ${styles.columnVariantB}`}>
@@ -1143,7 +1175,7 @@ export default function Compare() {
                     <CopyIconButton text={outputs.b} title="Копировать ответ B" />
                   </div>
                   <div className={styles.promptMarkdownWrap}>
-                    <MarkdownOutput>{outputs.b}</MarkdownOutput>
+                    <StreamedMarkdownOutput source={outputs.b} suspend={runningOutputs} />
                   </div>
                 </div>
               </div>
@@ -1157,28 +1189,39 @@ export default function Compare() {
           {/* Judge */}
           <div className={styles.judgeRow}>
             <div className={styles.judgeToggle} role="group" aria-label="Что судить">
-              <button
-                type="button"
-                className={judgeOn === 'prompts' ? styles.judgeToggleActive : styles.judgeToggleBtn}
-                onClick={() => setJudgeOn('prompts')}
-                disabled={workspace.source === 'models'}
-                title={
-                  workspace.source === 'models'
-                    ? 'Для сравнения моделей промпты совпадают — судья сравнивает ответы'
-                    : undefined
-                }
+              <ThemedTooltip
+                content="Для сравнения моделей промпты совпадают — судья сравнивает ответы"
+                side="top"
+                delayMs={240}
+                disabled={workspace.source !== 'models'}
               >
-                Судить промпты
-              </button>
-              <button
-                type="button"
-                className={judgeOn === 'outputs' ? styles.judgeToggleActive : styles.judgeToggleBtn}
-                onClick={() => setJudgeOn('outputs')}
-                disabled={!outputs}
-                title={!outputs ? 'Сначала прогоните на целевой модели' : 'Судить ответы модели'}
+                <span style={{ display: 'inline-block' }}>
+                  <button
+                    type="button"
+                    className={judgeOn === 'prompts' ? styles.judgeToggleActive : styles.judgeToggleBtn}
+                    onClick={() => setJudgeOn('prompts')}
+                    disabled={workspace.source === 'models'}
+                  >
+                    Судить промпты
+                  </button>
+                </span>
+              </ThemedTooltip>
+              <ThemedTooltip
+                content={!outputs ? 'Сначала прогоните на целевой модели' : 'Судить ответы модели'}
+                side="top"
+                delayMs={240}
               >
-                Судить ответы
-              </button>
+                <span style={{ display: 'inline-block' }}>
+                  <button
+                    type="button"
+                    className={judgeOn === 'outputs' ? styles.judgeToggleActive : styles.judgeToggleBtn}
+                    onClick={() => setJudgeOn('outputs')}
+                    disabled={!outputs}
+                  >
+                    Судить ответы
+                  </button>
+                </span>
+              </ThemedTooltip>
             </div>
             <label className={styles.judgeLabel}>
               Модель-судья
@@ -1239,7 +1282,7 @@ export default function Compare() {
               )}
               {judgeResult.reasoning && (
                 <div className={styles.judgeReasonMd}>
-                  <MarkdownOutput>{judgeResult.reasoning}</MarkdownOutput>
+                  <StreamedMarkdownOutput source={judgeResult.reasoning} suspend={judgeLoading} />
                 </div>
               )}
             </div>

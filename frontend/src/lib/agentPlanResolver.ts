@@ -7,12 +7,12 @@
  */
 import { api } from '../api/client'
 import {
-  AGENT_PRODUCT_HELP_TEXT,
   classifyAgentFollowUp,
   looksLikeApplyTipDirective,
   looksLikeStrongEdit,
   parseTagsFromText,
   parseTitleHint,
+  resolveSemanticChatReply,
   type FollowUpPlan,
 } from './agentFollowUp'
 
@@ -45,7 +45,7 @@ function planFromSemanticIntent(
     case 'iterate':
       return { type: 'iterate', debug: dbg }
     case 'chat':
-      return { type: 'chat', text: AGENT_PRODUCT_HELP_TEXT, debug: dbg }
+      return { type: 'chat', text: resolveSemanticChatReply(userText), debug: dbg }
     case 'save_library':
       return {
         type: 'save_library',

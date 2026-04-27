@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type CommunityPrompt } from '../api/client'
 import PublishToCommunityModal from '../components/PublishToCommunityModal'
+import ThemedTooltip from '../components/ThemedTooltip'
 import { useAuth } from '../context/AuthContext'
 import styles from './Community.module.css'
 
@@ -150,14 +151,15 @@ export default function Community() {
                 <div className={styles.cardFooter}>
                   <span className={styles.author}>@{item.author_name || 'anon'}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
-                      onClick={() => handleVote(item.id)}
-                      title="Голос"
-                      type="button"
-                    >
-                      ▲ {item.upvotes}
-                    </button>
+                    <ThemedTooltip content="Голос" side="top" delayMs={220}>
+                      <button
+                        className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
+                        onClick={() => handleVote(item.id)}
+                        type="button"
+                      >
+                        ▲ {item.upvotes}
+                      </button>
+                    </ThemedTooltip>
                     <button
                       type="button"
                       className={styles.useBtn}
@@ -166,14 +168,15 @@ export default function Community() {
                       Использовать
                     </button>
                     {isMine(item) ? (
-                      <button
-                        type="button"
-                        className={styles.deleteMineBtn}
-                        onClick={() => void handleDeleteMine(item.id)}
-                        title="Снять с публикации"
-                      >
-                        Убрать
-                      </button>
+                      <ThemedTooltip content="Снять с публикации" side="top" delayMs={240}>
+                        <button
+                          type="button"
+                          className={styles.deleteMineBtn}
+                          onClick={() => void handleDeleteMine(item.id)}
+                        >
+                          Убрать
+                        </button>
+                      </ThemedTooltip>
                     ) : null}
                   </div>
                 </div>
@@ -193,26 +196,28 @@ export default function Community() {
               <div className={styles.cardFooter}>
                 <span className={styles.author}>@{item.author_name || 'anon'}</span>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
-                    onClick={() => handleVote(item.id)}
-                    title="Голос"
-                  >
-                    ▲ {item.upvotes}
-                  </button>
+                  <ThemedTooltip content="Голос" side="top" delayMs={220}>
+                    <button
+                      type="button"
+                      className={`${styles.voteBtn} ${item.voted ? styles.voteBtnActive : ''}`}
+                      onClick={() => handleVote(item.id)}
+                    >
+                      ▲ {item.upvotes}
+                    </button>
+                  </ThemedTooltip>
                   <button type="button" className={styles.useBtn} onClick={() => handleUse(item.prompt)}>
                     Использовать
                   </button>
                   {isMine(item) ? (
-                    <button
-                      type="button"
-                      className={styles.deleteMineBtn}
-                      onClick={() => void handleDeleteMine(item.id)}
-                      title="Снять с публикации"
-                    >
-                      Убрать
-                    </button>
+                    <ThemedTooltip content="Снять с публикации" side="top" delayMs={240}>
+                      <button
+                        type="button"
+                        className={styles.deleteMineBtn}
+                        onClick={() => void handleDeleteMine(item.id)}
+                      >
+                        Убрать
+                      </button>
+                    </ThemedTooltip>
                   ) : null}
                 </div>
               </div>

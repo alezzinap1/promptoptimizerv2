@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import styles from './PromptToolbarIcons.module.css'
+import ThemedTooltip from './ThemedTooltip'
 
 export function CopyIconButton({
   text,
@@ -21,24 +22,25 @@ export function CopyIconButton({
     }
   }
   return (
-    <button
-      type="button"
-      className={`${styles.iconBtn} ${className || ''}`}
-      onClick={handle}
-      title={done ? 'Скопировано' : title}
-      aria-label={title}
-    >
-      {done ? (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-        </svg>
-      )}
-    </button>
+    <ThemedTooltip content={done ? 'Скопировано' : title} side="top" delayMs={220}>
+      <button
+        type="button"
+        className={`${styles.iconBtn} ${className || ''}`}
+        onClick={handle}
+        aria-label={title}
+      >
+        {done ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+          </svg>
+        )}
+      </button>
+    </ThemedTooltip>
   )
 }
 
@@ -52,12 +54,14 @@ export function PencilIconButton({
   className?: string
 }) {
   return (
-    <button type="button" className={`${styles.iconBtn} ${className || ''}`} onClick={onClick} title={title} aria-label={title}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-        <path d="m15 5 4 4" />
-      </svg>
-    </button>
+    <ThemedTooltip content={title} side="top" delayMs={220}>
+      <button type="button" className={`${styles.iconBtn} ${className || ''}`} onClick={onClick} aria-label={title}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+      </button>
+    </ThemedTooltip>
   )
 }
 
@@ -71,13 +75,15 @@ export function DownloadIconButton({
   className?: string
 }) {
   return (
-    <button type="button" className={`${styles.iconBtn} ${className || ''}`} onClick={onClick} title={title} aria-label={title}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" />
-        <line x1="12" x2="12" y1="15" y2="3" />
-      </svg>
-    </button>
+    <ThemedTooltip content={title} side="top" delayMs={220}>
+      <button type="button" className={`${styles.iconBtn} ${className || ''}`} onClick={onClick} aria-label={title}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" x2="12" y1="15" y2="3" />
+        </svg>
+      </button>
+    </ThemedTooltip>
   )
 }
 
@@ -94,14 +100,21 @@ export function TrashIconButton({
   className?: string
 }) {
   return (
-    <button type="button" className={`${styles.iconBtn} ${styles.danger} ${className || ''}`} onClick={onClick} title={title} aria-label={title}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 6h18" />
-        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-        <line x1="10" x2="10" y1="11" y2="17" />
-        <line x1="14" x2="14" y1="11" y2="17" />
-      </svg>
-    </button>
+    <ThemedTooltip content={title} side="top" delayMs={220}>
+      <button
+        type="button"
+        className={`${styles.iconBtn} ${styles.danger} ${className || ''}`}
+        onClick={onClick}
+        aria-label={title}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 6h18" />
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          <line x1="10" x2="10" y1="11" y2="17" />
+          <line x1="14" x2="14" y1="11" y2="17" />
+        </svg>
+      </button>
+    </ThemedTooltip>
   )
 }

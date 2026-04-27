@@ -12,6 +12,7 @@ from config.settings import TRIAL_MAX_COMPLETION_PER_M, TRIAL_TOKENS_LIMIT
 from db.manager import DBManager
 from services.admin_event_sanitize import sanitize_event_payload
 from services.model_health import ensure_fresh, run_health_check
+from core.model_catalog import MAX_COMPLETION_PER_M, MAX_COMPLETION_PER_M_IMAGE
 from services.model_router import catalog_summary
 from services.trial_budget import effective_trial_tokens_limit, effective_session_generation_budget
 
@@ -339,6 +340,12 @@ def admin_model_health(
         "items": rows,
         "events": events,
         "last_checked_at": last_checked.isoformat() if last_checked else None,
+        "completion_budget_caps_usd_per_million": {
+            "text": MAX_COMPLETION_PER_M,
+            "skill": MAX_COMPLETION_PER_M,
+            "image": MAX_COMPLETION_PER_M_IMAGE,
+            "helper": None,
+        },
     }
 
 
@@ -369,7 +376,9 @@ def admin_list_tier_overrides(
     """
     _admin_rate_guard(admin)
     overrides = db.get_tier_overrides()
-    health = {row["model_id"]: row for row in db.list_model_health()}
+    health_slots: dict[tuple[str, str, str], dict] = {}
+    for row in db.list_model_health():
+        health_slots[(row["model_id"], row["mode"], row["tier"])] = row
     catalog = catalog_summary()
     override_map = {(o["mode"], o["tier"]): o["model_id"] for o in overrides}
     rows: list[dict] = []
@@ -378,10 +387,11 @@ def admin_list_tier_overrides(
             candidates = [
                 {
                     "id": mid,
-                    "available": bool((health.get(mid) or {}).get("available", 1)),
-                    "reason": (health.get(mid) or {}).get("reason") or "",
+                    "available": bool((health_slots.get((mid, mode, tier)) or {}).get("available", 0)),
+                    "reason": (health_slots.get((mid, mode, tier)) or {}).get("reason") or "",
                     "price_completion_per_m": (
-                        float((health.get(mid) or {}).get("last_pricing_completion") or 0.0) * 1_000_000.0
+                        float((health_slots.get((mid, mode, tier)) or {}).get("last_pricing_completion") or 0.0)
+                        * 1_000_000.0
                     ),
                 }
                 for mid in ids

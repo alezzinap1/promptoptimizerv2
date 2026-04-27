@@ -1,20 +1,18 @@
 """
 Healthcheck каталога моделей.
 
-- `run_health_check(db)` — идёт по `CATALOG`, сверяет каждую модель с OpenRouter (через кеш
-  `services.openrouter_models.get_models`), пишет снапшот в `model_health`.
-- `is_available(db, model_id)` — быстрый фильтр для router'а.
-- `ensure_fresh(db, max_age_sec)` — вызвать на старте приложения и периодически; если
-  снапшот устарел — запускает проверку синхронно (кеш OpenRouter 24ч — дёшево).
-- `swap_suggestion(db, mode, tier, broken_id)` — вернуть следующий доступный из того же тира.
+- `run_health_check(db)` — по каждой ячейке `CATALOG` (model_id, mode, tier), сверка с OpenRouter.
+- `is_available(db, model_id, mode, tier)` — по строке слота; без строки в БД слот считается недоступным для auto-пути.
+- `ensure_fresh(db, max_age_sec)` — при устаревании снапшота запускает проверку.
 """
 from __future__ import annotations
 
 import logging
+import math
 import time
 from datetime import datetime, timezone
 
-from core.model_catalog import CATALOG, MAX_COMPLETION_PER_M, candidates
+from core.model_catalog import CATALOG, candidates, completion_budget_cap_per_m
 from db.manager import DBManager
 from services.openrouter_models import get_models
 
@@ -60,10 +58,11 @@ def _evaluate(model_id: str, mode: str, tier: str, index: dict[str, dict]) -> di
         cp_f = None
 
     comp_per_m = _price_per_m(cp_f)
-    if tier != "helper" and comp_per_m > MAX_COMPLETION_PER_M:
+    cap = completion_budget_cap_per_m(mode, tier)
+    if math.isfinite(cap) and comp_per_m > cap:
         return {
             "available": False,
-            "reason": f"over_budget({comp_per_m:.2f}/1M>{MAX_COMPLETION_PER_M})",
+            "reason": f"over_budget({comp_per_m:.2f}/1M>{cap:g})",
             "pricing_prompt": pp_f,
             "pricing_completion": cp_f,
         }
@@ -73,6 +72,34 @@ def _evaluate(model_id: str, mode: str, tier: str, index: dict[str, dict]) -> di
         "pricing_prompt": pp_f,
         "pricing_completion": cp_f,
     }
+
+
+def _pick_swap_target(
+    mids: list[str],
+    broken_id: str,
+    mode: str,
+    tier: str,
+    index: dict[str, dict],
+) -> str | None:
+    """Среди доступных альтернатив в том же тире — самая дешёвая по completion, затем порядок в каталоге."""
+    options: list[tuple[float, int, str]] = []
+    for ord_i, alt in enumerate(mids):
+        if alt == broken_id:
+            continue
+        alt_res = _evaluate(alt, mode, tier, index)
+        if not alt_res["available"]:
+            continue
+        cp = alt_res.get("pricing_completion")
+        try:
+            cp_t = float(cp) if cp is not None else 0.0
+        except (TypeError, ValueError):
+            cp_t = 0.0
+        comp_per_m = _price_per_m(cp_t)
+        options.append((comp_per_m, ord_i, alt))
+    if not options:
+        return None
+    options.sort(key=lambda x: (x[0], x[1]))
+    return options[0][2]
 
 
 def run_health_check(db: DBManager) -> dict:
@@ -92,14 +119,9 @@ def run_health_check(db: DBManager) -> dict:
                 swapped_to: str | None = None
                 if not result["available"]:
                     unavailable.append(mid)
-                    for alt in ids:
-                        if alt == mid:
-                            continue
-                        alt_res = _evaluate(alt, mode, tier, index)
-                        if alt_res["available"]:
-                            swapped_to = alt
-                            swaps.append({"from": mid, "to": alt, "mode": mode, "tier": tier})
-                            break
+                    swapped_to = _pick_swap_target(ids, mid, mode, tier, index)
+                    if swapped_to:
+                        swaps.append({"from": mid, "to": swapped_to, "mode": mode, "tier": tier})
                     db.log_model_health_event(
                         mid,
                         "unavailable",
@@ -164,36 +186,35 @@ def ensure_fresh(db: DBManager, max_age_sec: int = _DEFAULT_MAX_AGE_SEC) -> bool
     return False
 
 
-def _health_map(db: DBManager) -> dict[str, dict]:
-    return {r["model_id"]: r for r in db.list_model_health()}
+def _health_slot_map(db: DBManager) -> dict[tuple[str, str, str], dict]:
+    out: dict[tuple[str, str, str], dict] = {}
+    for r in db.list_model_health():
+        out[(str(r["model_id"]), str(r["mode"]), str(r["tier"]))] = dict(r)
+    return out
 
 
-def is_available(db: DBManager, model_id: str) -> bool:
-    row = _health_map(db).get(model_id)
+def is_available(db: DBManager, model_id: str, mode: str, tier: str) -> bool:
+    row = db.get_model_health_slot(model_id, mode, tier)
     if not row:
-        return True
+        return False
     return bool(row.get("available"))
 
 
 def pick_first_available(db: DBManager, mode: str, tier: str) -> str | None:
-    """Вернуть первый доступный id из (mode, tier) или None."""
+    """Первый доступный id из (mode, tier) по порядку каталога; без строки health — слот считается недоступным."""
     ids = candidates(mode, tier)  # type: ignore[arg-type]
     if not ids:
         return None
-    hmap = _health_map(db)
+    hmap = _health_slot_map(db)
     for mid in ids:
-        row = hmap.get(mid)
-        if row is None or int(row.get("available") or 0):
+        row = hmap.get((mid, mode, tier))
+        if row and int(row.get("available") or 0):
             return mid
     return None
 
 
 def swap_suggestion(db: DBManager, mode: str, tier: str, broken_id: str) -> str | None:
-    """Следующий доступный кандидат в том же (mode, tier), кроме broken_id."""
-    ids = [x for x in candidates(mode, tier) if x != broken_id]  # type: ignore[arg-type]
-    hmap = _health_map(db)
-    for mid in ids:
-        row = hmap.get(mid)
-        if row is None or int(row.get("available") or 0):
-            return mid
-    return None
+    """Следующий доступный кандидат в том же (mode, tier), кроме broken_id (дешевле среди доступных)."""
+    ids = candidates(mode, tier)  # type: ignore[arg-type]
+    index = _index_openrouter_models()
+    return _pick_swap_target(ids, broken_id, mode, tier, index)

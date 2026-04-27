@@ -7,8 +7,9 @@ import {
   type SimplePresetId,
 } from '../constants/simpleImprove'
 import AutoTextarea from '../components/AutoTextarea'
-import MarkdownOutput from '../components/MarkdownOutput'
+import { StreamedMarkdownOutput } from '../lib/simulatedLlmStream'
 import SelectDropdown from '../components/SelectDropdown'
+import ThemedTooltip from '../components/ThemedTooltip'
 import TierSelector, { loadTier, persistTier, type TierValue } from '../components/TierSelector'
 import { CopyIconButton } from '../components/PromptToolbarIcons'
 import LibraryPickButton from '../components/LibraryPickButton'
@@ -184,9 +185,11 @@ export default function SimpleImprove() {
             <div className={cb.composerFooter}>
               <div className={cb.composerFooterRow}>
                 <div className={`${cb.composerFooterMid} ${styles.simpleFooterMid}`}>
-                  <span className={styles.simpleControlIcon} title="Пресет улучшения">
-                    <IconSliders />
-                  </span>
+                  <ThemedTooltip content="Пресет улучшения" side="top" delayMs={220}>
+                    <span className={styles.simpleControlIcon}>
+                      <IconSliders />
+                    </span>
+                  </ThemedTooltip>
                   <SelectDropdown
                     value={preset}
                     options={PRESET_SELECT_OPTIONS}
@@ -194,9 +197,11 @@ export default function SimpleImprove() {
                     aria-label="Пресет"
                     variant="composer"
                   />
-                  <span className={styles.simpleControlIcon} title="Сложность генерации (как на Студии)">
-                    <IconSparkles />
-                  </span>
+                  <ThemedTooltip content="Сложность генерации (как на Студии)" side="top" delayMs={220}>
+                    <span className={styles.simpleControlIcon}>
+                      <IconSparkles />
+                    </span>
+                  </ThemedTooltip>
                   <TierSelector
                     value={tier}
                     onChange={(v) => {
@@ -207,9 +212,11 @@ export default function SimpleImprove() {
                   />
                   {tier === 'custom' ? (
                     <>
-                      <span className={styles.simpleControlIcon} title="Модель OpenRouter">
-                        <IconLayers />
-                      </span>
+                      <ThemedTooltip content="Модель OpenRouter" side="top" delayMs={220}>
+                        <span className={styles.simpleControlIcon}>
+                          <IconLayers />
+                        </span>
+                      </ThemedTooltip>
                       <SelectDropdown
                         value={genModel}
                         options={modelOptions}
@@ -221,9 +228,11 @@ export default function SimpleImprove() {
                       />
                     </>
                   ) : null}
-                  <span className={styles.simpleControlIcon} title="Целевая модель промпта">
-                    <IconGlobe />
-                  </span>
+                  <ThemedTooltip content="Целевая модель промпта" side="top" delayMs={220}>
+                    <span className={styles.simpleControlIcon}>
+                      <IconGlobe />
+                    </span>
+                  </ThemedTooltip>
                   <SelectDropdown
                     value={targetModel}
                     options={targetOptions}
@@ -261,7 +270,7 @@ export default function SimpleImprove() {
           <div className={styles.answerPanel}>
             {result ? (
               <div className={styles.resultMarkdown}>
-                <MarkdownOutput>{result}</MarkdownOutput>
+                <StreamedMarkdownOutput source={result} suspend={loading} />
               </div>
             ) : (
               <p className={styles.answerPlaceholder}>

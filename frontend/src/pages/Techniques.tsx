@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type TechniqueRecord } from '../api/client'
 import MarkdownOutput from '../components/MarkdownOutput'
 import SelectDropdown from '../components/SelectDropdown'
+import ThemedTooltip from '../components/ThemedTooltip'
 import styles from './Techniques.module.css'
 
 const TASK_TYPE_FILTER_OPTIONS = [
@@ -407,9 +408,9 @@ export default function Techniques({
                 )}
               </div>
               {t.when_to_use?.task_types && t.when_to_use.task_types.length > 0 && (
-                <p className={styles.tagMeta} title={t.when_to_use.task_types.join(', ')}>
-                  Типы задач: {t.when_to_use.task_types.join(', ')}
-                </p>
+                <ThemedTooltip content={t.when_to_use.task_types.join(', ')} side="top" delayMs={260} block>
+                  <p className={styles.tagMeta}>Типы задач: {t.when_to_use.task_types.join(', ')}</p>
+                </ThemedTooltip>
               )}
               <div className={styles.cardFooter}>
                 <span className={styles.moreLink}>Подробнее →</span>

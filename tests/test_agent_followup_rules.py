@@ -4,6 +4,7 @@ import unittest
 
 from core.agent_followup_rules import (
     AGENT_PRODUCT_HELP_TEXT,
+    AGENT_TRIAL_OR_MODEL_HELP_TEXT,
     classify_agent_follow_up_api_response,
     looks_like_apply_tip_directive,
     looks_like_strong_edit,
@@ -61,6 +62,11 @@ class AgentFollowupRulesTests(unittest.TestCase):
         r = classify_agent_follow_up_api_response("как работает версионирование?", "text")
         self.assertEqual(r["action"], "chat")
         self.assertEqual(r["data"]["message"], AGENT_PRODUCT_HELP_TEXT)
+
+    def test_rules_trial_model_help(self) -> None:
+        r = classify_agent_follow_up_api_response("какая модель недоступна?", "text")
+        self.assertEqual(r["action"], "chat")
+        self.assertEqual(r["data"]["message"], AGENT_TRIAL_OR_MODEL_HELP_TEXT)
 
     def test_rules_default_iterate(self) -> None:
         r = classify_agent_follow_up_api_response("добавь пример использования в конец", "text")
@@ -130,7 +136,16 @@ class ResolveHasPromptActionTests(unittest.TestCase):
             {"intent": "chat", "confidence": 0.99, "margin": 0.5},
         )
         self.assertEqual(r["action"], "chat")
+        self.assertEqual(r["data"]["message"], AGENT_TRIAL_OR_MODEL_HELP_TEXT)
+
+    def test_semantic_chat_fallback_includes_help(self) -> None:
+        r = self._resolve(
+            "ленивый кот спит на диване целый день",
+            {"intent": "chat", "confidence": 0.99, "margin": 0.5},
+        )
+        self.assertEqual(r["action"], "chat")
         self.assertIn("Версии", r["data"]["message"])
+        self.assertIn("понял", r["data"]["message"].lower())
 
     def test_judge_hints_override_semantic_chat(self) -> None:
         r = self._resolve(

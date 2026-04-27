@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { getTagAccent, setTagAccent } from '../lib/tagAccentColors'
+import ThemedTooltip from './ThemedTooltip'
 import styles from './LibraryTagChips.module.css'
 
 type Props = {
@@ -72,23 +73,23 @@ export default function LibraryTagChips({ tags, className = '', displayOnly = fa
       {list.map((tag) => {
         const accent = getTagAccent(tag)
         return (
-          <button
-            key={tag}
-            type="button"
-            className={styles.chip}
-            title="Нажмите, чтобы задать цвет тега"
-            style={
-              accent
-                ? {
-                    borderColor: accent,
-                    color: accent,
-                  }
-                : undefined
-            }
-            onClick={() => openPicker(tag)}
-          >
-            {tag}
-          </button>
+          <ThemedTooltip key={tag} content="Нажмите, чтобы задать цвет тега" side="top" delayMs={280}>
+            <button
+              type="button"
+              className={styles.chip}
+              style={
+                accent
+                  ? {
+                      borderColor: accent,
+                      color: accent,
+                    }
+                  : undefined
+              }
+              onClick={() => openPicker(tag)}
+            >
+              {tag}
+            </button>
+          </ThemedTooltip>
         )
       })}
     </div>

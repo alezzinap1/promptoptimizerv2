@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ThemedTooltip from '../../components/ThemedTooltip'
 import { evalApi, type EvalLibrarySummary } from '../../api/eval'
 import css from './Stability.module.css'
 
@@ -26,12 +27,15 @@ export default function EvalBadge({ libraryId }: Props) {
   const { last } = data
   if (last.agg_overall_p50 == null) return null
   return (
-    <span
-      className={css.evalBadge}
-      title={`Стабильность: p50=${last.agg_overall_p50.toFixed(2)} · diversity=${last.diversity_score?.toFixed(2) ?? '–'}`}
+    <ThemedTooltip
+      content={`Стабильность: p50=${last.agg_overall_p50.toFixed(2)} · diversity=${last.diversity_score?.toFixed(2) ?? '–'}`}
+      side="top"
+      delayMs={280}
     >
-      ⚖ {last.agg_overall_p50.toFixed(1)}
-      {last.diversity_score != null && <span className={css.muted}>±{last.diversity_score.toFixed(2)}</span>}
-    </span>
+      <span className={css.evalBadge}>
+        ⚖ {last.agg_overall_p50.toFixed(1)}
+        {last.diversity_score != null && <span className={css.muted}>±{last.diversity_score.toFixed(2)}</span>}
+      </span>
+    </ThemedTooltip>
   )
 }

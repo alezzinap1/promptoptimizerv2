@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { Workspace } from '../api/client'
 import menuStyles from './DropdownMenu.module.css'
 import PortalDropdown from './PortalDropdown'
+import ThemedTooltip from './ThemedTooltip'
 import styles from './WorkspacePicker.module.css'
 
 const WorkspaceIcon = () => (
@@ -36,18 +37,19 @@ export default function WorkspacePicker({ workspaces, workspaceId, onSelect, wor
 
   return (
     <div className={styles.wrap}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={styles.trigger}
-        title={summary}
-        aria-label={`Workspace: ${summary}`}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <WorkspaceIcon />
-      </button>
+      <ThemedTooltip content={summary} side="bottom" delayMs={280} disabled={open}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className={styles.trigger}
+          aria-label={`Workspace: ${summary}`}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <WorkspaceIcon />
+        </button>
+      </ThemedTooltip>
       <PortalDropdown open={open} onClose={() => setOpen(false)} anchorRef={triggerRef} minWidth={220}>
         <button
           type="button"
@@ -63,19 +65,19 @@ export default function WorkspacePicker({ workspaces, workspaceId, onSelect, wor
         {workspaces.map((ws) => {
           const id = Number(ws.id ?? 0)
           return (
-            <button
-              key={`${id}-${ws.name}`}
-              type="button"
-              role="option"
-              className={`${menuStyles.menuItem} ${workspaceId === id ? menuStyles.menuItemActive : ''}`}
-              title={ws.description || ws.name}
-              onClick={() => {
-                onSelect(id)
-                setOpen(false)
-              }}
-            >
-              {ws.name}
-            </button>
+            <ThemedTooltip key={`${id}-${ws.name}`} content={ws.description || ws.name} side="left" delayMs={220} block>
+              <button
+                type="button"
+                role="option"
+                className={`${menuStyles.menuItem} ${workspaceId === id ? menuStyles.menuItemActive : ''}`}
+                onClick={() => {
+                  onSelect(id)
+                  setOpen(false)
+                }}
+              >
+                {ws.name}
+              </button>
+            </ThemedTooltip>
           )
         })}
         <div className={menuStyles.menuDivider} />

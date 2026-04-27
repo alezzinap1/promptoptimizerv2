@@ -16,8 +16,15 @@ import {
 import AutoTextarea from '../components/AutoTextarea'
 import menuStyles from '../components/DropdownMenu.module.css'
 import MarkdownOutput from '../components/MarkdownOutput'
+import {
+  nextLlmStreamChunkSize,
+  nextLlmStreamDelayMs,
+  StreamedMarkdownOutput,
+  useSimulatedLlmStream,
+} from '../lib/simulatedLlmStream'
 import PortalDropdown from '../components/PortalDropdown'
 import SelectDropdown from '../components/SelectDropdown'
+import ThemedTooltip from '../components/ThemedTooltip'
 import TierSelector, { loadTier, type TierValue } from '../components/TierSelector'
 import TranslateButton from '../components/TranslateButton'
 import WorkspacePicker from '../components/WorkspacePicker'
@@ -70,6 +77,7 @@ import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
 import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
 import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
 import { appendLocalSkill, loadLocalSkills } from '../lib/localSkillsStore'
+import { isIdePromptStreamSeen, markIdePromptStreamSeen } from '../lib/idePromptStreamStorage'
 import { buildPromptDoneCard } from '../lib/studioPromptDoneCard'
 import type { PromptDoneCard } from '../lib/studioPromptDoneCard'
 import checkboxList from '../styles/CheckboxOptionList.module.css'
@@ -79,6 +87,33 @@ import styles from './Home.module.css'
 const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
 const ACTIVE_SESSION_KEY = 'prompt-engineer-active-prompt-session'
 const HOME_AGENT_SPLIT_KEY = 'prompt-engineer-home-agent-split'
+
+const LLM_REVIEW_DOCK_HELP =
+  'Судья анализирует формулировку промпта, не выполняет вашу задачу. Если текст похож на ответ задачи — «Свежая оценка».'
+
+function LlmReviewIconMaximize() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  )
+}
+
+function LlmReviewIconRestore() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14 3 21" />
+    </svg>
+  )
+}
+
+function LlmReviewIconClose() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
 
 /** Если в ответе одновременно [PROMPT] и хвост [QUESTIONS], UI зависает в режиме вопросов. */
 function normalizeClientGenerateResult(res: GenerateResult): GenerateResult {
@@ -284,8 +319,6 @@ const AGENT_THINKING_PHASES = [
   'Проверяю согласованность…',
 ]
 
-const THINKING_TYPEWRITER_BASE_MS = 26
-
 const PRE_PROMPT_ROUTING_LINE = 'Слушаю реплику и подбираю ответ…'
 const PRE_PROMPT_TASK_LINE = 'Понял задачу — собираю промпт…'
 const PRE_PROMPT_SKILL_LINE = 'Понял — оформляю скилл…'
@@ -418,6 +451,22 @@ export default function Home() {
     skill: cloneAgentStudioSnapshot(createEmptyStudioSnapshot('skill')),
   })
 
+  const idePromptBlock = result?.prompt_block ?? ''
+  const ideSessionKey = sessionId?.trim() ?? ''
+  const ideStreamSeen =
+    Boolean(ideSessionKey && idePromptBlock.trim()) && isIdePromptStreamSeen(ideSessionKey, idePromptBlock)
+  const markIdeStreamComplete = useCallback(() => {
+    if (!ideSessionKey || !idePromptBlock.trim()) return
+    markIdePromptStreamSeen(ideSessionKey, idePromptBlock)
+  }, [ideSessionKey, idePromptBlock])
+  const streamedPromptIde = useSimulatedLlmStream(idePromptBlock, {
+    suspend: loading || ideStreamSeen,
+    onStreamComplete: markIdeStreamComplete,
+  })
+  const streamedLlmReviewBody = useSimulatedLlmStream(llmReviewText, {
+    suspend: llmReviewBusy || llmReviewFromCache,
+  })
+
   const applyExpertPreset = useCallback((level: ExpertLevel, mode: PromptStudioMode) => {
     const p = getExpertLevelPreset(level, mode)
     setQuestionsMode(p.questionsMode)
@@ -437,6 +486,11 @@ export default function Home() {
     setFeedback(fresh.feedback)
     setResult(fresh.result)
     setSessionId(fresh.sessionId)
+    const hid = fresh.sessionId?.trim()
+    const pbt = typeof fresh.result?.prompt_block === 'string' ? fresh.result.prompt_block : ''
+    if (hid && pbt.trim()) {
+      markIdePromptStreamSeen(hid, pbt)
+    }
     setIterationMode(fresh.iterationMode)
     setQuestionState(fresh.questionState)
     setQuestionCarouselIdx(fresh.questionCarouselIdx)
@@ -933,13 +987,21 @@ export default function Home() {
           const latest = items[items.length - 1] as Record<string, unknown>
           const finalPrompt = String(latest.final_prompt || '')
           if (finalPrompt) {
-            setResult((prev) =>
-              mergeSessionVersionIntoResult(
+            setResult((prev) => {
+              const merged = mergeSessionVersionIntoResult(
                 prev?.session_id === sessionId ? prev : null,
                 latest,
                 sessionId,
-              ),
-            )
+              )
+              const fp = merged.prompt_block?.trim() ?? ''
+              if (sessionId?.trim() && fp) {
+                const reusePrev = Boolean(prev && prev.session_id === sessionId && prev.has_prompt)
+                if (!reusePrev) {
+                  markIdePromptStreamSeen(sessionId, fp)
+                }
+              }
+              return merged
+            })
             const ti = String(latest.task_input || '')
             if (ti) {
               setTaskInput(ti)
@@ -997,21 +1059,22 @@ export default function Home() {
     }
     const full =
       agentThinkingLine ?? AGENT_THINKING_PHASES[agentThinkingIdx % AGENT_THINKING_PHASES.length]
-    let i = 0
+    let pos = 0
     setThinkingStreamText('')
     let cancelled = false
     const twIds: number[] = []
     const tick = () => {
       if (cancelled) return
-      i += 1
-      if (i > full.length) {
+      if (pos >= full.length) {
         setThinkingStreamText(full)
         return
       }
-      setThinkingStreamText(full.slice(0, i))
-      twIds.push(window.setTimeout(tick, THINKING_TYPEWRITER_BASE_MS + Math.floor(Math.random() * 42)))
+      const chunk = nextLlmStreamChunkSize()
+      pos = Math.min(full.length, pos + chunk)
+      setThinkingStreamText(full.slice(0, pos))
+      twIds.push(window.setTimeout(tick, nextLlmStreamDelayMs()))
     }
-    twIds.push(window.setTimeout(tick, 48 + Math.floor(Math.random() * 140)))
+    twIds.push(window.setTimeout(tick, nextLlmStreamDelayMs()))
     return () => {
       cancelled = true
       twIds.forEach((tid) => window.clearTimeout(tid))
@@ -2275,65 +2338,69 @@ export default function Home() {
         <div className={`${styles.wizardFooter} ${styles.wizardFooterCompact}`}>
           <div className={styles.wizardToolbar}>
             {idx > 0 ? (
-              <button
-                type="button"
-                className={styles.wizIconBtn}
-                aria-label="Назад"
-                title="Назад"
-                onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path
-                    d="M15 18l-6-6 6-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+              <ThemedTooltip content="Назад" side="top" delayMs={200}>
+                <button
+                  type="button"
+                  className={styles.wizIconBtn}
+                  aria-label="Назад"
+                  onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M15 18l-6-6 6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </ThemedTooltip>
             ) : (
               <span className={styles.wizToolbarLeadSpacer} aria-hidden />
             )}
-            <button
-              type="button"
-              className={styles.wizTextBtn}
-              disabled={loading}
-              aria-label="Скип — без ответов на уточнения"
-              title="Пропустить все уточнения и сгенерировать промпт"
-              onClick={() => handleGenerate([], questionGenOpts)}
-            >
-              Скип
-            </button>
+            <ThemedTooltip content="Пропустить все уточнения и сгенерировать промпт" side="top" delayMs={280} disabled={loading}>
+              <button
+                type="button"
+                className={styles.wizTextBtn}
+                disabled={loading}
+                aria-label="Скип — без ответов на уточнения"
+                onClick={() => handleGenerate([], questionGenOpts)}
+              >
+                Скип
+              </button>
+            </ThemedTooltip>
             <span className={styles.wizToolbarGrow} aria-hidden />
             {idx < total - 1 ? (
-              <button
-                type="button"
-                className={`${styles.wizIconBtn} ${styles.wizIconBtnPrimary}`}
-                aria-label={`Вперёд: вопрос ${idx + 2} из ${total}`}
-                title={`Вопрос ${idx + 2} из ${total}`}
-                onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path
-                    d="M9 18l6-6-6-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+              <ThemedTooltip content={`Вопрос ${idx + 2} из ${total}`} side="top" delayMs={220}>
+                <button
+                  type="button"
+                  className={`${styles.wizIconBtn} ${styles.wizIconBtnPrimary}`}
+                  aria-label={`Вперёд: вопрос ${idx + 2} из ${total}`}
+                  onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M9 18l6-6-6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </ThemedTooltip>
             ) : (
-              <button
-                type="button"
-                className={styles.wizCreateBtn}
-                disabled={loading}
-                title="Собрать ответы со всех шагов и сгенерировать промпт"
-                onClick={() => submitWizardAnswers()}
-              >
-                Подтвердить
-              </button>
+              <ThemedTooltip content="Собрать ответы со всех шагов и сгенерировать промпт" side="top" delayMs={280} disabled={loading}>
+                <button
+                  type="button"
+                  className={styles.wizCreateBtn}
+                  disabled={loading}
+                  onClick={() => submitWizardAnswers()}
+                >
+                  Подтвердить
+                </button>
+              </ThemedTooltip>
             )}
           </div>
         </div>
@@ -2396,37 +2463,44 @@ export default function Home() {
                   {result.metrics && (() => {
                     const score = Number(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)
                     return score > 0 ? (
-                      <div className={styles.evalScorePrimary} title={COMPLETENESS_SCORE_TITLE}>
-                        <span className={styles.evalScoreLabel}>Полнота</span>
-                        <div className={styles.evalBar}>
-                          <div className={styles.evalBarFill} style={{ width: `${Math.min(100, score)}%` }} />
+                      <ThemedTooltip content={COMPLETENESS_SCORE_TITLE} side="bottom" delayMs={280} block>
+                        <div className={styles.evalScorePrimary}>
+                          <span className={styles.evalScoreLabel}>Полнота</span>
+                          <div className={styles.evalBar}>
+                            <div className={styles.evalBarFill} style={{ width: `${Math.min(100, score)}%` }} />
+                          </div>
+                          <span className={styles.evalScoreNum}>{score}%</span>
                         </div>
-                        <span className={styles.evalScoreNum}>{score}%</span>
-                      </div>
+                      </ThemedTooltip>
                     ) : null
                   })()}
                   {result.techniques?.length > 0 && (
-                    <span
-                      className={styles.evalMeta}
-                      title={`${TECHNIQUES_COUNT_TITLE} Сейчас: ${result.techniques.map((t) => t.name).join(', ')}.`}
+                    <ThemedTooltip
+                      content={`${TECHNIQUES_COUNT_TITLE} Сейчас: ${result.techniques.map((t) => t.name).join(', ')}.`}
+                      side="bottom"
+                      delayMs={280}
                     >
-                      {result.techniques.length} техн.
-                    </span>
+                      <span className={styles.evalMeta}>{result.techniques.length} техн.</span>
+                    </ThemedTooltip>
                   )}
                   {tokenEstimate > 0 && (
-                    <span className={styles.evalMetaSecondary} title={TOKEN_ESTIMATE_TITLE}>
-                      ≈{tokenEstimate.toLocaleString()} tok
-                    </span>
+                    <ThemedTooltip content={TOKEN_ESTIMATE_TITLE} side="bottom" delayMs={280}>
+                      <span className={styles.evalMetaSecondary}>≈{tokenEstimate.toLocaleString()} tok</span>
+                    </ThemedTooltip>
                   )}
                   {promptCostStr ? (
-                    <span className={styles.evalMetaSecondary} title={PROMPT_COST_TITLE}>
-                      {promptCostStr}
-                    </span>
+                    <ThemedTooltip content={PROMPT_COST_TITLE} side="bottom" delayMs={280}>
+                      <span className={styles.evalMetaSecondary}>{promptCostStr}</span>
+                    </ThemedTooltip>
                   ) : null}
                   {result.scene_analysis_applied ? (
-                    <span className={styles.evalMeta} title="К промпту подмешан структурированный бриф сцены (глубокий режим)">
-                      Deep · сцена
-                    </span>
+                    <ThemedTooltip
+                      content="К промпту подмешан структурированный бриф сцены (глубокий режим)"
+                      side="bottom"
+                      delayMs={280}
+                    >
+                      <span className={styles.evalMeta}>Deep · сцена</span>
+                    </ThemedTooltip>
                   ) : null}
                 </div>
                 <div className={styles.promptToolbar}>
@@ -2444,43 +2518,56 @@ export default function Home() {
                     title="Перевести промпт RU↔EN (одной кнопкой)"
                   />
                   {promptType === 'text' && (
-                    <button
-                      type="button"
-                      className={styles.toolbarTextBtn}
-                      title="Проверить промпт: один раунд с выбранной моделью (POST /playground/run)"
+                    <ThemedTooltip
+                      content="Проверить промпт: один раунд с выбранной моделью (POST /playground/run)"
+                      side="bottom"
+                      delayMs={300}
                       disabled={loading}
-                      onClick={() => {
-                        setPromptPlaygroundLog([])
-                        setPromptPlaygroundInput('')
-                        setPromptPlaygroundOpen(true)
-                      }}
                     >
-                      Песочница
-                    </button>
+                      <button
+                        type="button"
+                        className={styles.toolbarTextBtn}
+                        disabled={loading}
+                        onClick={() => {
+                          setPromptPlaygroundLog([])
+                          setPromptPlaygroundInput('')
+                          setPromptPlaygroundOpen(true)
+                        }}
+                      >
+                        Песочница
+                      </button>
+                    </ThemedTooltip>
                   )}
                   {promptType === 'image' && (
-                    <button
-                      type="button"
-                      className={styles.toolbarTextBtn}
-                      title="Пробная генерация (OpenRouter image-модель из настроек или gemini-2.5-flash-image). Картинку можно сохранить в библиотеку вместе с промптом."
+                    <ThemedTooltip
+                      content="Пробная генерация (OpenRouter image-модель из настроек или gemini-2.5-flash-image). Картинку можно сохранить в библиотеку вместе с промптом."
+                      side="bottom"
+                      delayMs={320}
                       disabled={loading || imageTryBusy}
-                      onClick={() => void runImageTryNano()}
                     >
-                      {imageTryBusy ? 'Рисую…' : 'Проба картинки'}
-                    </button>
+                      <button
+                        type="button"
+                        className={styles.toolbarTextBtn}
+                        disabled={loading || imageTryBusy}
+                        onClick={() => void runImageTryNano()}
+                      >
+                        {imageTryBusy ? 'Рисую…' : 'Проба картинки'}
+                      </button>
+                    </ThemedTooltip>
                   )}
                   <span className={styles.techModeMicroWrap}>
-                    <button
-                      type="button"
-                      className={styles.quickSaveBtn}
-                      title="Опубликовать в сообществе"
-                      onClick={() => setPublishCommunityOpen(true)}
-                    >
+                    <ThemedTooltip content="Опубликовать в сообществе" side="bottom" delayMs={260}>
+                      <button
+                        type="button"
+                        className={styles.quickSaveBtn}
+                        onClick={() => setPublishCommunityOpen(true)}
+                      >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                         <circle cx="12" cy="12" r="10" />
                         <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                       </svg>
-                    </button>
+                      </button>
+                    </ThemedTooltip>
                     {quickSaved && publishCommunityHintVisible ? (
                       <span
                         className={styles.seniorTechHintBubble}
@@ -2492,32 +2579,42 @@ export default function Home() {
                     ) : null}
                   </span>
                   {!quickSaved && (
-                    <button
-                      type="button"
-                      className={styles.toolbarTextBtn}
-                      title={promptType === 'skill' ? 'Сохранить скилл в локальную библиотеку' : 'Сохранить промпт в библиотеку на сервере'}
-                      onClick={handleQuickSave}
+                    <ThemedTooltip
+                      content={
+                        promptType === 'skill'
+                          ? 'Сохранить скилл в локальную библиотеку'
+                          : 'Сохранить промпт в библиотеку на сервере'
+                      }
+                      side="bottom"
+                      delayMs={280}
                     >
-                      <span className={styles.toolbarSaveInner}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                        </svg>
-                        {promptType === 'skill' ? 'В скиллы' : 'В библиотеку'}
-                      </span>
-                    </button>
+                      <button type="button" className={styles.toolbarTextBtn} onClick={handleQuickSave}>
+                        <span className={styles.toolbarSaveInner}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                          </svg>
+                          {promptType === 'skill' ? 'В скиллы' : 'В библиотеку'}
+                        </span>
+                      </button>
+                    </ThemedTooltip>
                   )}
                   {quickSaved && (
-                    <span
-                      className={styles.quickSavedMark}
-                      title={promptType === 'skill' ? 'Сохранено в библиотеку скиллов' : 'Сохранено в библиотеку'}
+                    <ThemedTooltip
+                      content={
+                        promptType === 'skill' ? 'Сохранено в библиотеку скиллов' : 'Сохранено в библиотеку'
+                      }
+                      side="bottom"
+                      delayMs={240}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                    </span>
+                      <span className={styles.quickSavedMark}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                      </span>
+                    </ThemedTooltip>
                   )}
                 </div>
               </div>
               <div className={styles.resultMarkdownWrap}>
-                <MarkdownOutput>{result.prompt_block}</MarkdownOutput>
+                <MarkdownOutput>{streamedPromptIde}</MarkdownOutput>
               </div>
               {promptType === 'image' && imageTryDataUrl ? (
                 <div className={styles.imageTryPreview}>
@@ -2529,7 +2626,7 @@ export default function Home() {
               ) : null}
               <button
                 type="button"
-                className={styles.ideModalBtn}
+                className={`${styles.ideModalBtn} ${styles.llmJudgeCta}`}
                 disabled={llmReviewBusy}
                 onClick={() => void runLlmReview()}
               >
@@ -2544,48 +2641,57 @@ export default function Home() {
                 <div className={styles.tipsBox}>
                   <div className={styles.tipsBoxHead}>
                     <strong>Что можно улучшить:</strong>
-                    <button
-                      type="button"
-                      className={styles.tipsApplyAllBtn}
+                    <ThemedTooltip
+                      content="Вставить все советы в запрос на доработку одним действием"
+                      side="top"
+                      delayMs={280}
                       disabled={loading}
-                      title="Вставить все советы в запрос на доработку одним действием"
-                      onClick={() => {
-                        const tips = result.metrics?.improvement_tips as string[]
-                        const body = tips.map((t, i) => `${i + 1}. ${t}`).join('\n')
-                        setChatInput(`Учти и примени советы по очереди:\n${body}`)
-                      }}
                     >
-                      Применить всё
-                    </button>
+                      <button
+                        type="button"
+                        className={styles.tipsApplyAllBtn}
+                        disabled={loading}
+                        onClick={() => {
+                          const tips = result.metrics?.improvement_tips as string[]
+                          const body = tips.map((t, i) => `${i + 1}. ${t}`).join('\n')
+                          setChatInput(`Учти и примени советы по очереди:\n${body}`)
+                        }}
+                      >
+                        Применить всё
+                      </button>
+                    </ThemedTooltip>
                   </div>
                   <ul>
                     {(result.metrics.improvement_tips as string[]).map((tip, idx) => (
                       <li key={idx} className={styles.tipItem}>
                         <span className={styles.tipText}>{tip}</span>
-                        <button
-                          type="button"
-                          className={styles.tipApplyBtn}
-                          disabled={loading}
-                          title="Автоматически применить этот совет"
-                          onClick={() => {
-                            setChatInput(`Примени совет: ${tip}`)
-                          }}
-                        >
-                          + Применить
-                        </button>
+                        <ThemedTooltip content="Автоматически применить этот совет" side="top" delayMs={260} disabled={loading}>
+                          <button
+                            type="button"
+                            className={styles.tipApplyBtn}
+                            disabled={loading}
+                            onClick={() => {
+                              setChatInput(`Примени совет: ${tip}`)
+                            }}
+                          >
+                            + Применить
+                          </button>
+                        </ThemedTooltip>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
               {result?.has_prompt && (
-                <p className={styles.strategicHint} title={COMPLETENESS_SCORE_TITLE}>
-                  {promptType === 'skill'
-                    ? 'Оценка полноты для скилла смотрит на структуру инструкции (роль, шаги, формат). Это не оценка «умения» будущего ассистента.'
-                    : result.metrics?.prompt_analysis_mode === 'image'
-                      ? 'Оценка полноты для изображений: субъект, стиль, композиция, свет/палитра, негатив, техника (эвристика на сервере). Это не оценка художественного качества картинки.'
-                      : 'Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.'}
-                </p>
+                <ThemedTooltip content={COMPLETENESS_SCORE_TITLE} side="bottom" delayMs={280} block>
+                  <div className={styles.strategicHint}>
+                    {promptType === 'skill'
+                      ? 'Оценка полноты для скилла смотрит на структуру инструкции (роль, шаги, формат). Это не оценка «умения» будущего ассистента.'
+                      : result.metrics?.prompt_analysis_mode === 'image'
+                        ? 'Оценка полноты для изображений: субъект, стиль, композиция, свет/палитра, негатив, техника (эвристика на сервере). Это не оценка художественного качества картинки.'
+                        : 'Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.'}
+                  </div>
+                </ThemedTooltip>
               )}
               <div className={styles.actions}>
                 <button
@@ -2671,23 +2777,24 @@ export default function Home() {
                       const score = Number(m.completeness_score ?? m.quality_score ?? 0)
                       const tok = Number(m.token_estimate ?? 0)
                       const isCurrent = result?.prompt_block === String(v.final_prompt || '')
+                      const versionTip = `v${String(v.version)} · ${String(v.created_at || '')}${score ? ` · ${score}%` : ''}${tok ? ` · ≈${tok} tok` : ''}`
                       return (
-                        <button
-                          key={String(v.version)}
-                          type="button"
-                          className={`${styles.versionPill} ${isCurrent ? styles.versionPillActive : ''}`}
-                          title={`v${String(v.version)} · ${String(v.created_at || '')}${score ? ` · ${score}%` : ''}${tok ? ` · ≈${tok} tok` : ''}`}
-                          onClick={() =>
-                            setResult((prev) =>
-                              prev && sessionId
-                                ? mergeSessionVersionIntoResult(prev, v, sessionId)
-                                : prev,
-                            )
-                          }
-                        >
-                          <span className={styles.versionPillNum}>v{String(v.version)}</span>
-                          {score > 0 && <span className={styles.versionPillScore}>{score}%</span>}
-                        </button>
+                        <ThemedTooltip key={String(v.version)} content={versionTip} side="top" delayMs={240}>
+                          <button
+                            type="button"
+                            className={`${styles.versionPill} ${isCurrent ? styles.versionPillActive : ''}`}
+                            onClick={() =>
+                              setResult((prev) =>
+                                prev && sessionId
+                                  ? mergeSessionVersionIntoResult(prev, v, sessionId)
+                                  : prev,
+                              )
+                            }
+                          >
+                            <span className={styles.versionPillNum}>v{String(v.version)}</span>
+                            {score > 0 && <span className={styles.versionPillScore}>{score}%</span>}
+                          </button>
+                        </ThemedTooltip>
                       )
                     })}
                   </div>
@@ -2754,23 +2861,27 @@ export default function Home() {
                         footerLink={{ to: '/help', label: t.studio.helpLevelsFooter }}
                       />
                       {useCustomGenModel ? (
-                        <span
-                          className={styles.expertLevelModelHint}
-                          title="Сбросить к модели профиля уровня студии (ниже — сложность Авто/Повседневный/…)"
+                        <ThemedTooltip
+                          content="Сбросить к модели профиля уровня студии (ниже — сложность Авто/Повседневный/…)"
+                          side="bottom"
+                          delayMs={280}
+                          block
                         >
-                          <span className={styles.expertLevelModelShort}>{shortGenerationModelLabel(genModel)}</span>
-                          <button
-                            type="button"
-                            className={styles.expertLevelModelReset}
-                            disabled={loading}
-                            onClick={() => {
-                              setUseCustomGenModel(false)
-                              setGenModel(EXPERT_DEFAULT_GEN_MODEL[expertLevel])
-                            }}
-                          >
-                            {t.studio.resetToProfile}
-                          </button>
-                        </span>
+                          <span className={styles.expertLevelModelHint}>
+                            <span className={styles.expertLevelModelShort}>{shortGenerationModelLabel(genModel)}</span>
+                            <button
+                              type="button"
+                              className={styles.expertLevelModelReset}
+                              disabled={loading}
+                              onClick={() => {
+                                setUseCustomGenModel(false)
+                                setGenModel(EXPERT_DEFAULT_GEN_MODEL[expertLevel])
+                              }}
+                            >
+                              {t.studio.resetToProfile}
+                            </button>
+                          </span>
+                        </ThemedTooltip>
                       ) : null}
                     </div>
                   </div>
@@ -2792,19 +2903,23 @@ export default function Home() {
                       {taskTextTokensLoading ? (
                         <span className={styles.evalMetaSecondary}>…</span>
                       ) : (
-                        <span
-                          className={styles.evalMetaSecondary}
-                          title="Токены только текста задачи (то, что улучшаем). Без system, без истории чата."
+                        <ThemedTooltip
+                          content="Токены только текста задачи (то, что улучшаем). Без system, без истории чата."
+                          side="bottom"
+                          delayMs={280}
                         >
-                          ≈{taskTextTokens ? taskTextTokens.tokens.toLocaleString() : '—'} tok
-                        </span>
+                          <span className={styles.evalMetaSecondary}>
+                            ≈{taskTextTokens ? taskTextTokens.tokens.toLocaleString() : '—'} tok
+                          </span>
+                        </ThemedTooltip>
                       )}
-                      <span
-                        className={styles.evalMeta}
-                        title="Размер исходной формулировки задачи; сравните с ≈tok у готового промпта справа"
+                      <ThemedTooltip
+                        content="Размер исходной формулировки задачи; сравните с ≈tok у готового промпта справа"
+                        side="bottom"
+                        delayMs={280}
                       >
-                        {t.studio.taskWord}
-                      </span>
+                        <span className={styles.evalMeta}>{t.studio.taskWord}</span>
+                      </ThemedTooltip>
                     </div>
                   </div>
                 ) : null}
@@ -2816,43 +2931,49 @@ export default function Home() {
                       {imagePromptTags.map((id) => {
                         const def = IMAGE_STYLES_BY_ID[id]
                         return (
-                          <button
-                            key={id}
-                            type="button"
-                            className={styles.imageSelectedChip}
-                            onClick={() => toggleImageTag(id)}
-                            title={def?.description ?? id}
-                          >
-                            {def?.label ?? id}
-                          </button>
+                          <ThemedTooltip key={id} content={def?.description ?? id} side="top" delayMs={240}>
+                            <button
+                              type="button"
+                              className={styles.imageSelectedChip}
+                              onClick={() => toggleImageTag(id)}
+                            >
+                              {def?.label ?? id}
+                            </button>
+                          </ThemedTooltip>
                         )
                       })}
                     </div>
-                    <button
-                      ref={imageStyleMoreBtnRef}
-                      type="button"
-                      className={styles.imageStyleMenuBtn}
-                      title="Открыть каталог стилей"
-                      aria-label="Каталог стилей изображения"
-                      aria-expanded={imageStylePickerOpen}
-                      aria-haspopup="listbox"
-                      onClick={() => setImageStylePickerOpen((o) => !o)}
-                    >
-                      Стили
-                    </button>
+                    <ThemedTooltip content="Открыть каталог стилей" side="bottom" delayMs={240}>
+                      <button
+                        ref={imageStyleMoreBtnRef}
+                        type="button"
+                        className={styles.imageStyleMenuBtn}
+                        aria-label="Каталог стилей изображения"
+                        aria-expanded={imageStylePickerOpen}
+                        aria-haspopup="listbox"
+                        onClick={() => setImageStylePickerOpen((o) => !o)}
+                      >
+                        Стили
+                      </button>
+                    </ThemedTooltip>
                   </div>
-                  <button
-                    type="button"
-                    className={`${styles.imageDeepToggle} ${imageDeepMode ? styles.imageDeepToggleOn : ''}`}
-                    aria-pressed={imageDeepMode}
-                    title="Анализирует сцену и добавляет детали освещения, перспективы и атмосферы перед генерацией промпта. Дороже по токенам, обычно точнее."
-                    onClick={() => setImageDeepMode((v) => !v)}
+                  <ThemedTooltip
+                    content="Анализирует сцену и добавляет детали освещения, перспективы и атмосферы перед генерацией промпта. Дороже по токенам, обычно точнее."
+                    side="bottom"
+                    delayMs={280}
                   >
-                    <span className={styles.imageDeepIcon} aria-hidden>
-                      🔬
-                    </span>
-                    <span className={styles.imageDeepToggleText}>Анализ сцены</span>
-                  </button>
+                    <button
+                      type="button"
+                      className={`${styles.imageDeepToggle} ${imageDeepMode ? styles.imageDeepToggleOn : ''}`}
+                      aria-pressed={imageDeepMode}
+                      onClick={() => setImageDeepMode((v) => !v)}
+                    >
+                      <span className={styles.imageDeepIcon} aria-hidden>
+                        🔬
+                      </span>
+                      <span className={styles.imageDeepToggleText}>Анализ сцены</span>
+                    </button>
+                  </ThemedTooltip>
                 </div>
               )}
               {promptType === 'skill' && chatMessages.length === 0 ? (
@@ -2889,9 +3010,11 @@ export default function Home() {
                         >
                           <div className={styles.editPreviewHead}>
                             <span className={styles.editPreviewTitle}>Превью правки</span>
-                            <span className={styles.editPreviewInstr} title={ep.instruction}>
-                              {ep.instruction.length > 120 ? `${ep.instruction.slice(0, 120)}…` : ep.instruction}
-                            </span>
+                            <ThemedTooltip content={ep.instruction} side="bottom" delayMs={240} block>
+                              <span className={styles.editPreviewInstr}>
+                                {ep.instruction.length > 120 ? `${ep.instruction.slice(0, 120)}…` : ep.instruction}
+                              </span>
+                            </ThemedTooltip>
                           </div>
                           {ep.diffOps.length > 0 ? (
                             <ul className={styles.editPreviewDiff} aria-label="Построчные изменения">
@@ -2944,7 +3067,7 @@ export default function Home() {
                             </span>
                           </summary>
                           <div className={styles.tipAppliedBody}>
-                            <MarkdownOutput>{m.appliedTip.fullText}</MarkdownOutput>
+                            <StreamedMarkdownOutput source={m.appliedTip.fullText} suspend={false} />
                           </div>
                         </details>
                       )
@@ -2963,19 +3086,20 @@ export default function Home() {
                               ✓
                             </span>
                             {isOldVersion ? (
-                              <button
-                                type="button"
-                                className={styles.promptDoneVersionBtn}
-                                title="Вернуться к этой версии промпта"
-                                onClick={() =>
-                                  setVersionRestoreConfirm({
-                                    version: card.version,
-                                    prompt: card.promptSnapshot,
-                                  })
-                                }
-                              >
-                                v{card.version}
-                              </button>
+                              <ThemedTooltip content="Вернуться к этой версии промпта" side="top" delayMs={240}>
+                                <button
+                                  type="button"
+                                  className={styles.promptDoneVersionBtn}
+                                  onClick={() =>
+                                    setVersionRestoreConfirm({
+                                      version: card.version,
+                                      prompt: card.promptSnapshot,
+                                    })
+                                  }
+                                >
+                                  v{card.version}
+                                </button>
+                              </ThemedTooltip>
                             ) : (
                               <span className={styles.promptDoneVersion}>v{card.version}</span>
                             )}
@@ -3189,7 +3313,7 @@ export default function Home() {
                           key={m.id}
                           className={`${styles.chatBubbleAssistant} ${styles.chatBubbleClarify}`}
                         >
-                          <MarkdownOutput>{m.content}</MarkdownOutput>
+                          <StreamedMarkdownOutput source={m.content} suspend={false} />
                           {rc.reason ? <p className={styles.routerClarifyReason}>— {rc.reason}</p> : null}
                           <button
                             type="button"
@@ -3213,7 +3337,7 @@ export default function Home() {
                             <span className={styles.thinkingSummaryText}>{firstLine.replace(/\*\*/g, '')}</span>
                           </summary>
                           <div className={styles.thinkingBody}>
-                            <MarkdownOutput>{displayContent}</MarkdownOutput>
+                            <StreamedMarkdownOutput source={displayContent} suspend={false} />
                           </div>
                         </details>
                       )
@@ -3223,7 +3347,7 @@ export default function Home() {
                         key={m.id}
                         className={m.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAssistant}
                       >
-                        <MarkdownOutput>{displayContent}</MarkdownOutput>
+                        <StreamedMarkdownOutput source={displayContent} suspend={m.role === 'user'} />
                         {m.role === 'assistant' && m.clarificationQA !== undefined ? (
                           <details className={styles.clarificationRecap}>
                             <summary>Показать вопросы и ответы</summary>
@@ -3332,12 +3456,16 @@ export default function Home() {
                 <div className={cb.composerFooter}>
                   <div className={cb.composerFooterRow}>
                     <div className={cb.composerFooterMid}>
-                      <span
-                        className={styles.studioCostHint}
-                        title={`Ориентир по профилю «${activeLevelBundle.label}»: фактические токены и цена зависят от модели и длины.`}
+                      <ThemedTooltip
+                        content={`Ориентир по профилю «${activeLevelBundle.label}»: фактические токены и цена зависят от модели и длины.`}
+                        side="top"
+                        delayMs={280}
+                        block
                       >
-                        {activeLevelBundle.estimatedCalls} вызов(ов) · {activeLevelBundle.estimatedCostHint}
-                      </span>
+                        <span className={styles.studioCostHint}>
+                          {activeLevelBundle.estimatedCalls} вызов(ов) · {activeLevelBundle.estimatedCostHint}
+                        </span>
+                      </ThemedTooltip>
                       <TierSelector
                         value={tier}
                         onChange={(t) => {
@@ -3347,12 +3475,12 @@ export default function Home() {
                         disabled={loading}
                       />
                       {tier === 'custom' ? (
-                        <span
-                          title={
-                            isReasoningModelId(genModel)
-                              ? 'Эта модель думает сама — упрощённый промпт даст лучший результат'
-                              : undefined
-                          }
+                        <ThemedTooltip
+                          content="Эта модель думает сама — упрощённый промпт даст лучший результат"
+                          side="top"
+                          delayMs={280}
+                          disabled={!isReasoningModelId(genModel)}
+                          block
                           className={styles.genModelWrap}
                         >
                           <SelectDropdown
@@ -3367,7 +3495,7 @@ export default function Home() {
                             disabled={loading}
                             footerLink={{ to: '/models', label: 'Добавить модель' }}
                           />
-                        </span>
+                        </ThemedTooltip>
                       ) : null}
                       <WorkspacePicker
                         workspaces={workspaces}
@@ -3430,27 +3558,36 @@ export default function Home() {
                         />
                       )}
                       <span className={styles.techModeMicroWrap}>
-                        <button
-                          type="button"
-                          className={styles.techModeMicro}
-                          title={techniqueMode === 'auto' ? 'Техники: авто — нажмите для выбора вручную' : 'Техники: вручную — нажмите для авто'}
-                          aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
-                          aria-pressed={techniqueMode === 'manual'}
-                          disabled={loading}
-                          onClick={() => {
-                            if (
-                              expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
-                              techniqueMode === 'manual' &&
-                              manualTechPickerCollapsed
-                            ) {
-                              setManualTechPickerCollapsed(false)
-                              return
-                            }
-                            setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))
-                          }}
+                        <ThemedTooltip
+                          content={
+                            techniqueMode === 'auto'
+                              ? 'Техники: авто — нажмите для выбора вручную'
+                              : 'Техники: вручную — нажмите для авто'
+                          }
+                          side="top"
+                          delayMs={240}
                         >
-                          {techniqueMode === 'auto' ? 'A' : '✎'}
-                        </button>
+                          <button
+                            type="button"
+                            className={styles.techModeMicro}
+                            aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
+                            aria-pressed={techniqueMode === 'manual'}
+                            disabled={loading}
+                            onClick={() => {
+                              if (
+                                expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
+                                techniqueMode === 'manual' &&
+                                manualTechPickerCollapsed
+                              ) {
+                                setManualTechPickerCollapsed(false)
+                                return
+                              }
+                              setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))
+                            }}
+                          >
+                            {techniqueMode === 'auto' ? 'A' : '✎'}
+                          </button>
+                        </ThemedTooltip>
                         {expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
                         techniqueMode === 'manual' &&
                         manualTechPickerCollapsed &&
@@ -3474,16 +3611,17 @@ export default function Home() {
                       </button>
                     </div>
                     <div className={cb.composerFooterEnd}>
-                      <button
-                        type="button"
-                        className={cb.composerSend}
-                        onClick={handleAgentSend}
-                        disabled={!chatInput.trim() || loading}
-                        title="Отправить в чат"
-                        aria-label="Отправить в чат"
-                      >
-                        {loading ? <span className={cb.composerSendSpinner} aria-hidden /> : <span aria-hidden>↑</span>}
-                      </button>
+                      <ThemedTooltip content="Отправить в чат" side="left" delayMs={240}>
+                        <button
+                          type="button"
+                          className={cb.composerSend}
+                          onClick={handleAgentSend}
+                          disabled={!chatInput.trim() || loading}
+                          aria-label="Отправить в чат"
+                        >
+                          {loading ? <span className={cb.composerSendSpinner} aria-hidden /> : <span aria-hidden>↑</span>}
+                        </button>
+                      </ThemedTooltip>
                     </div>
                   </div>
                 </div>
@@ -3535,16 +3673,25 @@ export default function Home() {
                     <div className={styles.advancedInline}>
                       <label className={styles.advancedInlineField}>
                         Т° {clampExpertGenerationTemperature(temperature)}
-                        <input
-                          type="range"
-                          min={0.1}
-                          max={EXPERT_GENERATION_TEMPERATURE_CAP}
-                          step={0.05}
-                          value={clampExpertGenerationTemperature(temperature)}
-                          title="Потолок температуры для стабильного блока [PROMPT]"
-                          disabled={loading}
-                          onChange={(e) => setTemperature(clampExpertGenerationTemperature(parseFloat(e.target.value)))}
-                        />
+                        <ThemedTooltip
+                          content="Потолок температуры для стабильного блока [PROMPT]"
+                          side="top"
+                          delayMs={240}
+                        >
+                          <span style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                            <input
+                              type="range"
+                              min={0.1}
+                              max={EXPERT_GENERATION_TEMPERATURE_CAP}
+                              step={0.05}
+                              value={clampExpertGenerationTemperature(temperature)}
+                              disabled={loading}
+                              onChange={(e) =>
+                                setTemperature(clampExpertGenerationTemperature(parseFloat(e.target.value)))
+                              }
+                            />
+                          </span>
+                        </ThemedTooltip>
                       </label>
                       <label className={styles.advancedInlineField}>
                         Top-P {topP.toFixed(2)}
@@ -3601,25 +3748,31 @@ export default function Home() {
                               align="right"
                             >
                               {localSkillsForPicker.map((s) => (
-                                <button
+                                <ThemedTooltip
                                   key={s.id}
-                                  type="button"
-                                  role="option"
-                                  className={menuStyles.menuItem}
-                                  title={s.description || s.title}
-                                  onClick={() => {
-                                    setSkillBody((prev) => {
-                                      const next = (prev || '').trim()
-                                      const block = (s.body || '').trim()
-                                      if (!block) return prev
-                                      if (!next) return block
-                                      return `${next}\n\n---\n${s.title}\n\n${block}`
-                                    })
-                                    setSkillInsertOpen(false)
-                                  }}
+                                  content={s.description || s.title}
+                                  side="right"
+                                  delayMs={200}
+                                  block
                                 >
-                                  {s.title}
-                                </button>
+                                  <button
+                                    type="button"
+                                    role="option"
+                                    className={menuStyles.menuItem}
+                                    onClick={() => {
+                                      setSkillBody((prev) => {
+                                        const next = (prev || '').trim()
+                                        const block = (s.body || '').trim()
+                                        if (!block) return prev
+                                        if (!next) return block
+                                        return `${next}\n\n---\n${s.title}\n\n${block}`
+                                      })
+                                      setSkillInsertOpen(false)
+                                    }}
+                                  >
+                                    {s.title}
+                                  </button>
+                                </ThemedTooltip>
                               ))}
                             </PortalDropdown>
                           </>
@@ -3684,29 +3837,52 @@ export default function Home() {
                 aria-labelledby="llm-review-dock-title"
               >
                 <div className={styles.llmReviewDockHead}>
-                  <h3 id="llm-review-dock-title" className={styles.llmReviewDockTitle}>
-                    Оценка промпта (LLM)
-                  </h3>
+                  <div className={styles.llmReviewDockTitleRow}>
+                    <h3 id="llm-review-dock-title" className={styles.llmReviewDockTitle}>
+                      Оценка промпта (LLM)
+                    </h3>
+                    <ThemedTooltip content={LLM_REVIEW_DOCK_HELP} side="top" delayMs={280}>
+                      <button
+                        type="button"
+                        className={styles.llmReviewDockHelpMark}
+                        aria-label={`Справка: ${LLM_REVIEW_DOCK_HELP}`}
+                      >
+                        ?
+                      </button>
+                    </ThemedTooltip>
+                  </div>
                   <div className={styles.llmReviewDockHeadTools}>
-                    <button
-                      type="button"
-                      className={styles.llmReviewDockToolBtn}
-                      onClick={() => setLlmReviewMaximized((m) => !m)}
-                      title={llmReviewMaximized ? 'Обычный размер окна' : 'Развернуть на весь экран'}
+                    <ThemedTooltip
+                      content={
+                        llmReviewMaximized ? 'Обычный размер окна' : 'Развернуть на весь экран'
+                      }
+                      side="bottom"
+                      delayMs={200}
                     >
-                      {llmReviewMaximized ? 'Окно' : 'На весь экран'}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.llmReviewDockClose}
-                      onClick={() => {
-                        setLlmReviewMaximized(false)
-                        setLlmReviewOpen(false)
-                      }}
-                      aria-label="Закрыть"
-                    >
-                      ×
-                    </button>
+                      <button
+                        type="button"
+                        className={styles.llmReviewDockIconBtn}
+                        onClick={() => setLlmReviewMaximized((m) => !m)}
+                        aria-label={
+                          llmReviewMaximized ? 'Обычный размер окна' : 'Развернуть на весь экран'
+                        }
+                      >
+                        {llmReviewMaximized ? <LlmReviewIconRestore /> : <LlmReviewIconMaximize />}
+                      </button>
+                    </ThemedTooltip>
+                    <ThemedTooltip content="Закрыть" side="bottom" delayMs={200}>
+                      <button
+                        type="button"
+                        className={styles.llmReviewDockClose}
+                        onClick={() => {
+                          setLlmReviewMaximized(false)
+                          setLlmReviewOpen(false)
+                        }}
+                        aria-label="Закрыть"
+                      >
+                        <LlmReviewIconClose />
+                      </button>
+                    </ThemedTooltip>
                   </div>
                 </div>
                 <div className={styles.llmReviewDockMeta}>
@@ -3717,13 +3893,6 @@ export default function Home() {
                         ? `${llmReviewModel}${llmReviewFromCache ? ' · из кэша' : ''}`
                         : '—'}
                   </span>
-                  <details className={styles.llmReviewDockHelp}>
-                    <summary>Справка</summary>
-                    <p>
-                      Судья анализирует формулировку промпта, не выполняет вашу задачу. Если текст похож на ответ
-                      задачи — «Свежая оценка».
-                    </p>
-                  </details>
                 </div>
                 <div className={styles.llmReviewDockGrow}>
                   <div className={styles.llmReviewDockScroll}>
@@ -3737,7 +3906,7 @@ export default function Home() {
                         <span>{llmReviewThinkingLine || 'Запрос к судье…'}</span>
                       </div>
                     ) : (
-                      <MarkdownOutput>{llmReviewText || '—'}</MarkdownOutput>
+                      <MarkdownOutput>{streamedLlmReviewBody || (llmReviewBusy ? '' : '—')}</MarkdownOutput>
                     )}
                   </div>
                   {!llmReviewBusy && llmReviewHints.length > 0 && !llmReviewText.startsWith('Ошибка:') ? (
@@ -3885,7 +4054,10 @@ export default function Home() {
                           row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
                         }
                       >
-                        <MarkdownOutput>{row.content}</MarkdownOutput>
+                        <StreamedMarkdownOutput
+                          source={row.content}
+                          suspend={row.role === 'user'}
+                        />
                       </div>
                     ))
                   )}
@@ -3974,7 +4146,10 @@ export default function Home() {
                           row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
                         }
                       >
-                        <MarkdownOutput>{row.content}</MarkdownOutput>
+                        <StreamedMarkdownOutput
+                          source={row.content}
+                          suspend={row.role === 'user'}
+                        />
                       </div>
                     ))
                   )}

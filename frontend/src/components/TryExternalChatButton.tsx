@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import PortalDropdown from './PortalDropdown'
+import ThemedTooltip from './ThemedTooltip'
 import menuStyles from './DropdownMenu.module.css'
 import {
   EXTERNAL_CHAT_PROVIDERS,
@@ -34,27 +35,28 @@ export function TryExternalChatButton({ prompt, title, className }: Props) {
 
   return (
     <div className={styles.wrap}>
-      <button
-        ref={ref}
-        type="button"
-        disabled={disabled}
-        className={`${styles.trigger} ${className || ''}`}
-        onClick={() => setOpen((v) => !v)}
-        title={title ?? defaultTitle}
-        aria-label="Открыть промпт во внешнем чате ИИ"
-        aria-expanded={open}
-        aria-haspopup="menu"
-      >
-        <span className={styles.triggerIcon} aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </span>
-        <span className={styles.triggerLabel}>В чат</span>
-        <span className={styles.triggerChev} aria-hidden>
-          ▾
-        </span>
-      </button>
+      <ThemedTooltip content={title ?? defaultTitle} side="bottom" delayMs={320} disabled={open || disabled}>
+        <button
+          ref={ref}
+          type="button"
+          disabled={disabled}
+          className={`${styles.trigger} ${className || ''}`}
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Открыть промпт во внешнем чате ИИ"
+          aria-expanded={open}
+          aria-haspopup="menu"
+        >
+          <span className={styles.triggerIcon} aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </span>
+          <span className={styles.triggerLabel}>В чат</span>
+          <span className={styles.triggerChev} aria-hidden>
+            ▾
+          </span>
+        </button>
+      </ThemedTooltip>
       <PortalDropdown open={open} onClose={() => setOpen(false)} anchorRef={ref} minWidth={220}>
         <div className={styles.menuHint} role="note">
           Текст копируется в буфер; откроется сайт выбранного ИИ.

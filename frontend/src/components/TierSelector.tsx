@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import SelectDropdown from './SelectDropdown'
+import ThemedTooltip from './ThemedTooltip'
 import { useT } from '../i18n'
 
 export type TierValue = 'auto' | 'fast' | 'mid' | 'advanced' | 'custom'
@@ -88,19 +89,18 @@ export default function TierSelector({
         const active = value === tier
         const pack = t.tiersUi[tier]
         return (
-          <button
-            key={tier}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled}
-            title={pack.hint}
-            onClick={() => {
-              if (disabled) return
-              persistTier(tier)
-              onChange(tier)
-            }}
-            style={{
+          <ThemedTooltip key={tier} content={pack.hint} side="top" delayMs={300}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={disabled}
+              onClick={() => {
+                if (disabled) return
+                persistTier(tier)
+                onChange(tier)
+              }}
+              style={{
               padding: _compact ? '3px 10px' : '5px 14px',
               border: 'none',
               borderRadius: 999,
@@ -112,9 +112,10 @@ export default function TierSelector({
               transition: 'background .12s, color .12s',
               opacity: disabled ? 0.55 : 1,
             }}
-          >
-            {pack.label}
-          </button>
+            >
+              {pack.label}
+            </button>
+          </ThemedTooltip>
         )
       })}
     </div>

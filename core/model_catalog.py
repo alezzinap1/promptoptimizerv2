@@ -5,7 +5,7 @@
 Идея:
 - UI показывает пользователю только «Авто / Повседневный / Средний / Продвинутый», а не имена.
 - Фактический model_id резолвится `services.model_router` с учётом healthcheck и бюджета.
-- Жёсткий потолок: completion ≤ `MAX_COMPLETION_PER_M` ($/1M токенов) для всех Auto-путей.
+- Потолок completion ($/1M): text/skill — `MAX_COMPLETION_PER_M`, image — `MAX_COMPLETION_PER_M_IMAGE`, helper — без потолка.
 - Пользователь со своим ключом OpenRouter всё ещё может вручную выбирать любые модели.
 
 Каталог редактируется здесь; `services.model_health` ежедневно проверяет, что id существуют.
@@ -18,7 +18,10 @@ Tier = Literal["fast", "mid", "advanced", "helper"]
 Mode = Literal["text", "image", "skill"]
 
 MAX_COMPLETION_PER_M: float = 3.0
-TRIAL_MAX_COMPLETION_PER_M: float = 1.0
+"""Потолок $/1M completion для text/skill (auto-пути)."""
+
+MAX_COMPLETION_PER_M_IMAGE: float = 4.0
+"""Чуть выше порог для image: превью/картинки часто дороже при том же качестве."""
 
 CATALOG: dict[Mode, dict[Tier, list[str]]] = {
     "text": {
@@ -97,3 +100,12 @@ def all_catalog_model_ids() -> list[str]:
 def candidates(mode: Mode, tier: Tier) -> list[str]:
     """Приоритетный список кандидатов для (mode, tier). Пустой → пустой список."""
     return list(CATALOG.get(mode, {}).get(tier, []))
+
+
+def completion_budget_cap_per_m(mode: str, tier: str) -> float:
+    """Потолок completion $/1M для health-check. helper = без потолка (inf)."""
+    if tier == "helper":
+        return float("inf")
+    if mode == "image":
+        return MAX_COMPLETION_PER_M_IMAGE
+    return MAX_COMPLETION_PER_M

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from config.settings import MAX_INPUT_CHARS
+from config.settings import MAX_INPUT_CHARS, TRIAL_MAX_COMPLETION_PER_M
 from core.simple_improve import normalize_preset
 from db.manager import DBManager
 from services.llm_client import PROVIDER_MODELS
@@ -12,7 +12,7 @@ DEFAULT_GENERATION_MODELS = [
     PROVIDER_MODELS["gemini_flash"],
 ]
 
-# Trial-safe defaults (completion <= $1/1M)
+# Trial-safe defaults (completion <= TRIAL_MAX_COMPLETION_PER_M from config)
 TRIAL_DEFAULT_GENERATION_MODELS = [
     PROVIDER_MODELS["deepseek"],
     PROVIDER_MODELS["gemini_flash"],
@@ -111,11 +111,11 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         target_models.insert(0, "unknown")
     if use_trial_defaults and gen_models:
         from services.openrouter_models import completion_price_per_m
-        from config.settings import TRIAL_MAX_COMPLETION_PER_M
+
         gen_models = [m for m in gen_models if completion_price_per_m(m) <= TRIAL_MAX_COMPLETION_PER_M]
     if use_trial_defaults and target_models:
         from services.openrouter_models import completion_price_per_m
-        from config.settings import TRIAL_MAX_COMPLETION_PER_M
+
         target_models = ["unknown"] + [m for m in target_models if m != "unknown" and completion_price_per_m(m) <= TRIAL_MAX_COMPLETION_PER_M]
     cls_mode = str(prefs.get("task_classification_mode") or "heuristic").lower()
     if cls_mode not in ("heuristic", "llm"):
@@ -135,6 +135,7 @@ def get_user_preferences_payload(db: DBManager, user_id: int) -> dict:
         "default_tier": _normalize_default_tier(str(prefs.get("default_tier") or "")),
         "openrouter_api_key_set": bool(user_key),
         "openrouter_api_key_masked": (user_key[:7] + "****") if len(user_key) > 7 else ("****" if user_key else ""),
+        "trial_max_completion_per_m": float(TRIAL_MAX_COMPLETION_PER_M),
     }
 
 

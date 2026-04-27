@@ -1,0 +1,56 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.wrapBlock {
+  display: block;
+  width: 100%;
+}
+
+.tip {
+  position: fixed;
+  z-index: 20050;
+  max-width: min(320px, calc(100vw - 16px));
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    transition: opacity 0.12s ease;
+    transform: none;
+  }
+}
+
+.tipVisible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tipInner {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-weight: 450;
+  color: var(--text);
+  background: var(--modal-surface, var(--panel));
+  border: 1px solid var(--modal-border, var(--stroke));
+  border-radius: 10px;
+  box-shadow:
+    0 10px 36px rgba(0, 0, 0, 0.35),
+    0 0 0 1px color-mix(in srgb, var(--stroke) 55%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+[data-theme='light'] .tipInner {
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--stroke) 40%, transparent);
+}

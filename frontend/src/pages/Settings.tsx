@@ -9,6 +9,7 @@ import {
 import { FONTS, PALETTES, useTheme, type PaletteId } from '../context/ThemeContext'
 import SelectDropdown from '../components/SelectDropdown'
 import LabelWithHint from '../components/LabelWithHint'
+import ThemedTooltip from '../components/ThemedTooltip'
 import styles from './Settings.module.css'
 
 const PALETTE_LABELS: Record<PaletteId, string> = {
@@ -304,17 +305,17 @@ export default function Settings() {
           <LabelWithHint label="Палитра и шрифт" hint={HINT_APPEARANCE}>
             <div className={styles.paletteRow} role="group" aria-label="Палитра">
               {PALETTES.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`${styles.paletteChip} ${palette === id ? styles.paletteChipOn : ''}`}
-                  onClick={() => setPalette(id)}
-                  aria-pressed={palette === id}
-                  title={PALETTE_LABELS[id]}
-                >
-                  <span className={styles.paletteDot} data-palette-swatch={id} aria-hidden />
-                  <span className={styles.paletteChipLabel}>{PALETTE_LABELS[id]}</span>
-                </button>
+                <ThemedTooltip key={id} content={PALETTE_LABELS[id]} side="top" delayMs={260}>
+                  <button
+                    type="button"
+                    className={`${styles.paletteChip} ${palette === id ? styles.paletteChipOn : ''}`}
+                    onClick={() => setPalette(id)}
+                    aria-pressed={palette === id}
+                  >
+                    <span className={styles.paletteDot} data-palette-swatch={id} aria-hidden />
+                    <span className={styles.paletteChipLabel}>{PALETTE_LABELS[id]}</span>
+                  </button>
+                </ThemedTooltip>
               ))}
             </div>
             <div className={styles.fieldStack}>

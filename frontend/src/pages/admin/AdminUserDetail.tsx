@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { api, type AdminUserEvent } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import ThemedTooltip from '../../components/ThemedTooltip'
 
 type AdminUserDetailPayload = {
   user: Record<string, unknown>
@@ -459,19 +460,19 @@ export default function AdminUserDetail() {
             {eventStats.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 {eventStats.map(([name, cnt]) => (
-                  <span
-                    key={name}
-                    style={{
-                      padding: '3px 10px',
-                      fontSize: 12,
-                      borderRadius: 999,
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.03)',
-                    }}
-                    title={name}
-                  >
-                    {EVENT_LABELS[name] || name}: <b>{cnt}</b>
-                  </span>
+                  <ThemedTooltip key={name} content={name} side="top" delayMs={200}>
+                    <span
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: 12,
+                        borderRadius: 999,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.03)',
+                      }}
+                    >
+                      {EVENT_LABELS[name] || name}: <b>{cnt}</b>
+                    </span>
+                  </ThemedTooltip>
                 ))}
               </div>
             ) : null}

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
+import ThemedTooltip from './ThemedTooltip'
 
 type Props = {
   /** Текущее значение поля. Если пусто — кнопка disabled. */
@@ -68,35 +69,40 @@ export default function TranslateButton({
     pair && (getValue().trim() === pair.source || getValue().trim() === pair.translated),
   )
 
+  const tip = useMemo(
+    () =>
+      title
+        ? `${title}${canToggle ? ' (повторное нажатие — вернуть другой язык без нового перевода)' : ''}`
+        : canToggle
+          ? 'Переключить RU/EN (из кэша, без запроса)'
+          : 'Перевести RU↔EN (одной кнопкой)',
+    [title, canToggle],
+  )
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => void run()}
-        disabled={busy || disabled}
-        title={
-          title
-            ? `${title}${canToggle ? ' (повторное нажатие — вернуть другой язык без нового перевода)' : ''}`
-            : canToggle
-              ? 'Переключить RU/EN (из кэша, без запроса)'
-              : 'Перевести RU↔EN (одной кнопкой)'
-        }
-        aria-label="Перевести текст"
-        style={{
-          padding: compact ? '3px 9px' : '5px 12px',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 8,
-          background: 'transparent',
-          color: 'var(--color-text-secondary, inherit)',
-          fontSize: compact ? 11 : 12.5,
-          cursor: busy ? 'wait' : 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
-      >
-        {busy ? '…' : 'RU⇄EN'}
-      </button>
+      <ThemedTooltip content={tip} side="top" delayMs={280} disabled={busy || Boolean(disabled)}>
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy || disabled}
+          aria-label="Перевести текст"
+          style={{
+            padding: compact ? '3px 9px' : '5px 12px',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 8,
+            background: 'transparent',
+            color: 'var(--color-text-secondary, inherit)',
+            fontSize: compact ? 11 : 12.5,
+            cursor: busy ? 'wait' : 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          {busy ? '…' : 'RU⇄EN'}
+        </button>
+      </ThemedTooltip>
       {err ? (
         <span style={{ color: 'var(--color-text-danger, #f87171)', fontSize: 11, marginLeft: 6 }}>{err}</span>
       ) : null}

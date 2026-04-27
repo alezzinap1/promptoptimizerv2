@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useT } from '../i18n'
 import { pushRecentSession } from '../lib/recentSessions'
-import { useTypewriterReveal } from '../lib/reveal'
+import { useSimulatedLlmStream } from '../lib/simulatedLlmStream'
+import ThemedTooltip from '../components/ThemedTooltip'
 import styles from './Onboarding.module.css'
 
 /*
@@ -96,12 +97,11 @@ export default function Onboarding() {
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<string>('')
   const [sessionId, setSessionId] = useState<string>('')
-  const [revealKey, setRevealKey] = useState(0)
-  const {
-    visible: revealed,
-    done: revealDone,
-    skip: revealSkip,
-  } = useTypewriterReveal(result, { durationMs: 700, resetKey: revealKey })
+  /** Мгновенно показать весь текст (клик по превью — как раньше skip). */
+  const [streamSkipped, setStreamSkipped] = useState(false)
+  const revealed = useSimulatedLlmStream(result, { suspend: busy || streamSkipped })
+  const revealDone = !result || revealed.length >= result.length
+  const revealSkip = () => setStreamSkipped(true)
 
   const progressPct = Math.min(100, (step / totalSteps) * 100)
   const progressLabel = t.onboarding.progress
@@ -143,6 +143,7 @@ export default function Onboarding() {
     setErr(null)
     setResult('')
     setSessionId('')
+    setStreamSkipped(false)
     try {
       const r = await api.generate({
         task_input: trimmed,
@@ -151,7 +152,6 @@ export default function Onboarding() {
         technique_mode: 'auto',
       })
       setResult(r.prompt_block || r.llm_raw || '')
-      setRevealKey((k) => k + 1)
       if (r.session_id) {
         setSessionId(r.session_id)
         pushRecentSession(r.session_id, trimmed)
@@ -175,6 +175,7 @@ export default function Onboarding() {
     setResult('')
     setErr(null)
     setSessionId('')
+    setStreamSkipped(false)
   }
 
   return (
@@ -257,16 +258,16 @@ export default function Onboarding() {
                   </span>
                   <div className={styles.suggestionsList}>
                     {suggestions.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        className={styles.suggestionPill}
-                        onClick={() => setTask(s)}
-                        disabled={busy}
-                        title={s}
-                      >
-                        {s}
-                      </button>
+                      <ThemedTooltip key={s} content={s} side="top" delayMs={220}>
+                        <button
+                          type="button"
+                          className={styles.suggestionPill}
+                          onClick={() => setTask(s)}
+                          disabled={busy}
+                        >
+                          {s}
+                        </button>
+                      </ThemedTooltip>
                     ))}
                   </div>
                 </div>
@@ -286,14 +287,21 @@ export default function Onboarding() {
               {result ? (
                 <div className={styles.resultBlock}>
                   <h3 className={styles.resultTitle}>{t.onboarding.step3.resultTitle}</h3>
-                  <pre
-                    className={styles.resultPre}
-                    onClick={revealDone ? undefined : revealSkip}
-                    title={revealDone ? undefined : 'click to reveal full prompt'}
+                  <ThemedTooltip
+                    content="click to reveal full prompt"
+                    side="bottom"
+                    delayMs={280}
+                    disabled={revealDone}
+                    block
                   >
-                    {revealed}
-                    {!revealDone ? <span className={styles.revealCaret} aria-hidden /> : null}
-                  </pre>
+                    <pre
+                      className={styles.resultPre}
+                      onClick={revealDone ? undefined : revealSkip}
+                    >
+                      {revealed}
+                      {!revealDone ? <span className={styles.revealCaret} aria-hidden /> : null}
+                    </pre>
+                  </ThemedTooltip>
                   <div className={styles.resultActions}>
                     <button type="button" className={styles.btnPrimary} onClick={openInStudio}>
                       {t.onboarding.step3.actions.openStudio}

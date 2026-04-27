@@ -17,7 +17,7 @@ def list_models(
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
 ):
-    """Return OpenRouter models. If user has no API key, only trial-allowed models (completion <= $1/1M)."""
+    """Return OpenRouter models. If user has no API key, only trial-allowed models (completion <= TRIAL_MAX_COMPLETION_PER_M)."""
     result = get_models(force_refresh=refresh)
     user_key = db.get_user_openrouter_api_key(int(user["id"]))
     if not user_key:

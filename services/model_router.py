@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from core.model_catalog import CATALOG, TRIAL_MAX_COMPLETION_PER_M, candidates
+from config.settings import TRIAL_MAX_COMPLETION_PER_M
+from core.model_catalog import CATALOG
 from db.manager import DBManager
 from services.model_health import is_available, pick_first_available
 
@@ -31,22 +32,21 @@ def _fallback_order(tier: Tier, trial: bool) -> list[str]:
     return ["advanced", "mid", "fast"]
 
 
-def _pricing_per_m(db: DBManager, model_id: str) -> float:
-    row = next((r for r in db.list_model_health() if r["model_id"] == model_id), None)
+def _pricing_per_m_slot(db: DBManager, model_id: str, mode: str, tier: str) -> float:
+    row = db.get_model_health_slot(model_id, mode, tier)
     if not row:
         return 0.0
     cp = row.get("last_pricing_completion")
     try:
-        return float(cp) * 1_000_000.0 if cp else 0.0
+        return float(cp) * 1_000_000.0 if cp is not None else 0.0
     except (TypeError, ValueError):
         return 0.0
 
 
-def _resolve_override(db: DBManager, mode: Mode, tier: Tier) -> str | None:
+def _resolve_override(db: DBManager, mode: Mode, tier: str) -> str | None:
     """
-    Админский ручной оверрайд (mode, tier) → model_id. Учитываем override, только если
-    модель проходит health-check; иначе падаем на каталог (оверрайд не должен блокировать
-    пользователя, если админ забыл обновить выбор).
+    Админский ручной оверрайд (mode, tier) → model_id. Учитываем override только если
+    слот (override, mode, tier) проходит health-check; иначе каталог.
     """
     try:
         override = db.get_tier_override(mode, tier)
@@ -54,7 +54,7 @@ def _resolve_override(db: DBManager, mode: Mode, tier: Tier) -> str | None:
         return None
     if not override:
         return None
-    if not is_available(db, override):
+    if not is_available(db, override, mode, tier):
         return None
     return override
 
@@ -68,11 +68,10 @@ def resolve(
 ) -> tuple[str, str]:
     """Вернуть (model_id, reasoning). Никогда не бросает; если каталог пуст — пустая строка."""
     reasoning_parts: list[str] = [f"tier={tier} mode={mode} trial={trial}"]
-    # Приоритет: ручной оверрайд для запрошенного тира (если доступен и в бюджете).
     effective_tier_for_override: Tier = "mid" if tier == "auto" else tier
     override = _resolve_override(db, mode, effective_tier_for_override)
     if override:
-        if trial and _pricing_per_m(db, override) > TRIAL_MAX_COMPLETION_PER_M:
+        if trial and _pricing_per_m_slot(db, override, mode, effective_tier_for_override) > TRIAL_MAX_COMPLETION_PER_M:
             reasoning_parts.append(f"override_skip({override}:trial_over_budget)")
         else:
             reasoning_parts.append(f"override_picked={override}")
@@ -82,7 +81,7 @@ def resolve(
         if not picked:
             reasoning_parts.append(f"no_candidates({try_tier})")
             continue
-        if trial and _pricing_per_m(db, picked) > TRIAL_MAX_COMPLETION_PER_M:
+        if trial and _pricing_per_m_slot(db, picked, mode, try_tier) > TRIAL_MAX_COMPLETION_PER_M:
             reasoning_parts.append(f"skip({picked}:trial_over_budget)")
             continue
         if try_tier != (tier if tier != "auto" else "mid"):
@@ -95,7 +94,7 @@ def resolve(
 
 def helper_for(db: DBManager, mode: Mode = "text") -> str:
     """Helper-модель для промежуточных шагов advanced-режима (классификация, критика, перевод)."""
-    override = _resolve_override(db, mode, "helper")  # type: ignore[arg-type]
+    override = _resolve_override(db, mode, "helper")
     if override:
         return override
     picked = pick_first_available(db, mode, "helper")

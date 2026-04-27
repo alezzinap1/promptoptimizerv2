@@ -426,6 +426,8 @@ export interface Settings {
   default_tier?: '' | 'auto' | 'fast' | 'mid' | 'advanced'
   /** Дневной бюджет на запуски Stability evaluation, USD. */
   eval_daily_budget_usd?: number
+  /** Порог $/1M completion для пробного режима (сервер). */
+  trial_max_completion_per_m?: number
 }
 
 export interface SimpleImproveResponse {

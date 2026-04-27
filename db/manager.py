@@ -187,6 +187,7 @@ class DBManager:
             self._migrate_phase21_eval_synthesis_dual_judge(conn)
             self._migrate_phase22_eval_lineage_meta(conn)
             self._migrate_phase23_eval_meta_lite(conn)
+            self._migrate_phase24_model_health_slot_pk(conn)
         logger.info("DB initialized at %s", self._path)
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
@@ -399,11 +400,11 @@ class DBManager:
         self._safe_add_column(conn, "user_usage", "session_generation_budget", "INTEGER")
 
     def _migrate_phase16_model_health(self, conn: sqlite3.Connection) -> None:
-        """Daily health snapshot for catalog models + swap audit for admin UI."""
+        """Снапшот здоровья: одна строка на слот каталога (model_id, mode, tier)."""
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS model_health (
-                model_id                TEXT PRIMARY KEY,
+                model_id                TEXT NOT NULL,
                 mode                    TEXT NOT NULL DEFAULT '',
                 tier                    TEXT NOT NULL DEFAULT '',
                 available               INTEGER NOT NULL DEFAULT 1,
@@ -411,7 +412,8 @@ class DBManager:
                 last_pricing_prompt     REAL,
                 last_pricing_completion REAL,
                 swapped_to              TEXT,
-                last_checked_at         TIMESTAMP
+                last_checked_at         TIMESTAMP,
+                PRIMARY KEY (model_id, mode, tier)
             )
             """
         )
@@ -629,6 +631,42 @@ class DBManager:
     def _migrate_phase23_eval_meta_lite(self, conn: sqlite3.Connection) -> None:
         """Lite meta-synthesis: single LLM pass instead of full multi-step pipeline."""
         self._safe_add_column(conn, "eval_runs", "meta_synthesis_mode", "TEXT NOT NULL DEFAULT 'full'")
+
+    def _migrate_phase24_model_health_slot_pk(self, conn: sqlite3.Connection) -> None:
+        """Старые БД: PRIMARY KEY только по model_id → пересобрать таблицу с составным ключом."""
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='model_health'"
+        ).fetchone()
+        if not row or not row[0]:
+            return
+        ddl = row[0]
+        if "PRIMARY KEY (model_id, mode, tier)" in ddl:
+            return
+        conn.executescript(
+            """
+            CREATE TABLE model_health__m24 (
+                model_id                TEXT NOT NULL,
+                mode                    TEXT NOT NULL DEFAULT '',
+                tier                    TEXT NOT NULL DEFAULT '',
+                available               INTEGER NOT NULL DEFAULT 1,
+                reason                  TEXT NOT NULL DEFAULT '',
+                last_pricing_prompt     REAL,
+                last_pricing_completion REAL,
+                swapped_to              TEXT,
+                last_checked_at         TIMESTAMP,
+                PRIMARY KEY (model_id, mode, tier)
+            );
+            INSERT INTO model_health__m24 (
+                model_id, mode, tier, available, reason,
+                last_pricing_prompt, last_pricing_completion, swapped_to, last_checked_at
+            )
+            SELECT model_id, mode, tier, available, reason,
+                   last_pricing_prompt, last_pricing_completion, swapped_to, last_checked_at
+            FROM model_health;
+            DROP TABLE model_health;
+            ALTER TABLE model_health__m24 RENAME TO model_health;
+            """
+        )
 
     def _safe_add_column(
         self,
@@ -1572,9 +1610,7 @@ class DBManager:
                     last_pricing_prompt, last_pricing_completion,
                     swapped_to, last_checked_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(model_id) DO UPDATE SET
-                    mode = excluded.mode,
-                    tier = excluded.tier,
+                ON CONFLICT(model_id, mode, tier) DO UPDATE SET
                     available = excluded.available,
                     reason = excluded.reason,
                     last_pricing_prompt = excluded.last_pricing_prompt,
@@ -1600,6 +1636,14 @@ class DBManager:
                 "SELECT * FROM model_health ORDER BY mode, tier, model_id"
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def get_model_health_slot(self, model_id: str, mode: str, tier: str) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM model_health WHERE model_id = ? AND mode = ? AND tier = ?",
+                (model_id, mode, tier),
+            ).fetchone()
+        return dict(row) if row else None
 
     def log_model_health_event(self, model_id: str, event: str, detail: str = "") -> None:
         with self._conn() as conn:

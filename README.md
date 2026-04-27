@@ -229,7 +229,8 @@ curl http://localhost:8000/api/health
 | `RATE_LIMIT_WINDOW_SEC` | Окно rate limit генерации (сек) |
 | `BUDGET_GENERATIONS_PER_SESSION` | Макс. генераций на auth-сессию |
 | `TRIAL_TOKENS_LIMIT` | Лимит токенов trial на пользователя при использовании ключа хоста |
-| `TRIAL_MAX_COMPLETION_PER_M` | Порог $/1M для моделей в trial |
+| `TRIAL_MAX_COMPLETION_PER_M` | Порог $/1M (completion) для моделей в trial (по умолчанию 3.0) |
+| `OPENROUTER_PROVIDER_SORT` | Маршрутизация провайдеров: `throughput` (по умолчанию), `latency`, `price`; `off` — отключить |
 | `LLM_TIMEOUT_SEC` | Таймаут запросов к LLM |
 | `SENTRY_DSN` | Sentry (опционально) |
 | `LOG_LEVEL` | Уровень логирования |

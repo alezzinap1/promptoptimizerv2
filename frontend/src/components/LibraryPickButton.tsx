@@ -9,6 +9,7 @@ import {
 } from '../lib/libraryPickText'
 import { formatLibraryCardDates } from '../lib/promptLibraryMeta'
 import LibraryTagChips from './LibraryTagChips'
+import ThemedTooltip from './ThemedTooltip'
 import EvalBadge from '../pages/eval/EvalBadge'
 import libStyles from '../pages/Library.module.css'
 import styles from './LibraryPickButton.module.css'
@@ -311,81 +312,87 @@ export default function LibraryPickButton({
                       ) : null}
                       <p className={libStyles.meta}>
                         {tt ? (
-                          <span className={libStyles.taskTypeLabel} title="Тип задачи при сохранении">
-                            {tt}
-                          </span>
+                          <ThemedTooltip content="Тип задачи при сохранении" side="top" delayMs={200}>
+                            <span className={libStyles.taskTypeLabel}>{tt}</span>
+                          </ThemedTooltip>
                         ) : null}
                         {isImagePrompt(item) && (
-                          <span className={libStyles.imageBadge} title="Промпт для генерации изображений">
-                            🎨
-                          </span>
+                          <ThemedTooltip content="Промпт для генерации изображений" side="top" delayMs={200}>
+                            <span className={libStyles.imageBadge}>🎨</span>
+                          </ThemedTooltip>
                         )}
                         <EvalBadge libraryId={item.id} />
                         {tm && tm !== 'unknown' && (
-                          <span className={libStyles.modelBadge} title="Целевая модель">
-                            {tm}
-                          </span>
+                          <ThemedTooltip content="Целевая модель" side="top" delayMs={200}>
+                            <span className={libStyles.modelBadge}>{tm}</span>
+                          </ThemedTooltip>
                         )}
-                        <span className={libStyles.ratingBadge} title="Оценка по шкале от 0 до 5 звёзд">
-                          {ratingLabel(item.rating)}
-                        </span>
-                        <span className={libStyles.tokenBadgeMini} title="Приблизительное количество токенов">
-                          ≈{Math.max(1, Math.round(promptText.length / 3.5)).toLocaleString('ru')} tok
-                        </span>
+                        <ThemedTooltip content="Оценка по шкале от 0 до 5 звёзд" side="top" delayMs={200}>
+                          <span className={libStyles.ratingBadge}>{ratingLabel(item.rating)}</span>
+                        </ThemedTooltip>
+                        <ThemedTooltip content="Приблизительное количество токенов" side="top" delayMs={200}>
+                          <span className={libStyles.tokenBadgeMini}>
+                            ≈{Math.max(1, Math.round(promptText.length / 3.5)).toLocaleString('ru')} tok
+                          </span>
+                        </ThemedTooltip>
                         {applyMode === 'prompt' ? (
                           hasAlt ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                stop(e)
-                                setLangView((prev) => ({
-                                  ...prev,
-                                  [item.id]: currentView === 'primary' ? 'alt' : 'primary',
-                                }))
-                              }}
-                              title={`Показать ${otherLang || 'другую'} версию`}
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 7px',
-                                borderRadius: 10,
-                                border: '1px solid rgba(255,255,255,0.14)',
-                                background: 'rgba(255,255,255,0.04)',
-                                color: 'inherit',
-                                cursor: 'pointer',
-                                lineHeight: '16px',
-                              }}
-                            >
-                              {promptLang || (currentView === 'primary' ? 'A' : 'B')} ⇄ {otherLang || '?'}
-                            </button>
+                            <ThemedTooltip content={`Показать ${otherLang || 'другую'} версию`} side="top" delayMs={200}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  stop(e)
+                                  setLangView((prev) => ({
+                                    ...prev,
+                                    [item.id]: currentView === 'primary' ? 'alt' : 'primary',
+                                  }))
+                                }}
+                                style={{
+                                  fontSize: 10,
+                                  padding: '1px 7px',
+                                  borderRadius: 10,
+                                  border: '1px solid rgba(255,255,255,0.14)',
+                                  background: 'rgba(255,255,255,0.04)',
+                                  color: 'inherit',
+                                  cursor: 'pointer',
+                                  lineHeight: '16px',
+                                }}
+                              >
+                                {promptLang || (currentView === 'primary' ? 'A' : 'B')} ⇄ {otherLang || '?'}
+                              </button>
+                            </ThemedTooltip>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                stop(e)
-                                void handleTranslate(item)
-                              }}
-                              disabled={Boolean(translating[item.id])}
-                              title="Перевести RU↔EN (бесплатно, без LLM)"
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 7px',
-                                borderRadius: 10,
-                                border: '1px solid rgba(255,255,255,0.14)',
-                                background: 'rgba(255,255,255,0.04)',
-                                color: 'inherit',
-                                cursor: translating[item.id] ? 'wait' : 'pointer',
-                                lineHeight: '16px',
-                                opacity: translating[item.id] ? 0.6 : 1,
-                              }}
-                            >
-                              {translating[item.id] ? '…' : '🌐 RU↔EN'}
-                            </button>
+                            <ThemedTooltip content="Перевести RU↔EN (бесплатно, без LLM)" side="top" delayMs={200}>
+                              <span style={{ display: 'inline-block' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    stop(e)
+                                    void handleTranslate(item)
+                                  }}
+                                  disabled={Boolean(translating[item.id])}
+                                  style={{
+                                    fontSize: 10,
+                                    padding: '1px 7px',
+                                    borderRadius: 10,
+                                    border: '1px solid rgba(255,255,255,0.14)',
+                                    background: 'rgba(255,255,255,0.04)',
+                                    color: 'inherit',
+                                    cursor: translating[item.id] ? 'wait' : 'pointer',
+                                    lineHeight: '16px',
+                                    opacity: translating[item.id] ? 0.6 : 1,
+                                  }}
+                                >
+                                  {translating[item.id] ? '…' : '🌐 RU↔EN'}
+                                </button>
+                              </span>
+                            </ThemedTooltip>
                           )
                         ) : null}
                         {translateErr[item.id] ? (
-                          <span title={translateErr[item.id]} style={{ fontSize: 10, color: '#f87171' }}>
-                            ошибка
-                          </span>
+                          <ThemedTooltip content={translateErr[item.id]} side="top" delayMs={200}>
+                            <span style={{ fontSize: 10, color: '#f87171' }}>ошибка</span>
+                          </ThemedTooltip>
                         ) : null}
                       </p>
                       {(item.tags || []).length > 0 ? (

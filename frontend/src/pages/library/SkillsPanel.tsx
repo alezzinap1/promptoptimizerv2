@@ -6,6 +6,7 @@ import MarkdownOutput from '../../components/MarkdownOutput'
 import { CopyIconButton, DownloadIconButton, PencilIconButton, TrashIconButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import SelectDropdown from '../../components/SelectDropdown'
+import ThemedTooltip from '../../components/ThemedTooltip'
 import TranslateButton from '../../components/TranslateButton'
 import {
   importLocalSkillsBundle,
@@ -210,97 +211,124 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
         <button type="button" className={`${styles.primary} ${styles.primarySmall} btn-primary`} onClick={openCreate}>
           + Скилл
         </button>
-        <button
-          type="button"
-          className={`${styles.primary} ${styles.primarySmall}`}
-          title="Скачать все скиллы одним JSON (импорт обратно — кнопка «Импорт»)"
-          onClick={() => {
-            const blob = new Blob([serializeLocalSkillsExport()], { type: 'application/json;charset=utf-8' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `metaprompt-skills-backup-${new Date().toISOString().slice(0, 10)}.json`
-            a.click()
-            URL.revokeObjectURL(url)
-          }}
+        <ThemedTooltip
+          content="Скачать все скиллы одним JSON (импорт обратно — кнопка «Импорт»)"
+          side="bottom"
+          delayMs={260}
         >
-          Экспорт JSON
-        </button>
-        <button
-          type="button"
-          className={`${styles.primary} ${styles.primarySmall}`}
-          title="Один .md файл: заголовки и тело каждого скилла — удобно копировать в Cursor"
-          onClick={() => {
-            const blob = new Blob([serializeLocalSkillsAsMarkdown()], { type: 'text/markdown;charset=utf-8' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `metaprompt-skills-${new Date().toISOString().slice(0, 10)}.md`
-            a.click()
-            URL.revokeObjectURL(url)
-          }}
+          <button
+            type="button"
+            className={`${styles.primary} ${styles.primarySmall}`}
+            onClick={() => {
+              const blob = new Blob([serializeLocalSkillsExport()], { type: 'application/json;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `metaprompt-skills-backup-${new Date().toISOString().slice(0, 10)}.json`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+          >
+            Экспорт JSON
+          </button>
+        </ThemedTooltip>
+        <ThemedTooltip
+          content="Один .md файл: заголовки и тело каждого скилла — удобно копировать в Cursor"
+          side="bottom"
+          delayMs={260}
         >
-          Экспорт Markdown
-        </button>
-        <button
-          type="button"
-          className={`${styles.primary} ${styles.primarySmall}`}
-          title="Импорт из файла бэкапа (объединение по id)"
-          onClick={() => importInputRef.current?.click()}
+          <button
+            type="button"
+            className={`${styles.primary} ${styles.primarySmall}`}
+            onClick={() => {
+              const blob = new Blob([serializeLocalSkillsAsMarkdown()], { type: 'text/markdown;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `metaprompt-skills-${new Date().toISOString().slice(0, 10)}.md`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+          >
+            Экспорт Markdown
+          </button>
+        </ThemedTooltip>
+        <ThemedTooltip content="Импорт из файла бэкапа (объединение по id)" side="bottom" delayMs={260}>
+          <button
+            type="button"
+            className={`${styles.primary} ${styles.primarySmall}`}
+            onClick={() => importInputRef.current?.click()}
+          >
+            Импорт…
+          </button>
+        </ThemedTooltip>
+        <ThemedTooltip
+          content="Подтянуть скиллы с сервера (аккаунт) в локальную библиотеку; записи id sk_srv_* обновятся"
+          side="bottom"
+          delayMs={260}
         >
-          Импорт…
-        </button>
-        <button
-          type="button"
-          className={`${styles.primary} ${styles.primarySmall}`}
-          title="Подтянуть скиллы с сервера (аккаунт) в локальную библиотеку; записи id sk_srv_* обновятся"
-          disabled={serverPullBusy}
-          onClick={() => {
-            setServerPullBusy(true)
-            void api
-              .getSkills()
-              .then((r) => {
-                const n = mergeServerSkillsIntoLocal(r.items)
-                setItems(loadLocalSkills())
-                window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
-                window.alert(`С сервера добавлено/обновлено: ${n} скилл(ов).`)
-              })
-              .catch(() => window.alert('Не удалось загрузить скиллы с сервера (войдите в аккаунт и проверьте сеть).'))
-              .finally(() => setServerPullBusy(false))
-          }}
+          <span style={{ display: 'inline-block' }}>
+            <button
+              type="button"
+              className={`${styles.primary} ${styles.primarySmall}`}
+              disabled={serverPullBusy}
+              onClick={() => {
+                setServerPullBusy(true)
+                void api
+                  .getSkills()
+                  .then((r) => {
+                    const n = mergeServerSkillsIntoLocal(r.items)
+                    setItems(loadLocalSkills())
+                    window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
+                    window.alert(`С сервера добавлено/обновлено: ${n} скилл(ов).`)
+                  })
+                  .catch(() =>
+                    window.alert('Не удалось загрузить скиллы с сервера (войдите в аккаунт и проверьте сеть).'),
+                  )
+                  .finally(() => setServerPullBusy(false))
+              }}
+            >
+              {serverPullBusy ? 'Сервер…' : 'С сервера'}
+            </button>
+          </span>
+        </ThemedTooltip>
+        <ThemedTooltip
+          content="Залить локальные скиллы на сервер (по local id); при более новой версии на сервере — конфликт"
+          side="bottom"
+          delayMs={260}
         >
-          {serverPullBusy ? 'Сервер…' : 'С сервера'}
-        </button>
-        <button
-          type="button"
-          className={`${styles.primary} ${styles.primarySmall}`}
-          title="Залить локальные скиллы на сервер (по local id); при более новой версии на сервере — конфликт"
-          disabled={serverSyncBusy}
-          onClick={() => {
-            setServerSyncBusy(true)
-            const local = loadLocalSkills().filter((x) => !x.id.startsWith('sk_srv_'))
-            void api
-              .bulkUpsertSkills({
-                items: local.map((x) => ({
-                  local_id: x.id,
-                  name: x.title,
-                  body: x.body,
-                  description: x.description,
-                  category: x.tags[0] || 'general',
-                  updated_at: x.createdAt,
-                })),
-              })
-              .then((r) => {
-                window.alert(
-                  `Загружено: ${r.inserted}, обновлено: ${r.updated}, конфликтов: ${r.conflicts}.`,
-                )
-              })
-              .catch(() => window.alert('Не удалось синхронизировать (войдите в аккаунт и проверьте сеть).'))
-              .finally(() => setServerSyncBusy(false))
-          }}
-        >
-          {serverSyncBusy ? '…' : '☁ Синхронизировать'}
-        </button>
+          <span style={{ display: 'inline-block' }}>
+            <button
+              type="button"
+              className={`${styles.primary} ${styles.primarySmall}`}
+              disabled={serverSyncBusy}
+              onClick={() => {
+                setServerSyncBusy(true)
+                const local = loadLocalSkills().filter((x) => !x.id.startsWith('sk_srv_'))
+                void api
+                  .bulkUpsertSkills({
+                    items: local.map((x) => ({
+                      local_id: x.id,
+                      name: x.title,
+                      body: x.body,
+                      description: x.description,
+                      category: x.tags[0] || 'general',
+                      updated_at: x.createdAt,
+                    })),
+                  })
+                  .then((r) => {
+                    window.alert(
+                      `Загружено: ${r.inserted}, обновлено: ${r.updated}, конфликтов: ${r.conflicts}.`,
+                    )
+                  })
+                  .catch(() => window.alert('Не удалось синхронизировать (войдите в аккаунт и проверьте сеть).'))
+                  .finally(() => setServerSyncBusy(false))
+              }}
+            >
+              {serverSyncBusy ? '…' : '☁ Синхронизировать'}
+            </button>
+          </span>
+        </ThemedTooltip>
         <input
           ref={importInputRef}
           type="file"
@@ -359,14 +387,11 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
               </div>
               <div className={styles.actions}>
                 <CopyIconButton text={it.body} title="Копировать тело скилла" />
-                <button
-                  type="button"
-                  className={styles.pubBtn}
-                  title="Опубликовать в сообществе"
-                  onClick={() => setPublishSkill(it)}
-                >
-                  Сообщество
-                </button>
+                <ThemedTooltip content="Опубликовать в сообществе" side="top" delayMs={220}>
+                  <button type="button" className={styles.pubBtn} onClick={() => setPublishSkill(it)}>
+                    Сообщество
+                  </button>
+                </ThemedTooltip>
                 <DownloadIconButton
                   title="Скачать скилл как .txt"
                   onClick={() => {
@@ -380,18 +405,19 @@ export default function SkillsPanel({ libraryActiveTab, onCountChange, gridCols 
                     URL.revokeObjectURL(url)
                   }}
                 />
-                <button
-                  type="button"
-                  className={styles.forkBtn}
-                  title="Открыть в студии (вкладка Скилл)"
-                  onClick={() =>
-                    navigate('/', {
-                      state: { studioForkSkill: { body: it.body, title: it.title } },
-                    })
-                  }
-                >
-                  Форк
-                </button>
+                <ThemedTooltip content="Открыть в студии (вкладка Скилл)" side="top" delayMs={220}>
+                  <button
+                    type="button"
+                    className={styles.forkBtn}
+                    onClick={() =>
+                      navigate('/', {
+                        state: { studioForkSkill: { body: it.body, title: it.title } },
+                      })
+                    }
+                  >
+                    Форк
+                  </button>
+                </ThemedTooltip>
                 <PencilIconButton title="Редактировать" onClick={() => openEdit(it)} />
                 <TrashIconButton title="Удалить скилл" onClick={() => remove(it.id)} />
               </div>

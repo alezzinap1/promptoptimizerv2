@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ThemedTooltip from '../../components/ThemedTooltip'
 import { evalApi, type EvalRunDetail, type PreviewCostRequest } from '../../api/eval'
 import StabilityComposer, { type ComposerValue } from './StabilityComposer'
 import CostPreview from './CostPreview'
@@ -214,9 +215,11 @@ export default function StabilityTab({
             </details>
           </div>
           <div className={css.stabilityHeadActions}>
-            <Link to="/eval" className={css.stabilityStudioLink} title="Лидерборд и архив отчётов">
-              История прогонов
-            </Link>
+            <ThemedTooltip content="Лидерборд и архив отчётов" side="bottom" delayMs={260} block>
+              <Link to="/eval" className={css.stabilityStudioLink}>
+                История прогонов
+              </Link>
+            </ThemedTooltip>
             <button type="button" className={css.ghostBtn} onClick={() => setHistoryOpen(true)}>
               История
             </button>

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import menuStyles from './DropdownMenu.module.css'
 import PortalDropdown from './PortalDropdown'
 import styles from './SelectDropdown.module.css'
+import ThemedTooltip from './ThemedTooltip'
 
 export type SelectOption = {
   value: string
@@ -53,40 +54,49 @@ export default function SelectDropdown({
   const triggerVariant =
     variant === 'toolbar' ? styles.triggerToolbar : variant === 'field' ? styles.triggerField : styles.triggerComposer
 
+  const tip = selected?.title || selected?.label || ariaLabel
+
   return (
     <div className={`${styles.wrap} ${className}`.trim()}>
-      <button
-        ref={btnRef}
-        type="button"
-        disabled={disabled}
-        className={`${styles.trigger} ${triggerVariant} ${triggerClassName}`.trim()}
-        aria-label={ariaLabel}
-        title={selected?.title || selected?.label || ariaLabel}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => !disabled && setOpen((v) => !v)}
-      >
-        <span className={styles.triggerLabel}>
-          {triggerContent ?? (selected?.label ?? (options.length ? '—' : 'Нет моделей'))}
-        </span>
-        <Chevron />
-      </button>
+      <ThemedTooltip content={tip} side="bottom" disabled={open || disabled}>
+        <button
+          ref={btnRef}
+          type="button"
+          disabled={disabled}
+          className={`${styles.trigger} ${triggerVariant} ${triggerClassName}`.trim()}
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          onClick={() => !disabled && setOpen((v) => !v)}
+        >
+          <span className={styles.triggerLabel}>
+            {triggerContent ?? (selected?.label ?? (options.length ? '—' : 'Нет моделей'))}
+          </span>
+          <Chevron />
+        </button>
+      </ThemedTooltip>
       <PortalDropdown open={open} onClose={() => setOpen(false)} anchorRef={btnRef} minWidth={220} align="left">
         {options.map((opt) => (
-          <button
+          <ThemedTooltip
             key={opt.value}
-            type="button"
-            role="option"
-            aria-selected={opt.value === value}
-            className={`${menuStyles.menuItem} ${opt.value === value ? menuStyles.menuItemActive : ''}`}
-            title={opt.title || opt.label}
-            onClick={() => {
-              onChange(opt.value)
-              setOpen(false)
-            }}
+            content={opt.title || opt.label}
+            side="left"
+            delayMs={220}
+            block
           >
-            {opt.label}
-          </button>
+            <button
+              type="button"
+              role="option"
+              aria-selected={opt.value === value}
+              className={`${menuStyles.menuItem} ${opt.value === value ? menuStyles.menuItemActive : ''}`}
+              onClick={() => {
+                onChange(opt.value)
+                setOpen(false)
+              }}
+            >
+              {opt.label}
+            </button>
+          </ThemedTooltip>
         ))}
         {footerLink ? (
           <>

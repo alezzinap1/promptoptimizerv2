@@ -6,7 +6,47 @@ import {
   type EvalResultRow,
   type EvalVerifiedHypothesis,
 } from '../../api/eval'
+import { useSimulatedLlmStream } from '../../lib/simulatedLlmStream'
 import css from './Stability.module.css'
+
+function SynthesisSummaryStreamed({ text }: { text: string }) {
+  const s = useSimulatedLlmStream(text, { suspend: false })
+  return <p className={css.synthesisSummary}>{s}</p>
+}
+
+function ResultsEvalRow({ r }: { r: EvalResultRow }) {
+  const bodySource =
+    r.status === 'ok' ? (r.output_text ?? '') : `[error] ${r.error ?? 'unknown'}`
+  const out = useSimulatedLlmStream(bodySource, { suspend: false })
+  const j1 = useSimulatedLlmStream(r.judge_reasoning ?? '', { suspend: !r.judge_reasoning })
+  const j2 = useSimulatedLlmStream(r.judge_reasoning_secondary ?? '', {
+    suspend: !r.judge_reasoning_secondary,
+  })
+  return (
+    <div id={`eval-result-${r.id}`} className={css.outputItem}>
+      <div className={css.outputHeader}>
+        <span>
+          #{r.run_index} · {r.latency_ms ?? '?'}ms
+        </span>
+        <span className={css.scoreBadge}>
+          {r.judge_overall != null ? r.judge_overall.toFixed(2) : '—'}
+          {r.judge_overall_secondary != null ? ` / ₂${r.judge_overall_secondary.toFixed(2)}` : ''}
+        </span>
+      </div>
+      <div className={css.outputText}>{out}</div>
+      {r.judge_reasoning ? (
+        <div className={css.muted} style={{ fontSize: 11, marginTop: 4 }}>
+          judge₁: {j1}
+        </div>
+      ) : null}
+      {r.judge_reasoning_secondary ? (
+        <div className={css.muted} style={{ fontSize: 11, marginTop: 4 }}>
+          judge₂: {j2}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 interface Props {
   detail: EvalRunDetail
@@ -73,31 +113,8 @@ export default function ResultsPanel({ detail }: Props) {
           </div>
         )}
         <div className={css.outputList}>
-          {rows.map(r => (
-            <div key={r.id} id={`eval-result-${r.id}`} className={css.outputItem}>
-              <div className={css.outputHeader}>
-                <span>#{r.run_index} · {r.latency_ms ?? '?'}ms</span>
-                <span className={css.scoreBadge}>
-                  {r.judge_overall != null ? r.judge_overall.toFixed(2) : '—'}
-                  {r.judge_overall_secondary != null
-                    ? ` / ₂${r.judge_overall_secondary.toFixed(2)}`
-                    : ''}
-                </span>
-              </div>
-              <div className={css.outputText}>
-                {r.status === 'ok' ? r.output_text : `[error] ${r.error ?? 'unknown'}`}
-              </div>
-              {r.judge_reasoning && (
-                <div className={css.muted} style={{ fontSize: 11, marginTop: 4 }}>
-                  judge₁: {r.judge_reasoning}
-                </div>
-              )}
-              {r.judge_reasoning_secondary && (
-                <div className={css.muted} style={{ fontSize: 11, marginTop: 4 }}>
-                  judge₂: {r.judge_reasoning_secondary}
-                </div>
-              )}
-            </div>
+          {rows.map((r) => (
+            <ResultsEvalRow key={r.id} r={r} />
           ))}
         </div>
       </div>
@@ -129,7 +146,7 @@ export default function ResultsPanel({ detail }: Props) {
               </span>
             )}
           </div>
-          <p className={css.synthesisSummary}>{rep.summary}</p>
+          <SynthesisSummaryStreamed text={rep.summary ?? ''} />
           {rep.failure_modes && rep.failure_modes.length > 0 && (
             <div className={css.synthesisSection}>
               <div className={css.synthesisSub}>Паттерны сбоев</div>

@@ -1,5 +1,6 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { RecentSession } from '../lib/recentSessions'
+import ThemedTooltip from './ThemedTooltip'
 import styles from './AppSidebar.module.css'
 
 const CompareIcon = () => (
@@ -100,152 +101,174 @@ export default function AppSidebar({
     <aside className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''}`} aria-label="Навигация">
       <div className={styles.sidebarInner}>
         <div className={styles.collapseRow}>
-          <button
-            type="button"
-            className={styles.collapseBtn}
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
-            title={collapsed ? 'Развернуть' : 'Свернуть'}
-          >
-            <MenuIcon />
-          </button>
+          <ThemedTooltip content={collapsed ? 'Развернуть' : 'Свернуть'} side="right" delayMs={260}>
+            <button
+              type="button"
+              className={styles.collapseBtn}
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            >
+              <MenuIcon />
+            </button>
+          </ThemedTooltip>
         </div>
         <div className={styles.scroll}>
           {workspaceLabel ? (
-            <div className={styles.workspacePill} title={`Активное пространство: ${workspaceLabel}`}>
-              <span className={styles.workspaceDot} aria-hidden />
-              <span className={styles.workspaceName}>{workspaceLabel}</span>
-            </div>
+            <ThemedTooltip content={`Активное пространство: ${workspaceLabel}`} side="right" delayMs={280} block>
+              <div className={styles.workspacePill}>
+                <span className={styles.workspaceDot} aria-hidden />
+                <span className={styles.workspaceName}>{workspaceLabel}</span>
+              </div>
+            </ThemedTooltip>
           ) : null}
 
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Инструменты</div>
-            <NavLink
-              to="/compare"
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title="Сравнение A/B"
+            <ThemedTooltip content="Сравнение A/B" side="right" delayMs={260} block>
+              <NavLink
+                to="/compare"
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>
+                  <CompareIcon />
+                </span>
+                <span className={styles.label}>Сравнение A/B</span>
+              </NavLink>
+            </ThemedTooltip>
+            <ThemedTooltip
+              content="История прогонов стабильности, лидерборд и отчёты (Eval Studio)"
+              side="right"
+              delayMs={260}
+              block
             >
-              <span className={styles.icon} aria-hidden>
-                <CompareIcon />
-              </span>
-              <span className={styles.label}>Сравнение A/B</span>
-            </NavLink>
-            <NavLink
-              to="/eval"
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title="История прогонов стабильности, лидерборд и отчёты (Eval Studio)"
-            >
-              <span className={styles.icon} aria-hidden>
-                <EvalIcon />
-              </span>
-              <span className={styles.label}>История прогонов</span>
-            </NavLink>
+              <NavLink
+                to="/eval"
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>
+                  <EvalIcon />
+                </span>
+                <span className={styles.label}>История прогонов</span>
+              </NavLink>
+            </ThemedTooltip>
           </div>
 
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Библиотека</div>
-            <NavLink
-              to="/library"
-              className={`${styles.navItem} ${libraryPromptsActive ? styles.navActive : ''}`}
-              title="Промпты"
-            >
-              <span className={styles.icon} aria-hidden>
-                <LibraryIcon />
-              </span>
-              <span className={styles.label}>Мои промпты</span>
-              <span className={styles.badge}>{counts.prompts === null ? '…' : counts.prompts}</span>
-            </NavLink>
-            <NavLink
-              to="/library?tab=presets"
-              className={`${styles.navItem} ${libraryPresetsActive ? styles.navActive : ''}`}
-              title="Пресеты"
-            >
-              <span className={styles.icon} aria-hidden>
-                <PresetsIcon />
-              </span>
-              <span className={styles.label}>Пресеты</span>
-            </NavLink>
-            <NavLink
-              to="/library?tab=skills"
-              className={`${styles.navItem} ${librarySkillsActive ? styles.navActive : ''}`}
-              title="Скиллы"
-            >
-              <span className={styles.icon} aria-hidden>
-                <SkillsIcon />
-              </span>
-              <span className={styles.label}>Скиллы</span>
-              <span className={styles.badge}>{counts.skills}</span>
-            </NavLink>
+            <ThemedTooltip content="Промпты" side="right" delayMs={260} block>
+              <NavLink
+                to="/library"
+                className={`${styles.navItem} ${libraryPromptsActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>
+                  <LibraryIcon />
+                </span>
+                <span className={styles.label}>Мои промпты</span>
+                <span className={styles.badge}>{counts.prompts === null ? '…' : counts.prompts}</span>
+              </NavLink>
+            </ThemedTooltip>
+            <ThemedTooltip content="Пресеты" side="right" delayMs={260} block>
+              <NavLink
+                to="/library?tab=presets"
+                className={`${styles.navItem} ${libraryPresetsActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>
+                  <PresetsIcon />
+                </span>
+                <span className={styles.label}>Пресеты</span>
+              </NavLink>
+            </ThemedTooltip>
+            <ThemedTooltip content="Скиллы" side="right" delayMs={260} block>
+              <NavLink
+                to="/library?tab=skills"
+                className={`${styles.navItem} ${librarySkillsActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>
+                  <SkillsIcon />
+                </span>
+                <span className={styles.label}>Скиллы</span>
+                <span className={styles.badge}>{counts.skills}</span>
+              </NavLink>
+            </ThemedTooltip>
           </div>
 
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Сообщество</div>
-            <NavLink
-              to="/community"
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title="Общая библиотека"
-            >
-              <span className={styles.icon} aria-hidden>&#127760;</span>
-              <span className={styles.label}>Лента</span>
-            </NavLink>
+            <ThemedTooltip content="Общая библиотека" side="right" delayMs={260} block>
+              <NavLink
+                to="/community"
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>&#127760;</span>
+                <span className={styles.label}>Лента</span>
+              </NavLink>
+            </ThemedTooltip>
           </div>
 
           <div className={styles.section}>
             <div className={styles.sectionLabel}>Проекты</div>
-            <NavLink
-              to="/workspaces"
-              className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-              title="Пространства"
-            >
-              <span className={styles.icon} aria-hidden>
-                <FolderIcon />
-              </span>
-              <span className={styles.label}>Пространства</span>
-            </NavLink>
+            <ThemedTooltip content="Пространства" side="right" delayMs={260} block>
+              <NavLink
+                to="/workspaces"
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+              >
+                <span className={styles.icon} aria-hidden>
+                  <FolderIcon />
+                </span>
+                <span className={styles.label}>Пространства</span>
+              </NavLink>
+            </ThemedTooltip>
           </div>
 
           {isAdmin ? (
             <div className={styles.section}>
               <div className={styles.sectionLabel}>Админ</div>
-              <NavLink
-                to="/admin"
-                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-                title="Дашборд и метрики"
-              >
-                <span className={styles.icon} aria-hidden>
-                  <ShieldIcon />
-                </span>
-                <span className={styles.label}>Админка</span>
-              </NavLink>
-              <NavLink
-                to="/admin/community"
-                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
-                title="Модерация ленты сообщества"
-              >
-                <span className={styles.icon} aria-hidden>
-                  <FeedModIcon />
-                </span>
-                <span className={styles.label}>Лента (модерация)</span>
-              </NavLink>
+              <ThemedTooltip content="Дашборд и метрики" side="right" delayMs={260} block>
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+                >
+                  <span className={styles.icon} aria-hidden>
+                    <ShieldIcon />
+                  </span>
+                  <span className={styles.label}>Админка</span>
+                </NavLink>
+              </ThemedTooltip>
+              <ThemedTooltip content="Модерация ленты сообщества" side="right" delayMs={260} block>
+                <NavLink
+                  to="/admin/community"
+                  className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
+                >
+                  <span className={styles.icon} aria-hidden>
+                    <FeedModIcon />
+                  </span>
+                  <span className={styles.label}>Лента (модерация)</span>
+                </NavLink>
+              </ThemedTooltip>
             </div>
           ) : null}
 
           {recentSessions.length > 0 ? (
             <div className={styles.section}>
-              <div className={styles.recentLabel} title="Сессии на сервере (история версий). Черновик чата в студии дополнительно сохраняется в браузере до «Новый диалог».">
-                Сессии
-              </div>
+              <ThemedTooltip
+                content="Сессии на сервере (история версий). Черновик чата в студии дополнительно сохраняется в браузере до «Новый диалог»."
+                side="right"
+                delayMs={320}
+                block
+              >
+                <div className={styles.recentLabel}>Сессии</div>
+              </ThemedTooltip>
               <div className={styles.recentList}>
                 {recentSessions.map((s) => (
-                  <button
-                    key={s.sessionId}
-                    type="button"
-                    className={styles.recentCard}
-                    title={s.label}
-                    onClick={() => navigate('/home', { state: { restoreSessionId: s.sessionId } })}
-                  >
-                    {s.label}
-                  </button>
+                  <ThemedTooltip key={s.sessionId} content={s.label} side="right" delayMs={240} block>
+                    <button
+                      type="button"
+                      className={styles.recentCard}
+                      onClick={() => navigate('/home', { state: { restoreSessionId: s.sessionId } })}
+                    >
+                      {s.label}
+                    </button>
+                  </ThemedTooltip>
                 ))}
               </div>
             </div>

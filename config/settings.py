@@ -38,7 +38,7 @@ SESSION_TTL_SEC = max(3600, SESSION_TTL_HOURS * 3600)  # minimum 1 hour
 
 # ── Trial (host key) ─────────────────────────────────────────
 TRIAL_TOKENS_LIMIT = int(os.getenv("TRIAL_TOKENS_LIMIT", "50000"))
-TRIAL_MAX_COMPLETION_PER_M = float(os.getenv("TRIAL_MAX_COMPLETION_PER_M", "1.0"))  # $/1M tokens
+TRIAL_MAX_COMPLETION_PER_M = float(os.getenv("TRIAL_MAX_COMPLETION_PER_M", "3.0"))  # $/1M tokens (completion)
 
 # ── GitHub OAuth ─────────────────────────────────────────────
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
@@ -57,6 +57,33 @@ OPENROUTER_LOG_REQUEST_BODIES = os.getenv("OPENROUTER_LOG_REQUEST_BODIES", "0").
     "on",
 )
 OPENROUTER_LOG_MAX_CHARS = int(os.getenv("OPENROUTER_LOG_MAX_CHARS", "262144"))
+
+# OpenRouter routing (optional). See https://openrouter.ai/docs/guides/routing/provider-selection
+# OPENROUTER_PROVIDER_ORDER=x-ai,deepinfra — try providers in order (slugs from model pages).
+# OPENROUTER_PROVIDER_ALLOW_FALLBACKS=0 — set allow_fallbacks false when order is set.
+# OPENROUTER_PROVIDER_SORT: default throughput — OpenRouter ranks providers without a static list (set off to omit).
+_raw_prov_order = os.getenv("OPENROUTER_PROVIDER_ORDER", "").strip()
+OPENROUTER_PROVIDER_ORDER: list[str] = [p.strip() for p in _raw_prov_order.split(",") if p.strip()]
+_raw_fb = os.getenv("OPENROUTER_PROVIDER_ALLOW_FALLBACKS", "").strip().lower()
+if _raw_fb in ("1", "true", "yes", "on"):
+    OPENROUTER_PROVIDER_ALLOW_FALLBACKS: bool | None = True
+elif _raw_fb in ("0", "false", "no", "off"):
+    OPENROUTER_PROVIDER_ALLOW_FALLBACKS = False
+else:
+    OPENROUTER_PROVIDER_ALLOW_FALLBACKS = None  # omit — OpenRouter default
+_raw_sort_env = os.getenv("OPENROUTER_PROVIDER_SORT")
+if _raw_sort_env is None:
+    _raw_sort = "throughput"
+else:
+    _raw_sort = _raw_sort_env.strip().lower()
+if _raw_sort in ("off", "none", "disable", "false", "0"):
+    OPENROUTER_PROVIDER_SORT: str | None = None
+elif _raw_sort in ("throughput", "latency", "price"):
+    OPENROUTER_PROVIDER_SORT = _raw_sort
+elif _raw_sort == "":
+    OPENROUTER_PROVIDER_SORT = "throughput"
+else:
+    OPENROUTER_PROVIDER_SORT = "throughput"
 
 # ── Семантический роутер агента (fastembed) ─────────────────
 # Косинус к центроидам; margin отсекает «почти равные» классы.

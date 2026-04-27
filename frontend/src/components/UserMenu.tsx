@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import ThemedTooltip from './ThemedTooltip'
 import styles from './UserMenu.module.css'
 
 const MenuIcon = () => (
@@ -101,14 +102,15 @@ export default function UserMenu() {
 
   return (
     <div className={styles.container} ref={containerRef}>
-      <button
-        className={styles.trigger}
-        onClick={() => setOpen((v) => !v)}
-        title="Меню"
-        aria-expanded={open}
-      >
-        <MenuIcon />
-      </button>
+      <ThemedTooltip content="Меню" side="bottom" delayMs={300} disabled={open}>
+        <button
+          className={styles.trigger}
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
+          <MenuIcon />
+        </button>
+      </ThemedTooltip>
 
       {open && (
         <div className={styles.dropdown}>
@@ -138,14 +140,22 @@ export default function UserMenu() {
           <div className={styles.themeToggleRow}>
             <MoonIcon />
             <span className={styles.themeLabel}>Тёмная</span>
-            <button
-              type="button"
-              className={`${styles.toggleSwitch} ${mode === 'light' ? styles.toggleSwitchOn : ''}`}
-              onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
-              title={mode === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
+            <ThemedTooltip
+              content={mode === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
+              side="top"
+              delayMs={260}
             >
-              <span className={styles.toggleKnob} />
-            </button>
+              <button
+                type="button"
+                className={`${styles.toggleSwitch} ${mode === 'light' ? styles.toggleSwitchOn : ''}`}
+                onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
+                aria-label={
+                  mode === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'
+                }
+              >
+                <span className={styles.toggleKnob} />
+              </button>
+            </ThemedTooltip>
             <span className={styles.themeLabel}>Светлая</span>
             <SunIcon />
           </div>

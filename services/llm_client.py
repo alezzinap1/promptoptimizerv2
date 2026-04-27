@@ -16,6 +16,11 @@ from typing import Iterator
 
 from openai import OpenAI
 
+from config.settings import (
+    OPENROUTER_PROVIDER_ALLOW_FALLBACKS,
+    OPENROUTER_PROVIDER_ORDER,
+    OPENROUTER_PROVIDER_SORT,
+)
 from services.openrouter_request_log import maybe_log_openrouter_chat_completion
 
 logger = logging.getLogger(__name__)
@@ -116,6 +121,28 @@ def get_model_for_tier(tier: str, preferred: str | None = None) -> str:
     return models[0]
 
 
+def _openrouter_extra_body(top_k: int | None) -> dict | None:
+    """OpenRouter extra_body: top_k + provider routing.
+
+    By default `provider.sort=throughput` lets OpenRouter pick among endpoints without a static
+    provider list. For adaptive tuning from your own latency samples, see observability / future
+    closed-loop routing (not implemented here).
+    """
+    extra: dict = {}
+    if top_k is not None and top_k > 0:
+        extra["top_k"] = top_k
+    provider: dict = {}
+    if OPENROUTER_PROVIDER_ORDER:
+        provider["order"] = list(OPENROUTER_PROVIDER_ORDER)
+        if OPENROUTER_PROVIDER_ALLOW_FALLBACKS is not None:
+            provider["allow_fallbacks"] = OPENROUTER_PROVIDER_ALLOW_FALLBACKS
+    if OPENROUTER_PROVIDER_SORT in ("throughput", "latency", "price"):
+        provider["sort"] = OPENROUTER_PROVIDER_SORT
+    if provider:
+        extra["provider"] = provider
+    return extra if extra else None
+
+
 class LLMClient:
     """Synchronous LLM client for call sites that do not use an async event loop."""
 
@@ -151,8 +178,9 @@ class LLMClient:
         }
         if top_p is not None and 0 <= top_p <= 1:
             kwargs["top_p"] = top_p
-        if top_k is not None and top_k > 0:
-            kwargs["extra_body"] = {"top_k": top_k}
+        ob = _openrouter_extra_body(top_k)
+        if ob:
+            kwargs["extra_body"] = ob
         if stream:
             kwargs["stream"] = True
         return kwargs

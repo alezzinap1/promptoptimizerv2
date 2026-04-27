@@ -4,6 +4,7 @@ import { api, type LibraryItem } from '../../api/client'
 import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
 import LibraryTagChips from '../../components/LibraryTagChips'
 import SelectDropdown from '../../components/SelectDropdown'
+import ThemedTooltip from '../../components/ThemedTooltip'
 import { CopyIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
 import PublishToCommunityModal from '../../components/PublishToCommunityModal'
 import { formatLibraryCardDates } from '../../lib/promptLibraryMeta'
@@ -424,10 +425,12 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                         }}
                       >
                         <span className={styles.pairStabilityRowTitle}>{bItem.title}</span>
-                        <span className={styles.pairStabilityRowMeta} title={bPreview}>
-                          {bPreview.slice(0, 120)}
-                          {bPreview.length > 120 ? '…' : ''}
-                        </span>
+                        <ThemedTooltip content={bPreview} side="bottom" delayMs={240} block>
+                          <span className={styles.pairStabilityRowMeta}>
+                            {bPreview.slice(0, 120)}
+                            {bPreview.length > 120 ? '…' : ''}
+                          </span>
+                        </ThemedTooltip>
                       </button>
                     )
                   })
@@ -524,10 +527,27 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   />
                   <div className={styles.libHeroGrad} aria-hidden />
                   <div className={styles.libHeroOverlay}>
+                    <ThemedTooltip content="Открыть на Студии с этим промптом" side="bottom" delayMs={240} block>
+                      <button
+                        type="button"
+                        className={styles.libHeroTitle}
+                        onClick={() =>
+                          navigate('/home', {
+                            state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true },
+                          })
+                        }
+                      >
+                        {item.title}
+                      </button>
+                    </ThemedTooltip>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <ThemedTooltip content="Открыть на Студии с этим промптом" side="bottom" delayMs={240} block>
                     <button
                       type="button"
-                      className={styles.libHeroTitle}
-                      title="Открыть на Студии с этим промптом"
+                      className={styles.cardTitleBtn}
                       onClick={() =>
                         navigate('/home', {
                           state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true },
@@ -536,22 +556,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                     >
                       {item.title}
                     </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={styles.cardTitleBtn}
-                    title="Открыть на Студии с этим промптом"
-                    onClick={() =>
-                      navigate('/home', {
-                        state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true },
-                      })
-                    }
-                  >
-                    {item.title}
-                  </button>
+                  </ThemedTooltip>
                   {item.created_at ? (
                     <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
                   ) : null}
@@ -562,77 +567,80 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                 <p className={styles.cardDates}>{formatLibraryCardDates(item.created_at, item.updated_at)}</p>
               ) : null}
               <p className={styles.meta}>
-                <span className={styles.taskTypeLabel} title="Тип задачи при сохранении">
-                  {item.task_type}
-                </span>
+                <ThemedTooltip content="Тип задачи при сохранении" side="top" delayMs={200}>
+                  <span className={styles.taskTypeLabel}>{item.task_type}</span>
+                </ThemedTooltip>
                 {isImagePrompt(item) && (
-                  <span className={styles.imageBadge} title="Промпт для генерации изображений">
-                    🎨
-                  </span>
+                  <ThemedTooltip content="Промпт для генерации изображений" side="top" delayMs={200}>
+                    <span className={styles.imageBadge}>🎨</span>
+                  </ThemedTooltip>
                 )}
                 <EvalBadge libraryId={item.id} />
                 {item.target_model && item.target_model !== 'unknown' && (
-                  <span className={styles.modelBadge} title="Целевая модель">
-                    {item.target_model}
-                  </span>
+                  <ThemedTooltip content="Целевая модель" side="top" delayMs={200}>
+                    <span className={styles.modelBadge}>{item.target_model}</span>
+                  </ThemedTooltip>
                 )}
-                <span className={styles.ratingBadge} title="Оценка по шкале от 0 до 5 звёзд">
-                  {ratingLabel(item.rating)}
-                </span>
-                <span className={styles.tokenBadgeMini} title="Приблизительное количество токенов">
-                  ≈{Math.max(1, Math.round(promptText.length / 3.5)).toLocaleString()} tok
-                </span>
+                <ThemedTooltip content="Оценка по шкале от 0 до 5 звёзд" side="top" delayMs={200}>
+                  <span className={styles.ratingBadge}>{ratingLabel(item.rating)}</span>
+                </ThemedTooltip>
+                <ThemedTooltip content="Приблизительное количество токенов" side="top" delayMs={200}>
+                  <span className={styles.tokenBadgeMini}>
+                    ≈{Math.max(1, Math.round(promptText.length / 3.5)).toLocaleString()} tok
+                  </span>
+                </ThemedTooltip>
                 {hasAlt ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setLangView((prev) => ({
-                        ...prev,
-                        [item.id]: currentView === 'primary' ? 'alt' : 'primary',
-                      }))
-                    }
-                    title={`Показать ${otherLang || 'другую'} версию`}
-                    style={{
-                      fontSize: 10,
-                      padding: '1px 7px',
-                      borderRadius: 10,
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      background: 'rgba(255,255,255,0.04)',
-                      color: 'inherit',
-                      cursor: 'pointer',
-                      lineHeight: '16px',
-                    }}
-                  >
-                    {promptLang || (currentView === 'primary' ? 'A' : 'B')} ⇄ {otherLang || '?'}
-                  </button>
+                  <ThemedTooltip content={`Показать ${otherLang || 'другую'} версию`} side="top" delayMs={200}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLangView((prev) => ({
+                          ...prev,
+                          [item.id]: currentView === 'primary' ? 'alt' : 'primary',
+                        }))
+                      }
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 7px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        background: 'rgba(255,255,255,0.04)',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        lineHeight: '16px',
+                      }}
+                    >
+                      {promptLang || (currentView === 'primary' ? 'A' : 'B')} ⇄ {otherLang || '?'}
+                    </button>
+                  </ThemedTooltip>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void handleTranslate(item)}
-                    disabled={Boolean(translating[item.id])}
-                    title="Перевести RU↔EN (бесплатно, без LLM)"
-                    style={{
-                      fontSize: 10,
-                      padding: '1px 7px',
-                      borderRadius: 10,
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      background: 'rgba(255,255,255,0.04)',
-                      color: 'inherit',
-                      cursor: translating[item.id] ? 'wait' : 'pointer',
-                      lineHeight: '16px',
-                      opacity: translating[item.id] ? 0.6 : 1,
-                    }}
-                  >
-                    {translating[item.id] ? '…' : '🌐 RU↔EN'}
-                  </button>
+                  <ThemedTooltip content="Перевести RU↔EN (бесплатно, без LLM)" side="top" delayMs={200}>
+                    <span style={{ display: 'inline-block' }}>
+                      <button
+                        type="button"
+                        onClick={() => void handleTranslate(item)}
+                        disabled={Boolean(translating[item.id])}
+                        style={{
+                          fontSize: 10,
+                          padding: '1px 7px',
+                          borderRadius: 10,
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          background: 'rgba(255,255,255,0.04)',
+                          color: 'inherit',
+                          cursor: translating[item.id] ? 'wait' : 'pointer',
+                          lineHeight: '16px',
+                          opacity: translating[item.id] ? 0.6 : 1,
+                        }}
+                      >
+                        {translating[item.id] ? '…' : '🌐 RU↔EN'}
+                      </button>
+                    </span>
+                  </ThemedTooltip>
                 )}
                 {translateErr[item.id] ? (
-                  <span
-                    title={translateErr[item.id]}
-                    style={{ fontSize: 10, color: '#f87171' }}
-                  >
-                    ошибка
-                  </span>
+                  <ThemedTooltip content={translateErr[item.id]} side="top" delayMs={200}>
+                    <span style={{ fontSize: 10, color: '#f87171' }}>ошибка</span>
+                  </ThemedTooltip>
                 ) : null}
               </p>
               {item.tags.length > 0 ? <LibraryTagChips tags={item.tags} className={styles.tagChipsMargin} /> : null}
@@ -643,21 +651,22 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                 </pre>
               </div>
               <div className={styles.cardActions}>
-                <button
-                  type="button"
-                  className={`${styles.openBtn} ${styles.openBtnAccent} btn-primary`}
-                  title="Открыть на Студии с этим промптом"
-                  onClick={() =>
-                    navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true } })
-                  }
-                >
-                  <svg className={styles.openBtnIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                  Открыть
-                </button>
+                <ThemedTooltip content="Открыть на Студии с этим промптом" side="top" delayMs={240}>
+                  <button
+                    type="button"
+                    className={`${styles.openBtn} ${styles.openBtnAccent} btn-primary`}
+                    onClick={() =>
+                      navigate('/home', { state: { prefillTask: `Улучши этот промпт:\n\n${promptText}`, clearResult: true } })
+                    }
+                  >
+                    <svg className={styles.openBtnIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                    Открыть
+                  </button>
+                </ThemedTooltip>
                 <TryInGeminiButton
                   prompt={promptText}
                   title={
@@ -668,8 +677,10 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                 />
                 <CopyIconButton text={promptText} title="Копировать текст промпта в буфер обмена" />
                 <details className={styles.cardMore}>
-                  <summary className={styles.cardMoreSummary} title="Другие действия">
-                    Ещё
+                  <summary className={styles.cardMoreSummary}>
+                    <ThemedTooltip content="Другие действия" side="left" delayMs={220}>
+                      <span>Ещё</span>
+                    </ThemedTooltip>
                   </summary>
                   <div className={styles.cardMoreMenu}>
                     <button type="button" className={styles.cardMoreItem} onClick={() => setPublishItem(item)}>
@@ -734,13 +745,15 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                     <span className={styles.evalInlineLoading}>Оцениваю…</span>
                   ) : evalData ? (
                     <>
-                      <div className={styles.evalInlineRow} title={COMPLETENESS_SCORE_TITLE}>
-                        <span className={styles.evalInlineLabel}>Полнота</span>
-                        <div className={styles.evalMiniBar}>
-                          <div className={styles.evalMiniBarFill} style={{ width: `${Math.min(100, Number(evalData.completeness_score ?? 0))}%` }} />
+                      <ThemedTooltip content={COMPLETENESS_SCORE_TITLE} side="bottom" delayMs={260} block>
+                        <div className={styles.evalInlineRow}>
+                          <span className={styles.evalInlineLabel}>Полнота</span>
+                          <div className={styles.evalMiniBar}>
+                            <div className={styles.evalMiniBarFill} style={{ width: `${Math.min(100, Number(evalData.completeness_score ?? 0))}%` }} />
+                          </div>
+                          <span className={styles.evalInlineVal}>{String(evalData.completeness_score ?? 0)}%</span>
                         </div>
-                        <span className={styles.evalInlineVal}>{String(evalData.completeness_score ?? 0)}%</span>
-                      </div>
+                      </ThemedTooltip>
                       <div className={styles.evalInlineChips}>
                         {evalData.has_role ? <span className={styles.evalChipGood}>роль</span> : <span className={styles.evalChipMiss}>роль</span>}
                         {evalData.has_output_format ? <span className={styles.evalChipGood}>формат</span> : <span className={styles.evalChipMiss}>формат</span>}

@@ -23,6 +23,22 @@ def test_catalog_structure_and_ids_unique():
     assert candidates("text", "fast")
 
 
+def test_image_mode_allows_higher_completion_cap(monkeypatch):
+    from services import model_health
+
+    mid = "img/test-model"
+    # $3.5 / 1M completion — допустимо для image, недопустимо для text при пороге 3
+    fake = {mid: {"id": mid, "pricing": {"prompt": 0.0, "completion": 0.0000035}}}
+    monkeypatch.setattr(model_health, "_index_openrouter_models", lambda: fake)
+
+    ok_img = model_health._evaluate(mid, "image", "mid", fake)
+    assert ok_img["available"] is True
+
+    bad_text = model_health._evaluate(mid, "text", "mid", fake)
+    assert bad_text["available"] is False
+    assert "over_budget" in bad_text["reason"]
+
+
 def test_budget_cap_is_enforced_by_health_evaluate(monkeypatch):
     from services import model_health
 

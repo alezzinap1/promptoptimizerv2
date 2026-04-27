@@ -21,6 +21,80 @@ export const AGENT_PRODUCT_HELP_TEXT = `Кратко про интерфейс:
 
 Чтобы **изменить текст промпта**, опишите правку явно (например: «убери третий пункт», «добавь пример»).`
 
+export const AGENT_TRIAL_OR_MODEL_HELP_TEXT = `Сообщение про **недоступную модель** относится к **модели генерации**, которую вы выбрали в студии (уровень внизу и список моделей в **Настройках**).
+
+В **пробном режиме без своего ключа OpenRouter** сервер разрешает только модели с достаточно низкой **ценой выхода** (порог задаётся на сервере; точное значение — в **User Info** и в тексте ошибки).
+
+**Что сделать:** добавьте **свой ключ OpenRouter** в **Настройках**, либо переключите уровень/модель на более дешёвую из доступных в пробном режиме.`
+
+const AGENT_SEMANTIC_CHAT_FALLBACK_TEXT = `Я не до конца понял вопрос. Если речь про **ошибку модели или пробный режим** — откройте **Настройки** / **User Info** и проверьте ключ и выбранную модель. Про кнопки студии — краткая справка ниже.
+
+${AGENT_PRODUCT_HELP_TEXT}`
+
+export function looksLikeTrialOrModelAvailabilityQuestion(t: string): boolean {
+  const low = t.toLowerCase()
+  const needles = [
+    'недоступн',
+    'какая модель',
+    'какой модел',
+    'какую модел',
+    'модель недоступ',
+    'какая именно модель',
+    'какой именно модел',
+    'пробн',
+    'trial',
+    'openrouter',
+    'свой ключ',
+    'своего ключа',
+    'api ключ',
+    'апи ключ',
+    'api-ключ',
+    'хостовый ключ',
+    'общий ключ',
+    'лимит токен',
+    '1$/1m',
+    '1.0/1m',
+    '$1/',
+    'стоимост',
+    'дорог',
+    'дешёв',
+    'дешев',
+  ]
+  return needles.some((n) => low.includes(n))
+}
+
+function looksLikeMetaOrProductQuestion(t: string): boolean {
+  if (/^(а\s+)?(как|что|почему|объясни|расскажи|где|когда|зачем)\b/i.test(t.trim())) return true
+  const low = t.toLowerCase()
+  const needles = [
+    'версионирован',
+    'версии ',
+    'версия ',
+    'библиотек',
+    'интерфейс',
+    'как ты ',
+    'как вы ',
+    'что такое',
+    'как работает',
+    'как устроен',
+    'полноту ',
+    'оцениваешь',
+    'оцениваете',
+    'сколько стоит',
+    'trial',
+    'лимит',
+  ]
+  return needles.some((n) => low.includes(n))
+}
+
+/** Ответ для семантического класса chat (не подставлять всегда один product_help). */
+export function resolveSemanticChatReply(userText: string): string {
+  const raw = normalizeAgentUserMessage(userText)
+  if (looksLikeTrialOrModelAvailabilityQuestion(raw)) return AGENT_TRIAL_OR_MODEL_HELP_TEXT
+  if (looksLikeMetaOrProductQuestion(raw)) return AGENT_PRODUCT_HELP_TEXT
+  return AGENT_SEMANTIC_CHAT_FALLBACK_TEXT
+}
+
 function looksLikeEditCommand(t: string): boolean {
   const s = t.trim()
   if (/^(измени|убери|добавь|замени|перепиши|сократ|удлин|вставь|удали|поправь|улучши|дополни|расширь|сжать|формализуй)\b/i.test(s))
@@ -64,30 +138,6 @@ export function looksLikeStrongEdit(t: string): boolean {
   const s = normalizeAgentUserMessage(t)
   if (looksLikeApplyTipDirective(s)) return true
   return looksLikeEditCommand(s)
-}
-
-function looksLikeMetaOrProductQuestion(t: string): boolean {
-  const low = t.toLowerCase()
-  if (/^(а\s+)?(как|что|почему|объясни|расскажи|где|когда|зачем)\b/i.test(t.trim())) return true
-  const needles = [
-    'версионирован',
-    'версии ',
-    'версия ',
-    'библиотек',
-    'интерфейс',
-    'как ты ',
-    'как вы ',
-    'что такое',
-    'как работает',
-    'как устроен',
-    'полноту ',
-    'оцениваешь',
-    'оцениваете',
-    'сколько стоит',
-    'trial',
-    'лимит',
-  ]
-  return needles.some((n) => low.includes(n))
 }
 
 export function parseTagsFromText(t: string): string[] {
@@ -153,6 +203,10 @@ export function classifyAgentFollowUp(text: string): FollowUpPlan {
       search: q?.[1]?.trim(),
       debug: 'nav_library',
     }
+  }
+
+  if (looksLikeTrialOrModelAvailabilityQuestion(raw) && !looksLikeEditCommand(raw)) {
+    return { type: 'chat', text: AGENT_TRIAL_OR_MODEL_HELP_TEXT, debug: 'trial_model_help' }
   }
 
   if (looksLikeMetaOrProductQuestion(raw) && !looksLikeEditCommand(raw)) {

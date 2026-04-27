@@ -17,6 +17,16 @@ AGENT_PRODUCT_HELP_TEXT = """Кратко про интерфейс:
 
 Чтобы **изменить текст промпта**, опишите правку явно (например: «убери третий пункт», «добавь пример»)."""
 
+AGENT_TRIAL_OR_MODEL_HELP_TEXT = """Сообщение про **недоступную модель** относится к **модели генерации**, которую вы выбрали в студии (уровень внизу и список моделей в **Настройках**).
+
+В **пробном режиме без своего ключа OpenRouter** сервер разрешает только модели с достаточно низкой **ценой выхода** (порог задаётся на сервере; точное значение — в **User Info** и в тексте ошибки).
+
+**Что сделать:** добавьте **свой ключ OpenRouter** в **Настройках**, либо переключите уровень/модель на более дешёвую из доступных в пробном режиме."""
+
+AGENT_SEMANTIC_CHAT_FALLBACK_TEXT = """Я не до конца понял вопрос. Если речь про **ошибку модели или пробный режим** — откройте **Настройки** / **User Info** и проверьте ключ и выбранную модель. Про кнопки студии — краткая справка ниже.
+
+""" + AGENT_PRODUCT_HELP_TEXT
+
 
 def normalize_agent_user_message(t: str) -> str:
     s = t.replace("\ufeff", "")
@@ -67,6 +77,39 @@ def looks_like_strong_edit(t: str) -> bool:
     if looks_like_apply_tip_directive(s):
         return True
     return looks_like_edit_command(s)
+
+
+def looks_like_trial_or_model_availability_question(t: str) -> bool:
+    """Вопросы про блокировку модели, пробный режим, ключ — не сводить к общему product_help."""
+    low = t.lower()
+    needles = (
+        "недоступн",
+        "какая модель",
+        "какой модел",
+        "какую модел",
+        "модель недоступ",
+        "какая именно модель",
+        "какой именно модел",
+        "пробн",
+        "trial",
+        "openrouter",
+        "свой ключ",
+        "своего ключа",
+        "api ключ",
+        "апи ключ",
+        "api-ключ",
+        "хостовый ключ",
+        "общий ключ",
+        "лимит токен",
+        "1$/1m",
+        "1.0/1m",
+        "$1/",
+        "стоимост",
+        "дорог",
+        "дешёв",
+        "дешев",
+    )
+    return any(n in low for n in needles)
 
 
 def looks_like_meta_or_product_question(t: str) -> bool:
@@ -173,6 +216,13 @@ def classify_agent_follow_up_api_response(text: str, prompt_type: str) -> dict[s
             data["search"] = search
         return {"action": "nav_library", "data": data, "reasoning": "rules: nav_library"}
 
+    if looks_like_trial_or_model_availability_question(raw) and not looks_like_edit_command(raw):
+        return {
+            "action": "chat",
+            "data": {"message": AGENT_TRIAL_OR_MODEL_HELP_TEXT},
+            "reasoning": "rules: trial_model_help",
+        }
+
     if looks_like_meta_or_product_question(raw) and not looks_like_edit_command(raw):
         return {
             "action": "chat",
@@ -232,9 +282,15 @@ def map_semantic_intent_to_follow_up_response(
     if intent == "nav_skills":
         return {"action": "nav_skills", "data": {}, "reasoning": reason_meta}
     if intent == "chat":
+        if looks_like_trial_or_model_availability_question(text):
+            msg = AGENT_TRIAL_OR_MODEL_HELP_TEXT
+        elif looks_like_meta_or_product_question(text):
+            msg = AGENT_PRODUCT_HELP_TEXT
+        else:
+            msg = AGENT_SEMANTIC_CHAT_FALLBACK_TEXT
         return {
             "action": "chat",
-            "data": {"message": AGENT_PRODUCT_HELP_TEXT},
+            "data": {"message": msg},
             "reasoning": reason_meta,
         }
     if intent.startswith("nav_"):

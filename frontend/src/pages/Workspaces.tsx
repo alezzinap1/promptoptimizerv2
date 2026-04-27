@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ThemedTooltip from '../components/ThemedTooltip'
 import { api, type Workspace } from '../api/client'
 import styles from './Workspaces.module.css'
 
@@ -71,7 +72,11 @@ export default function Workspaces() {
           <label key={field.key} className={styles.formField}>
             <span className={styles.labelRow}>
               <span>{field.label}</span>
-              <span className={styles.helpIcon} title={field.help}>?</span>
+              <ThemedTooltip content={field.help} side="top" delayMs={280}>
+                <span className={styles.helpIcon} aria-label={field.help}>
+                  ?
+                </span>
+              </ThemedTooltip>
             </span>
             {isTextarea ? (
               <textarea
@@ -176,10 +181,17 @@ export default function Workspaces() {
                 </div>
                 <div className={styles.cardHeaderActions}>
                   {isActive ? (
-                    <div className={styles.activePill} title="Это пространство подставляется в блок генерации на главной">
-                      <span className={styles.activeDot} aria-hidden />
-                      Активно сейчас
-                    </div>
+                    <ThemedTooltip
+                      content="Это пространство подставляется в блок генерации на главной"
+                      side="top"
+                      delayMs={280}
+                      block
+                    >
+                      <div className={styles.activePill}>
+                        <span className={styles.activeDot} aria-hidden />
+                        Активно сейчас
+                      </div>
+                    </ThemedTooltip>
                   ) : (
                     <button
                       type="button"

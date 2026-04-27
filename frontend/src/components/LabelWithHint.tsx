@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import ThemedTooltip from './ThemedTooltip'
 import styles from './LabelWithHint.module.css'
 
 type Props = {
@@ -15,9 +16,11 @@ export default function LabelWithHint({ label, hint, children, className }: Prop
       <span className={styles.labelRow}>
         <span className={styles.labelText}>{label}</span>
         {hint ? (
-          <button type="button" className={styles.hintBtn} title={hint} aria-label={hint}>
-            ?
-          </button>
+          <ThemedTooltip content={hint} side="top">
+            <button type="button" className={styles.hintBtn} aria-label={hint}>
+              ?
+            </button>
+          </ThemedTooltip>
         ) : null}
       </span>
       {children}

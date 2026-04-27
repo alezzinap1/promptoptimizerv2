@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ThemedTooltip from '../components/ThemedTooltip'
 import {
   evalApi,
   downloadEvalRunMarkdown,
@@ -129,10 +130,12 @@ export default function EvalStudio() {
           <div className={css.evalStudioHeaderRow}>
             <h1 className="pageTitleGradient">Eval Studio</h1>
             {syncLabel && (
-              <span className={css.evalStudioSync} title="Время последней синхронизации списка">
-                Обновлено: {syncLabel}
-                {runs.some(r => r.status === 'running' || r.status === 'queued') ? ' · авто' : ''}
-              </span>
+              <ThemedTooltip content="Время последней синхронизации списка" side="bottom" delayMs={280}>
+                <span className={css.evalStudioSync}>
+                  Обновлено: {syncLabel}
+                  {runs.some(r => r.status === 'running' || r.status === 'queued') ? ' · авто' : ''}
+                </span>
+              </ThemedTooltip>
             )}
           </div>
           <p className={pageStyles.panelSubtitle}>
@@ -259,8 +262,10 @@ export default function EvalStudio() {
                         className={sr.id === detail.run.id ? css.seriesRowActive : undefined}
                       >
                         <td>{sr.id}</td>
-                        <td className={css.muted} style={{ fontSize: 11, maxWidth: 180 }} title={sr.target_model_id}>
-                          {sr.target_model_id.replace(/^[^/]+\//, '')}
+                        <td className={css.muted} style={{ fontSize: 11, maxWidth: 180 }}>
+                          <ThemedTooltip content={sr.target_model_id} side="top" delayMs={200}>
+                            <span>{sr.target_model_id.replace(/^[^/]+\//, '')}</span>
+                          </ThemedTooltip>
                         </td>
                         <td>{sr.agg_overall_p50?.toFixed(2) ?? '—'}</td>
                         <td>{sr.diversity_score != null ? sr.diversity_score.toFixed(2) : '—'}</td>
