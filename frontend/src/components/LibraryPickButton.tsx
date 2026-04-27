@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { api, type LibraryItem } from '../api/client'
+import { api, type LibraryItem, type LibraryRevision } from '../api/client'
 import {
   libraryPromptText,
   libraryTaskDescriptionFromCard,
@@ -9,6 +9,7 @@ import {
 } from '../lib/libraryPickText'
 import { formatLibraryCardDates } from '../lib/promptLibraryMeta'
 import LibraryTagChips from './LibraryTagChips'
+import LibraryRevisionStrip from './LibraryRevisionStrip'
 import ThemedTooltip from './ThemedTooltip'
 import EvalBadge from '../pages/eval/EvalBadge'
 import libStyles from '../pages/Library.module.css'
@@ -120,6 +121,9 @@ export default function LibraryPickButton({
   const [langView, setLangView] = useState<Record<number, 'primary' | 'alt'>>({})
   const [translating, setTranslating] = useState<Record<number, boolean>>({})
   const [translateErr, setTranslateErr] = useState<Record<number, string>>({})
+  const [expandedPickId, setExpandedPickId] = useState<number | null>(null)
+  const [revCache, setRevCache] = useState<Record<number, LibraryRevision[]>>({})
+  const [revLoading, setRevLoading] = useState<number | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -157,6 +161,9 @@ export default function LibraryPickButton({
     setLangView({})
     setTranslating({})
     setTranslateErr({})
+    setExpandedPickId(null)
+    setRevCache({})
+    setRevLoading(null)
     const t = window.setTimeout(() => searchRef.current?.focus(), 50)
     return () => window.clearTimeout(t)
   }, [open])
@@ -223,6 +230,49 @@ export default function LibraryPickButton({
     setOpen(false)
   }
 
+  const loadRevisionsForPick = async (itemId: number) => {
+    if (revCache[itemId]) return
+    setRevLoading(itemId)
+    try {
+      const r = await api.getLibraryRevisions(itemId)
+      setRevCache((c) => ({ ...c, [itemId]: r.items }))
+    } finally {
+      setRevLoading(null)
+    }
+  }
+
+  const patchStars = (itemId: number, starId: number | null) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId || !it.revisions?.length) return it
+        return {
+          ...it,
+          revisions: it.revisions.map((x) => ({
+            ...x,
+            is_starred: starId != null && x.id === starId,
+          })),
+        }
+      }),
+    )
+    setRevCache((c) => {
+      const list = c[itemId]
+      if (!list) return c
+      return {
+        ...c,
+        [itemId]: list.map((x) => ({
+          ...x,
+          is_starred: starId != null && x.id === starId,
+        })),
+      }
+    })
+  }
+
+  const handleStarPick = async (itemId: number, revisionId: number, isCurrentlyStarred: boolean) => {
+    const next = isCurrentlyStarred ? null : revisionId
+    await api.starLibraryRevision(itemId, next)
+    patchStars(itemId, next)
+  }
+
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
   const modal =
@@ -275,11 +325,25 @@ export default function LibraryPickButton({
                 const tt = (item.task_type || '').trim()
                 const tm = (item.target_model || '').trim()
 
+                const revCount = item.revisions?.length ?? 0
+                const multiPromptPick = applyMode === 'prompt' && revCount > 1
+
                 return (
                   <article
                     key={item.id}
-                    className={`${libStyles.card} ${libStyles.cardMasonry} ${hasCover ? libStyles.cardWithCover : ''} ${styles.pickCardWrap}`}
-                    onClick={() => pick(item)}
+                    className={`${libStyles.card} ${libStyles.cardMasonry} ${hasCover ? libStyles.cardWithCover : ''} ${styles.pickCardWrap} ${expandedPickId === item.id ? styles.pickCardExpanded : ''}`}
+                    onClick={() => {
+                      if (!multiPromptPick) {
+                        pick(item)
+                        return
+                      }
+                      if (expandedPickId === item.id) {
+                        setExpandedPickId(null)
+                        return
+                      }
+                      setExpandedPickId(item.id)
+                      void loadRevisionsForPick(item.id)
+                    }}
                   >
                     {hasCover ? (
                       <div className={libStyles.libHero}>
@@ -410,6 +474,39 @@ export default function LibraryPickButton({
                           {promptText.length > 200 ? '…' : ''}
                         </pre>
                       </div>
+                      {item.revisions && item.revisions.length > 0 ? (
+                        <div onClick={stop}>
+                          {revLoading === item.id ? (
+                            <p className={styles.revLoading}>Загрузка версий…</p>
+                          ) : expandedPickId === item.id && multiPromptPick ? (
+                            <LibraryRevisionStrip
+                              libraryId={item.id}
+                              revisions={item.revisions}
+                              showMultiVersionHint
+                              pickMode
+                              onPickVersion={(seq) => {
+                                const row = revCache[item.id]?.find((x) => x.version_seq === seq)
+                                onApply(row?.prompt ?? item.prompt)
+                                setOpen(false)
+                                setExpandedPickId(null)
+                              }}
+                              onStarRevision={(rid, st) => void handleStarPick(item.id, rid, st)}
+                            />
+                          ) : (
+                            <>
+                              <LibraryRevisionStrip
+                                libraryId={item.id}
+                                revisions={item.revisions}
+                                showMultiVersionHint
+                                onStarRevision={(rid, st) => void handleStarPick(item.id, rid, st)}
+                              />
+                              {multiPromptPick ? (
+                                <p className={styles.pickExpandHint}>Нажмите карточку — выбрать версию для подстановки.</p>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   </article>
                 )

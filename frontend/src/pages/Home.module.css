@@ -103,6 +103,23 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Достаточно для 2–3 рядов чипов; старый 52px обрезал перенос — «карусель» пропадала. */
+.suggestedActionsBarInnerCollapsed {
+  max-height: 7.75rem;
+}
+
+.suggestedActionsBarInnerExpanded {
+  max-height: min(70vh, 32rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suggestedActionsBarInner {
+    transition: none;
+  }
 }
 
 .suggestedActionChip {
@@ -1829,10 +1846,14 @@ details[open].chatBubbleThinking .thinkingSummary::before {
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+  width: 100%;
   max-width: 100%;
+  min-height: 30px;
   overflow-x: auto;
-  padding: 2px 0 0;
+  overflow-y: hidden;
+  padding: 2px 0 4px;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .promptDoneChipCompact {
@@ -3668,6 +3689,55 @@ details[open].chatBubbleTipApplied .tipAppliedSummary::before {
   color: var(--muted);
   line-height: 1.45;
   opacity: 0.92;
+}
+
+.saveLibraryVersionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 6px;
+}
+
+.saveLibraryVersionLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-warm, #d4a574);
+}
+
+.saveLibraryRadio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.saveLibrarySelectLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.saveLibrarySelect {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font-family: inherit;
+}
+
+.saveVersionActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .ideItem,

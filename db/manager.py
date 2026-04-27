@@ -188,7 +188,39 @@ class DBManager:
             self._migrate_phase22_eval_lineage_meta(conn)
             self._migrate_phase23_eval_meta_lite(conn)
             self._migrate_phase24_model_health_slot_pk(conn)
+            self._migrate_phase25_library_revisions(conn)
         logger.info("DB initialized at %s", self._path)
+
+    def _migrate_phase25_library_revisions(self, conn: sqlite3.Connection) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_library_revision (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                library_id INTEGER NOT NULL,
+                version_seq INTEGER NOT NULL,
+                prompt TEXT NOT NULL,
+                completeness_score REAL,
+                token_estimate INTEGER,
+                is_starred INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (library_id) REFERENCES prompt_library(id) ON DELETE CASCADE,
+                UNIQUE(library_id, version_seq)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_plrev_library ON prompt_library_revision(library_id)"
+        )
+        conn.execute(
+            """
+            INSERT INTO prompt_library_revision (library_id, version_seq, prompt, completeness_score, token_estimate, is_starred)
+            SELECT pl.id, 1, pl.prompt, NULL, NULL, 0
+            FROM prompt_library pl
+            WHERE NOT EXISTS (
+                SELECT 1 FROM prompt_library_revision r WHERE r.library_id = pl.id
+            )
+            """
+        )
 
     def _migrate_phase2(self, conn: sqlite3.Connection) -> None:
         """Best-effort migration for auth/multitenancy columns on old DBs."""
@@ -1895,6 +1927,8 @@ class DBManager:
         notes: str = "",
         user_id: int | None = None,
         cover_image_path: str | None = None,
+        completeness_score: float | None = None,
+        token_estimate: int | None = None,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
@@ -1914,7 +1948,269 @@ class DBManager:
                     (cover_image_path or "").strip(),
                 ),
             )
-            return cur.lastrowid  # type: ignore[return-value]
+            item_id = int(cur.lastrowid)  # type: ignore[arg-type]
+            conn.execute(
+                """
+                INSERT INTO prompt_library_revision
+                    (library_id, version_seq, prompt, completeness_score, token_estimate, is_starred)
+                VALUES (?, 1, ?, ?, ?, 0)
+                """,
+                (item_id, prompt, completeness_score, token_estimate),
+            )
+            return item_id
+
+    @staticmethod
+    def _revision_summaries_for_library_ids(
+        conn: sqlite3.Connection, library_ids: list[int]
+    ) -> dict[int, list[dict]]:
+        if not library_ids:
+            return {}
+        ph = ",".join("?" * len(library_ids))
+        cur = conn.execute(
+            f"""
+            SELECT library_id, id, version_seq, completeness_score, is_starred, token_estimate
+            FROM prompt_library_revision
+            WHERE library_id IN ({ph})
+            ORDER BY library_id ASC, version_seq ASC
+            """,
+            library_ids,
+        )
+        by: dict[int, list[dict]] = {i: [] for i in library_ids}
+        for row in cur.fetchall():
+            lid = int(row["library_id"])
+            by.setdefault(lid, []).append(
+                {
+                    "id": int(row["id"]),
+                    "version_seq": int(row["version_seq"]),
+                    "completeness_score": row["completeness_score"],
+                    "is_starred": bool(row["is_starred"]),
+                    "token_estimate": row["token_estimate"],
+                }
+            )
+        for lid in list(by.keys()):
+            by[lid].sort(key=lambda x: x["version_seq"], reverse=True)
+        return by
+
+    def list_library_revisions(self, item_id: int, user_id: int) -> list[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM prompt_library WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            ).fetchone()
+            if not row:
+                return []
+            cur = conn.execute(
+                """
+                SELECT id, library_id, version_seq, prompt, completeness_score, token_estimate, is_starred, created_at
+                FROM prompt_library_revision
+                WHERE library_id = ?
+                ORDER BY version_seq DESC
+                """,
+                (item_id,),
+            )
+            out = []
+            for r in cur.fetchall():
+                d = dict(r)
+                d["is_starred"] = bool(d.get("is_starred"))
+                out.append(d)
+            return out
+
+    def append_library_revision(
+        self,
+        item_id: int,
+        prompt: str,
+        user_id: int,
+        completeness_score: float | None = None,
+        token_estimate: int | None = None,
+        title: str | None = None,
+        tags: list[str] | None = None,
+        notes: str | None = None,
+        techniques: list[str] | None = None,
+        target_model: str | None = None,
+        task_type: str | None = None,
+        cover_image_path: str | None = None,
+    ) -> dict:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM prompt_library WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            ).fetchone()
+            if not row:
+                raise ValueError("library_not_found")
+            r2 = conn.execute(
+                "SELECT COALESCE(MAX(version_seq), 0) AS m FROM prompt_library_revision WHERE library_id = ?",
+                (item_id,),
+            ).fetchone()
+            next_seq = int(r2["m"]) + 1
+            cur = conn.execute(
+                """
+                INSERT INTO prompt_library_revision
+                  (library_id, version_seq, prompt, completeness_score, token_estimate, is_starred)
+                VALUES (?, ?, ?, ?, ?, 0)
+                """,
+                (item_id, next_seq, prompt, completeness_score, token_estimate),
+            )
+            rev_id = int(cur.lastrowid)
+            updates = ["prompt = ?", "updated_at = CURRENT_TIMESTAMP"]
+            params: list = [prompt]
+            if title is not None:
+                updates.append("title = ?")
+                params.append(title)
+            if tags is not None:
+                updates.append("tags = ?")
+                params.append(json.dumps(tags, ensure_ascii=False))
+            if notes is not None:
+                updates.append("notes = ?")
+                params.append(notes)
+            if techniques is not None:
+                updates.append("techniques = ?")
+                params.append(json.dumps(techniques, ensure_ascii=False))
+            if target_model is not None:
+                updates.append("target_model = ?")
+                params.append(target_model)
+            if task_type is not None:
+                updates.append("task_type = ?")
+                params.append(task_type)
+            if cover_image_path is not None:
+                updates.append("cover_image_path = ?")
+                params.append(cover_image_path.strip())
+            conn.execute(
+                f"UPDATE prompt_library SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                [*params, item_id, user_id],
+            )
+        return {"revision_id": rev_id, "version_seq": next_seq}
+
+    def replace_latest_library_revision(
+        self,
+        item_id: int,
+        prompt: str,
+        user_id: int,
+        completeness_score: float | None = None,
+        token_estimate: int | None = None,
+        title: str | None = None,
+        tags: list[str] | None = None,
+        notes: str | None = None,
+        techniques: list[str] | None = None,
+        target_model: str | None = None,
+        task_type: str | None = None,
+        cover_image_path: str | None = None,
+    ) -> dict:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM prompt_library WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            ).fetchone()
+            if not row:
+                raise ValueError("library_not_found")
+            r2 = conn.execute(
+                "SELECT MAX(version_seq) AS m FROM prompt_library_revision WHERE library_id = ?",
+                (item_id,),
+            ).fetchone()
+            if not r2 or r2["m"] is None:
+                raise ValueError("no_revisions")
+            max_seq = int(r2["m"])
+            conn.execute(
+                """
+                UPDATE prompt_library_revision
+                SET prompt = ?, completeness_score = ?, token_estimate = ?
+                WHERE library_id = ? AND version_seq = ?
+                """,
+                (prompt, completeness_score, token_estimate, item_id, max_seq),
+            )
+            rev_row = conn.execute(
+                "SELECT id FROM prompt_library_revision WHERE library_id = ? AND version_seq = ?",
+                (item_id, max_seq),
+            ).fetchone()
+            rev_id = int(rev_row["id"]) if rev_row else 0
+            updates = ["prompt = ?", "updated_at = CURRENT_TIMESTAMP"]
+            params: list = [prompt]
+            if title is not None:
+                updates.append("title = ?")
+                params.append(title)
+            if tags is not None:
+                updates.append("tags = ?")
+                params.append(json.dumps(tags, ensure_ascii=False))
+            if notes is not None:
+                updates.append("notes = ?")
+                params.append(notes)
+            if techniques is not None:
+                updates.append("techniques = ?")
+                params.append(json.dumps(techniques, ensure_ascii=False))
+            if target_model is not None:
+                updates.append("target_model = ?")
+                params.append(target_model)
+            if task_type is not None:
+                updates.append("task_type = ?")
+                params.append(task_type)
+            if cover_image_path is not None:
+                updates.append("cover_image_path = ?")
+                params.append(cover_image_path.strip())
+            conn.execute(
+                f"UPDATE prompt_library SET {', '.join(updates)} WHERE id = ? AND user_id = ?",
+                [*params, item_id, user_id],
+            )
+        return {"revision_id": rev_id, "version_seq": max_seq}
+
+    def set_starred_library_revision(self, item_id: int, revision_id: int, user_id: int) -> bool:
+        with self._conn() as conn:
+            r = conn.execute(
+                """
+                SELECT r.id FROM prompt_library_revision r
+                INNER JOIN prompt_library pl ON pl.id = r.library_id
+                WHERE r.id = ? AND r.library_id = ? AND pl.user_id = ?
+                """,
+                (revision_id, item_id, user_id),
+            ).fetchone()
+            if not r:
+                return False
+            conn.execute(
+                "UPDATE prompt_library_revision SET is_starred = 0 WHERE library_id = ?",
+                (item_id,),
+            )
+            conn.execute(
+                "UPDATE prompt_library_revision SET is_starred = 1 WHERE id = ? AND library_id = ?",
+                (revision_id, item_id),
+            )
+        return True
+
+    def clear_starred_library_revisions(self, item_id: int, user_id: int) -> bool:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM prompt_library WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            ).fetchone()
+            if not row:
+                return False
+            conn.execute(
+                "UPDATE prompt_library_revision SET is_starred = 0 WHERE library_id = ?",
+                (item_id,),
+            )
+        return True
+
+    def _sync_latest_revision_prompt(
+        self,
+        conn: sqlite3.Connection,
+        item_id: int,
+        prompt: str,
+    ) -> None:
+        r2 = conn.execute(
+            "SELECT MAX(version_seq) AS m FROM prompt_library_revision WHERE library_id = ?",
+            (item_id,),
+        ).fetchone()
+        if not r2 or r2["m"] is None:
+            conn.execute(
+                """
+                INSERT INTO prompt_library_revision (library_id, version_seq, prompt, is_starred)
+                VALUES (?, 1, ?, 0)
+                """,
+                (item_id, prompt),
+            )
+            return
+        max_seq = int(r2["m"])
+        conn.execute(
+            "UPDATE prompt_library_revision SET prompt = ? WHERE library_id = ? AND version_seq = ?",
+            (prompt, item_id, max_seq),
+        )
 
     def get_library(
         self,
@@ -1942,19 +2238,22 @@ class DBManager:
 
         query += " ORDER BY rating DESC, created_at DESC"
 
+        result = []
         with self._conn() as conn:
             cur = conn.execute(query, params)
             rows = cur.fetchall()
-
-        result = []
-        for row in rows:
-            d = dict(row)
-            for field in ("tags", "techniques"):
-                try:
-                    d[field] = json.loads(d[field]) if d[field] else []
-                except Exception:
-                    d[field] = []
-            result.append(d)
+            for row in rows:
+                d = dict(row)
+                for field in ("tags", "techniques"):
+                    try:
+                        d[field] = json.loads(d[field]) if d[field] else []
+                    except Exception:
+                        d[field] = []
+                result.append(d)
+            ids = [int(d["id"]) for d in result]
+            sum_map = self._revision_summaries_for_library_ids(conn, ids)
+            for d in result:
+                d["revisions"] = sum_map.get(int(d["id"]), [])
         return result
 
     def update_library_item(
@@ -1993,6 +2292,8 @@ class DBManager:
         updates.append("updated_at = CURRENT_TIMESTAMP")
         params.append(item_id)
         with self._conn() as conn:
+            if prompt is not None:
+                self._sync_latest_revision_prompt(conn, item_id, prompt)
             if user_id is None:
                 conn.execute(
                     f"UPDATE prompt_library SET {', '.join(updates)} WHERE id = ?",

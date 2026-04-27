@@ -1,0 +1,147 @@
+/* Компактная «лента» версий под превью карточки */
+.ribbon {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-sizing: border-box;
+}
+
+.ribbonLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent-warm, #d4a574);
+}
+
+.count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.55));
+  min-width: 1.1rem;
+  height: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sparkMini {
+  flex-shrink: 0;
+  opacity: 0.88;
+  vertical-align: middle;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.pillRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text, inherit);
+  font-size: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.pill:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pillActive {
+  border-color: rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18);
+}
+
+.pillStarred {
+  border-color: rgba(250, 204, 21, 0.5);
+  background: rgba(250, 204, 21, 0.06);
+}
+
+.pillNum {
+  font-weight: 600;
+}
+
+.pillScore {
+  color: var(--color-success, #4ade80);
+  font-weight: 500;
+  font-size: 9px;
+}
+
+.starBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.07);
+  color: rgba(250, 204, 21, 0.72);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.starBtn:hover {
+  color: rgba(250, 204, 21, 1);
+  background: rgba(250, 204, 21, 0.14);
+}
+
+.starOn {
+  color: rgba(250, 204, 21, 1);
+  background: rgba(250, 204, 21, 0.18);
+}
+
+.expandHint {
+  font-size: 9px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.42));
+  margin: 4px 0 0;
+  line-height: 1.35;
+  width: 100%;
+}
+
+.singleHint {
+  font-size: 9px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.4));
+  margin-left: 4px;
+  line-height: 1.3;
+  max-width: 220px;
+}

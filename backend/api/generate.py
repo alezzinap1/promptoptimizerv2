@@ -32,7 +32,11 @@ from core.image_presets import format_active_style_preset_system_block, get_imag
 from core.image_style_tags import expand_image_tags_to_directives
 from core.image_target_syntax import get_image_engine_syntax_block
 from core.workspace_profile import normalize_workspace
-from core.suggested_actions import build_suggested_actions
+from core.suggested_actions import (
+    IMPROVEMENT_APPLY_GOAL_TEXT,
+    IMPROVEMENT_PREP_KIND_LABEL_RU,
+    build_suggested_actions,
+)
 from db.manager import DBManager
 from prompts import load_prompt
 from services.api_key_resolver import resolve_openrouter_api_key
@@ -106,6 +110,7 @@ QUESTIONS_CONTRACT_TEMPLATE = load_prompt("backend/questions_contract_system.txt
 QUESTIONS_CONTRACT_IMAGE_TEMPLATE = load_prompt("backend/questions_contract_image_system.txt")
 QUESTIONS_CONTRACT_SKILL_TEMPLATE = load_prompt("backend/questions_contract_skill_system.txt")
 ITERATION_GUARD_BLOCK = load_prompt("backend/iteration_guard.txt")
+IMPROVEMENT_PREP_SYSTEM = load_prompt("backend/improvement_prep_system.txt")
 
 
 def _questions_contract_sys_for_prompt_type(prompt_type: str | None, max_q: int) -> str:
@@ -325,6 +330,174 @@ class GenerateRequest(BaseModel):
     # Фаза 2: тир вместо явного gen_model. "custom" (или пусто) → использовать gen_model из запроса как раньше.
     # "auto" | "fast" | "mid" | "advanced" → model_router.resolve игнорирует gen_model и выбирает сам.
     tier: str | None = None
+    # Двухшаговое улучшение (студия): сначала только вопросы, затем итерация с ответами.
+    improvement_prep: str | None = None  # creative | deep_improve
+
+
+def _is_improvement_prep_request(req: GenerateRequest) -> bool:
+    k = (req.improvement_prep or "").strip()
+    if k not in ("creative", "deep_improve"):
+        return False
+    if not req.previous_prompt or not str(req.previous_prompt).strip():
+        return False
+    if req.question_answers:
+        return False
+    return True
+
+
+def _fallback_improvement_prep_questions(kind_label: str) -> list[dict]:
+    return [
+        {
+            "question": f"Продолжить в режиме «{kind_label}» с минимальными уточнениями?",
+            "options": [
+                "Да, улучшай опираясь только на задачу и текущий промпт",
+                "Стоп — я сформулирую пожелания отдельным сообщением в чат",
+            ],
+        },
+        {
+            "question": "Насколько смело менять формулировки?",
+            "options": ["Только точечные правки", "Умеренно перестроить", "Смело, но без новых выдуманных фактов"],
+        },
+        {
+            "question": "Что сохранить любой ценой?",
+            "options": ["Жёсткие ограничения из оригинала", "Структуру списков/разделов", "Тон «как есть»", "Пропустить"],
+        },
+    ]
+
+
+def _improvement_prep_llm_response(
+    *,
+    llm: LLMClient,
+    req: GenerateRequest,
+    user_id: int,
+    using_host_key: bool,
+    session_id: str,
+    classification: dict,
+    context_gap: float,
+    questions_policy: dict,
+    prompt_spec: dict,
+    evidence: dict,
+    debug_issues: list,
+    intent_graph: list,
+    techniques: list,
+    technique_ids: list[str],
+    technique_reasons: list,
+    workspace,
+    auth_session_id: str | None,
+    db: DBManager,
+) -> dict:
+    """Дешёвый проход: только [QUESTIONS] перед основным улучшением промпта."""
+    kind = (req.improvement_prep or "").strip()
+    kind_label = IMPROVEMENT_PREP_KIND_LABEL_RU.get(kind, kind)
+    goal = IMPROVEMENT_APPLY_GOAL_TEXT.get(kind, "")
+    if len(goal) > 4500:
+        goal = goal[:4497] + "…"
+
+    q_provider = _scene_analysis_provider(using_host_key)
+    if using_host_key:
+        cmid_q = resolve_openrouter_model_id(q_provider)
+        if completion_price_per_m(cmid_q) > TRIAL_MAX_COMPLETION_PER_M:
+            q_provider = "gemini_flash"
+
+    ru = _task_primary_language_is_russian(req.task_input)
+    prev = str(req.previous_prompt or "").strip()
+    if len(prev) > 12000:
+        prev = prev[:11997] + "…"
+
+    task_hdr = "Задача пользователя" if ru else "User task"
+    mode_hdr = "Режим улучшения" if ru else "Improvement mode"
+    goal_hdr = "Цель переписывания (контекст для вопросов; не цитируй дословно)" if ru else "Rewrite goal (context only)"
+    prompt_hdr = "Текущий промпт" if ru else "Current prompt"
+
+    prep_user = (
+        f"{task_hdr}:\n{req.task_input.strip()}\n\n"
+        f"{prompt_hdr}:\n{prev}\n\n"
+        f"{mode_hdr}: {kind_label}\n\n"
+        f"{goal_hdr}:\n{goal}"
+    )
+
+    started_at = time.perf_counter()
+    raw = ""
+    try:
+        raw = llm.generate(IMPROVEMENT_PREP_SYSTEM, prep_user, q_provider, temperature=0.35)
+    except Exception:
+        logger.warning("improvement_prep LLM failed", exc_info=True)
+    raw = (raw or "").strip()
+    parsed = parse_reply(raw)
+    questions = parse_questions(parsed.get("questions_raw", "")) or []
+
+    if not questions:
+        questions = _fallback_improvement_prep_questions(kind_label)
+
+    gen_flags = diagnose_generation_response(
+        {**parsed, "has_prompt": False, "has_questions": True},
+        questions,
+    )
+    target_model_type = classify_model(req.target_model)
+    latency_ms = round((time.perf_counter() - started_at) * 1000, 1)
+
+    if using_host_key and raw:
+        c_raw = len(IMPROVEMENT_PREP_SYSTEM) + len(prep_user) + len(raw) + 120
+        model_id = resolve_openrouter_model_id(q_provider)
+        pr, cp = get_model_pricing(model_id)
+        db.add_user_usage(user_id, c_raw // 4, (c_raw // 4) * (pr + cp))
+
+    db.log_event(
+        "improvement_prep_questions",
+        session_id=auth_session_id or "",
+        payload={
+            "kind": kind,
+            "question_count": len(questions),
+            "gen_model": req.gen_model,
+            "prep_provider": q_provider,
+            "latency_ms": latency_ms,
+        },
+        user_id=user_id,
+    )
+
+    suggested_actions = build_suggested_actions(
+        has_prompt=False,
+        prompt_type=req.prompt_type or "text",
+        current_prompt=None,
+        metrics={},
+    )
+
+    return {
+        "prompt_block": "",
+        "reasoning": (parsed.get("reasoning") or "").strip(),
+        "has_prompt": False,
+        "has_questions": True,
+        "llm_raw": raw,
+        "generation_issue": None,
+        "generation_flags": gen_flags,
+        "questions": questions,
+        "questions_raw": "",
+        "context_gap": context_gap,
+        "questions_policy": questions_policy,
+        "questions_enforced": False,
+        "techniques": [{"id": t["id"], "name": t.get("name", t["id"])} for t in techniques],
+        "technique_ids": technique_ids,
+        "technique_reasons": technique_reasons,
+        "task_types": classification["task_types"],
+        "complexity": classification["complexity"],
+        "task_input": req.task_input,
+        "prompt_type": req.prompt_type or "text",
+        "gen_model": req.gen_model,
+        "target_model": req.target_model,
+        "target_model_type": target_model_type.value,
+        "metrics": {},
+        "input_token_estimate": (len(IMPROVEMENT_PREP_SYSTEM) + len(prep_user) + 400) // 4,
+        "prompt_spec": prompt_spec,
+        "evidence": evidence,
+        "debug_issues": debug_issues,
+        "intent_graph": intent_graph,
+        "workspace": normalize_workspace(workspace),
+        "session_id": session_id,
+        "scene_analysis_applied": False,
+        "questions_contract_used": False,
+        "suggested_actions": suggested_actions,
+        "test_cases": [],
+    }
 
 
 def _apply_expert_level_questions_policy(policy: dict, expert_level: str | None) -> dict:
@@ -740,6 +913,7 @@ def generate_prompt(
             "task_classification_mode": cls_mode,
             "tier": (req.tier or "custom"),
             "tier_picked_model": tier_picked or "",
+            "improvement_prep": (req.improvement_prep or "")[:32],
         },
         user_id=int(user["id"]),
     )
@@ -800,6 +974,28 @@ def generate_prompt(
             techniques = [t for t in (registry.get(tid) for tid in domain_tech_ids) if t]
             technique_ids = [t["id"] for t in techniques]
             technique_reasons = _build_technique_reasons(techniques, classification, req.prompt_type or "text")
+
+    if _is_improvement_prep_request(req):
+        return _improvement_prep_llm_response(
+            llm=llm,
+            req=req,
+            user_id=user_id,
+            using_host_key=using_host_key,
+            session_id=session_id,
+            classification=classification,
+            context_gap=context_gap,
+            questions_policy=questions_policy,
+            prompt_spec=prompt_spec,
+            evidence=evidence,
+            debug_issues=debug_issues,
+            intent_graph=intent_graph,
+            techniques=techniques,
+            technique_ids=technique_ids,
+            technique_reasons=technique_reasons,
+            workspace=workspace,
+            auth_session_id=auth_session_id,
+            db=db,
+        )
 
     builder = ContextBuilder(registry)
 
@@ -1122,10 +1318,16 @@ def generate_prompt(
     target_model_type = classify_model(req.target_model)
 
     # После ответов на уточнения модель иногда оставляет хвост [QUESTIONS] вместе с [PROMPT] —
-    # иначе клиент остаётся в режиме вопросов без показа результата.
+    # иначе клиент остаётся в режиме вопросов без показа результата — тогда вопросы отбрасываем.
+    # При итерации готового промпта (previous_prompt) наоборот сохраняем вопросы: фронт покажет их в чате.
     if parsed.get("has_prompt"):
-        questions = []
-        parsed = {**parsed, "has_questions": False, "questions_raw": ""}
+        is_iteration = bool(req.previous_prompt and str(req.previous_prompt).strip())
+        keep_chat_questions = bool(is_iteration and questions)
+        if keep_chat_questions:
+            parsed = {**parsed, "has_questions": False, "questions_raw": ""}
+        else:
+            questions = []
+            parsed = {**parsed, "has_questions": False, "questions_raw": ""}
 
     suggested_actions = build_suggested_actions(
         has_prompt=bool(parsed.get("has_prompt")),

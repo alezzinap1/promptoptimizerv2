@@ -211,6 +211,8 @@ export interface GenerateRequest {
   expert_level?: string | null
   /** Тир сложности: auto | fast | mid | advanced | custom. При !custom бэкенд сам выбирает модель. */
   tier?: string | null
+  /** Двухшаговое улучшение: только вопросы (без финального [PROMPT]); затем вызов с ответами и forceIteration. */
+  improvement_prep?: 'creative' | 'deep_improve' | null
 }
 
 export type SuggestedStudioAction = {
@@ -458,6 +460,20 @@ export interface CompareJudgeResponse {
   parse_error?: boolean
 }
 
+export interface LibraryRevisionSummary {
+  id: number
+  version_seq: number
+  completeness_score: number | null
+  is_starred: boolean
+  token_estimate?: number | null
+}
+
+export interface LibraryRevision extends LibraryRevisionSummary {
+  library_id: number
+  prompt: string
+  created_at: string
+}
+
 export interface LibraryItem {
   id: number
   title: string
@@ -471,6 +487,8 @@ export interface LibraryItem {
   cover_image_path?: string
   created_at: string
   updated_at: string
+  /** Ревизии промпта (новые сверху). Пустой массив, если ещё не мигрировано. */
+  revisions?: LibraryRevisionSummary[]
   /** Альтернативная языковая версия промпта (свободный перевод MyMemory/Lingva, без LLM). */
   prompt_alt?: string
   prompt_lang?: string
@@ -900,7 +918,18 @@ export const api = {
     techniques?: string[]
     notes?: string
     cover_image_path?: string
-  }) => fetchApi<{ id: number }>('/library', { method: 'POST', body: JSON.stringify(req) }),
+    completeness_score?: number | null
+    token_estimate?: number | null
+    existing_library_id?: number | null
+    version_mode?: 'new_card' | 'append' | 'replace_latest'
+  }) => fetchApi<{ id: number; revision_id?: number; version_seq?: number }>('/library', { method: 'POST', body: JSON.stringify(req) }),
+  getLibraryRevisions: (itemId: number) =>
+    fetchApi<{ items: LibraryRevision[] }>(`/library/${itemId}/revisions`),
+  starLibraryRevision: (itemId: number, revisionId: number | null) =>
+    fetchApi<{ ok: boolean }>(`/library/${itemId}/revisions/star`, {
+      method: 'POST',
+      body: JSON.stringify({ revision_id: revisionId }),
+    }),
   updateLibrary: (
     id: number,
     req: { title?: string; prompt?: string; tags?: string[]; notes?: string; rating?: number; cover_image_path?: string },

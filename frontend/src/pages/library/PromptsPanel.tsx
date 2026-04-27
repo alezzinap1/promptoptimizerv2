@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type LibraryItem } from '../../api/client'
 import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
 import LibraryTagChips from '../../components/LibraryTagChips'
+import LibraryRevisionStrip from '../../components/LibraryRevisionStrip'
 import SelectDropdown from '../../components/SelectDropdown'
 import ThemedTooltip from '../../components/ThemedTooltip'
 import { CopyIconButton, TryInGeminiButton } from '../../components/PromptToolbarIcons'
@@ -264,6 +265,27 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
     } finally {
       setEvalLoading(false)
     }
+  }
+
+  const handleLibraryRevisionStar = async (
+    itemId: number,
+    revisionId: number,
+    isCurrentlyStarred: boolean,
+  ) => {
+    const next = isCurrentlyStarred ? null : revisionId
+    await api.starLibraryRevision(itemId, next)
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId || !it.revisions?.length) return it
+        return {
+          ...it,
+          revisions: it.revisions.map((r) => ({
+            ...r,
+            is_starred: next != null && r.id === next,
+          })),
+        }
+      }),
+    )
   }
 
   const masonryClass = gridCols === 4 ? `${styles.masonry} ${styles.masonry4}` : styles.masonry
@@ -650,6 +672,16 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
                   {promptText.length > 200 ? '…' : ''}
                 </pre>
               </div>
+              {item.revisions && item.revisions.length > 0 ? (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <LibraryRevisionStrip
+                    libraryId={item.id}
+                    revisions={item.revisions}
+                    showMultiVersionHint
+                    onStarRevision={(rid, st) => void handleLibraryRevisionStar(item.id, rid, st)}
+                  />
+                </div>
+              ) : null}
               <div className={styles.cardActions}>
                 <ThemedTooltip content="Открыть на Студии с этим промптом" side="top" delayMs={240}>
                   <button

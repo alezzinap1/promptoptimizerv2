@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -55,6 +56,11 @@ class SaveToLibraryRequest(BaseModel):
     techniques: list[str] = []
     notes: str = ""
     cover_image_path: str = ""
+    completeness_score: float | None = None
+    token_estimate: int | None = None
+    """Если задано — сохранить в эту карточку вместо создания новой."""
+    existing_library_id: int | None = None
+    version_mode: Literal["new_card", "append", "replace_latest"] = "new_card"
 
 
 @router.post("/library")
@@ -63,6 +69,47 @@ def save_to_library(
     user: dict = Depends(get_current_user),
     db: DBManager = Depends(get_db),
 ):
+    uid = int(user["id"])
+    cover = (req.cover_image_path or "").strip() or None
+    if req.existing_library_id is not None and req.version_mode in ("append", "replace_latest"):
+        try:
+            if req.version_mode == "append":
+                meta = db.append_library_revision(
+                    item_id=req.existing_library_id,
+                    prompt=req.prompt,
+                    user_id=uid,
+                    completeness_score=req.completeness_score,
+                    token_estimate=req.token_estimate,
+                    title=req.title.strip() or None,
+                    tags=req.tags,
+                    notes=req.notes,
+                    techniques=req.techniques,
+                    target_model=req.target_model,
+                    task_type=req.task_type,
+                    cover_image_path=cover,
+                )
+            else:
+                meta = db.replace_latest_library_revision(
+                    item_id=req.existing_library_id,
+                    prompt=req.prompt,
+                    user_id=uid,
+                    completeness_score=req.completeness_score,
+                    token_estimate=req.token_estimate,
+                    title=req.title.strip() or None,
+                    tags=req.tags,
+                    notes=req.notes,
+                    techniques=req.techniques,
+                    target_model=req.target_model,
+                    task_type=req.task_type,
+                    cover_image_path=cover,
+                )
+        except ValueError as e:
+            if str(e) == "library_not_found":
+                raise HTTPException(404, "Карточка не найдена.") from e
+            if str(e) == "no_revisions":
+                raise HTTPException(400, "У карточки нет версий.") from e
+            raise
+        return {"id": req.existing_library_id, **meta}
     id_ = db.save_to_library(
         title=req.title,
         prompt=req.prompt,
@@ -71,10 +118,50 @@ def save_to_library(
         task_type=req.task_type,
         techniques=req.techniques,
         notes=req.notes,
-        user_id=int(user["id"]),
-        cover_image_path=(req.cover_image_path or "").strip() or None,
+        user_id=uid,
+        cover_image_path=cover,
+        completeness_score=req.completeness_score,
+        token_estimate=req.token_estimate,
     )
     return {"id": id_}
+
+
+@router.get("/library/{item_id}/revisions")
+def list_library_revisions(
+    item_id: int,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+):
+    items = db.list_library_revisions(item_id, int(user["id"]))
+    if not items:
+        row = db.get_library_item(item_id, user_id=int(user["id"]))
+        if not row:
+            raise HTTPException(404, "Карточка не найдена.")
+    return {"items": items}
+
+
+class StarLibraryRevisionBody(BaseModel):
+    """null — снять пометку со всех версий карточки."""
+    revision_id: int | None = None
+
+
+@router.post("/library/{item_id}/revisions/star")
+def star_library_revision(
+    item_id: int,
+    req: StarLibraryRevisionBody,
+    user: dict = Depends(get_current_user),
+    db: DBManager = Depends(get_db),
+):
+    uid = int(user["id"])
+    if req.revision_id is None:
+        ok = db.clear_starred_library_revisions(item_id, uid)
+        if not ok:
+            raise HTTPException(404, "Карточка не найдена.")
+        return {"ok": True}
+    ok = db.set_starred_library_revision(item_id, req.revision_id, uid)
+    if not ok:
+        raise HTTPException(404, "Ревизия не найдена.")
+    return {"ok": True}
 
 
 class UpdateLibraryRequest(BaseModel):

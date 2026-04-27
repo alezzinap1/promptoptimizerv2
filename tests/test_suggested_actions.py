@@ -17,7 +17,7 @@ class SuggestedActionsTests(unittest.TestCase):
             [],
         )
 
-    def test_includes_eval_and_save(self) -> None:
+    def test_includes_iterate_hints_and_save(self) -> None:
         actions = build_suggested_actions(
             has_prompt=True,
             prompt_type="text",
@@ -25,7 +25,9 @@ class SuggestedActionsTests(unittest.TestCase):
             metrics={"completeness_score": 80, "token_estimate": 100},
         )
         ids = [a["id"] for a in actions]
-        self.assertIn("evaluate", ids)
+        self.assertIn("creative", ids)
+        self.assertIn("deep_improve", ids)
+        self.assertNotIn("evaluate", ids)
         self.assertIn("save_library", ids)
         self.assertIn("compare", ids)
 

@@ -142,7 +142,25 @@
   cursor: inherit;
 }
 
-article.pickCardWrap {
+article.pickCardExpanded {
+  outline: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  border-radius: 12px;
+}
+
+.revLoading {
+  font-size: 11px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
+  margin: 6px 0 0;
+}
+
+.pickExpandHint {
+  font-size: 10px;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.48));
+  margin: 6px 0 0;
+  line-height: 1.35;
+}
+
+.pickCardWrap {
   cursor: pointer;
   text-align: left;
   /* Выше специфичность, чем у .card / .cardWithCover — не обрезать карточку по высоте ряда */

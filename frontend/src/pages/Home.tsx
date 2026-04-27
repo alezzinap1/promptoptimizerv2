@@ -7,7 +7,9 @@ import {
   type GenerateRequest,
   type GenerateResult,
   type GenerationIssue,
+  type StructuredQuestion,
   type ImageMetaResponse,
+  type LibraryItem,
   type OpenRouterModel,
   type SuggestedStudioAction,
   type UserPresetRecord,
@@ -115,10 +117,34 @@ function LlmReviewIconClose() {
   )
 }
 
-/** Если в ответе одновременно [PROMPT] и хвост [QUESTIONS], UI зависает в режиме вопросов. */
-function normalizeClientGenerateResult(res: GenerateResult): GenerateResult {
+/**
+ * При первичной генерации: [PROMPT]+хвост [QUESTIONS] без парсинга вопросов во второй фазе ломает мастер уточнений — чистим.
+ * При итерации сервер оставляет structured questions для сообщения в чате; тогда has_questions всё равно false (мастер не открываем).
+ */
+function normalizeClientGenerateResult(
+  res: GenerateResult,
+  opts?: { keepIterationCompanionQuestions?: boolean },
+): GenerateResult {
   if (!res.has_prompt) return res
+  if (opts?.keepIterationCompanionQuestions && (res.questions?.length ?? 0) > 0) {
+    return { ...res, has_questions: false }
+  }
   return { ...res, has_questions: false, questions: [] }
+}
+
+function formatCompanionQuestionsForChat(questions: StructuredQuestion[]): string {
+  const lines: string[] = [
+    '**Уточнения по идеям** (ответьте в чате — дальше можно снова нажать «Креативнее» или описать выбор словами):',
+    '',
+  ]
+  questions.forEach((q, i) => {
+    lines.push(`${i + 1}. ${q.question}`)
+    for (const opt of q.options || []) {
+      lines.push(`   - ${opt}`)
+    }
+    lines.push('')
+  })
+  return lines.join('\n').trimEnd()
 }
 
 /** Строка из prompt_sessions → обновить result справа (полнота, токены, техники совпадают с версией). */
@@ -292,6 +318,13 @@ function computeChatAfterGeneration(
         prevTokens: doneCtx.prevTokens,
       }),
     })
+    if ((res.questions?.length ?? 0) > 0) {
+      next.push({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: formatCompanionQuestionsForChat(res.questions!),
+      })
+    }
   } else if (res.has_questions && (res.questions?.length || 0) > 0) {
     const cid = crypto.randomUUID()
     lastClarificationsMsgId = cid
@@ -392,6 +425,10 @@ export default function Home() {
   const [saveTitle, setSaveTitle] = useState('')
   const [saveTags, setSaveTags] = useState('')
   const [saveNotes, setSaveNotes] = useState('')
+  const [saveLibraryTarget, setSaveLibraryTarget] = useState<'new' | 'existing'>('new')
+  const [saveExistingLibraryId, setSaveExistingLibraryId] = useState<number | ''>('')
+  const [saveVersionAction, setSaveVersionAction] = useState<'append' | 'replace_latest'>('append')
+  const [librarySaveOptions, setLibrarySaveOptions] = useState<LibraryItem[]>([])
   const [questionState, setQuestionState] = useState<Record<number, { options: string[]; custom: string }>>({})
   const [llmReviewOpen, setLlmReviewOpen] = useState(false)
   const [llmReviewText, setLlmReviewText] = useState('')
@@ -524,6 +561,31 @@ export default function Home() {
     [applyExpertPreset],
   )
 
+  useEffect(() => {
+    if (!showSaveDialog) {
+      setSaveLibraryTarget('new')
+      setSaveExistingLibraryId('')
+      setSaveVersionAction('append')
+      return
+    }
+    if (promptType === 'skill') return
+    let cancelled = false
+    setSaveLibraryTarget('new')
+    setSaveExistingLibraryId('')
+    setSaveVersionAction('append')
+    api
+      .getLibrary({})
+      .then((r) => {
+        if (!cancelled) setLibrarySaveOptions(r.items)
+      })
+      .catch(() => {
+        if (!cancelled) setLibrarySaveOptions([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [showSaveDialog, promptType])
+
   const persistCurrentModeToRef = useCallback(() => {
     studioModesRef.current[promptType] = cloneAgentStudioSnapshot({
       chatMessages,
@@ -614,6 +676,8 @@ export default function Home() {
   const [issueBannerDismissed, setIssueBannerDismissed] = useState(false)
   const lastQuestionAnswersRef = useRef<{ question: string; answers: string[] }[] | undefined>(undefined)
   const lastClarificationsMsgIdRef = useRef<string | null>(null)
+  /** После «Креативнее» / «Продумать»: базовый промпт и текст улучшения для второго запроса с ответами мастера. */
+  const improvementWizardApplyRef = useRef<{ basePrompt: string; feedback: string } | null>(null)
   const agentStudioBootstrappedRef = useRef(false)
   const restoredFromSidebarRef = useRef(false)
   const [agentThinkingIdx, setAgentThinkingIdx] = useState(0)
@@ -1130,6 +1194,8 @@ export default function Home() {
     feedbackOverride?: string
     forceIteration?: boolean
     previousPromptOverride?: string
+    /** Фаза 1 двухшагового улучшения: только вопросы на сервере. */
+    improvementPrep?: 'creative' | 'deep_improve'
     skipAgentChatReplies?: boolean
     /** Сообщения, добавляемые в чат до блоков «размышления» / карточки результата (например «применён совет»). */
     chatAppendBeforeResult?: GenChatMsg[]
@@ -1145,17 +1211,21 @@ export default function Home() {
     const requestPromptType = promptType
     const effectiveTask = (opts?.taskInputOverride ?? taskInput).trim()
     if (!effectiveTask) return
+    if (!opts?.improvementPrep && !(questionAnswers && questionAnswers.length > 0)) {
+      improvementWizardApplyRef.current = null
+    }
     lastQuestionAnswersRef.current = questionAnswers
     setIssueBannerDismissed(false)
     setSuggestedActions([])
     setSuggestionsBarExpanded(false)
     setLoading(true)
     setError(null)
+    const improvementPrep = opts?.improvementPrep
     const isIteration =
       opts?.forceIteration !== undefined ? opts.forceIteration : iterationMode
     const feedbackText = isIteration ? (opts?.feedbackOverride ?? feedback).trim() : ''
     const previousPrompt =
-      isIteration
+      isIteration || improvementPrep
         ? opts?.previousPromptOverride ?? result?.prompt_block
         : undefined
     let modelWaitTimer: number | undefined
@@ -1189,6 +1259,7 @@ export default function Home() {
         recent_technique_ids: loadRecentTechniqueIds(),
         expert_level: expertLevel,
         tier,
+        improvement_prep: improvementPrep ?? null,
       }
       if (!opts?.fromPrePromptRouter) {
         setAgentThinkingLine('Собираю параметры запроса…')
@@ -1200,7 +1271,9 @@ export default function Home() {
       modelWaitTimer = window.setTimeout(() => {
         setAgentThinkingLine('Ожидание ответа модели…')
       }, 2200 + Math.random() * 4200)
-      const res = normalizeClientGenerateResult(await api.generate(req))
+      const res = normalizeClientGenerateResult(await api.generate(req), {
+        keepIterationCompanionQuestions: isIteration && !improvementPrep,
+      })
       if (modelWaitTimer) window.clearTimeout(modelWaitTimer)
       const nextSuggestions = normalizeSuggestedStudioActions(res.suggested_actions)
       setSuggestedActions(nextSuggestions)
@@ -1266,6 +1339,9 @@ export default function Home() {
       setResult(res)
       setSessionId(res.session_id)
       setIterationMode(false)
+      if (res.has_prompt && improvementWizardApplyRef.current) {
+        improvementWizardApplyRef.current = null
+      }
       setQuestionState({})
       setQuestionCarouselIdx(0)
       setQuickSaved(false)
@@ -1347,6 +1423,16 @@ export default function Home() {
 
     if (item.action === 'iterate') {
       const fb = item.data?.feedback?.trim() || item.title
+      if (item.id === 'creative' || item.id === 'deep_improve') {
+        improvementWizardApplyRef.current = { basePrompt: snapshot.prompt_block, feedback: fb }
+        void handleGenerate(undefined, {
+          taskInputOverride: taskRef,
+          improvementPrep: item.id,
+          previousPromptOverride: snapshot.prompt_block,
+          forceIteration: false,
+        })
+        return
+      }
       void handleGenerate(undefined, {
         taskInputOverride: taskRef,
         feedbackOverride: fb,
@@ -2101,16 +2187,49 @@ export default function Home() {
       setPublishCommunityHintVisible(true)
       return
     }
-    await api.saveToLibrary({
-      title,
-      prompt: result.prompt_block,
-      tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
-      target_model: effectiveTargetModel,
-      task_type: result.task_types?.[0] || 'general',
-      techniques: result.technique_ids,
-      notes: saveNotes,
-      cover_image_path: promptType === 'image' && imageTryCoverPath ? imageTryCoverPath : undefined,
-    })
+    const completenessScore = (() => {
+      const n = Number(result.metrics?.completeness_score ?? result.metrics?.quality_score ?? 0)
+      return Number.isFinite(n) && n > 0 ? n : null
+    })()
+    const tokenEst = (() => {
+      const n = Number(result.metrics?.token_estimate ?? 0)
+      return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+    })()
+    if (saveLibraryTarget === 'existing') {
+      const exId = saveExistingLibraryId === '' ? 0 : Number(saveExistingLibraryId)
+      if (!exId) {
+        window.alert('Выберите карточку библиотеки или сохраните как новую.')
+        return
+      }
+      await api.saveToLibrary({
+        title,
+        prompt: result.prompt_block,
+        tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
+        target_model: effectiveTargetModel,
+        task_type: result.task_types?.[0] || 'general',
+        techniques: result.technique_ids,
+        notes: saveNotes,
+        cover_image_path: promptType === 'image' && imageTryCoverPath ? imageTryCoverPath : undefined,
+        completeness_score: completenessScore,
+        token_estimate: tokenEst,
+        existing_library_id: exId,
+        version_mode: saveVersionAction,
+      })
+    } else {
+      await api.saveToLibrary({
+        title,
+        prompt: result.prompt_block,
+        tags: saveTags.split(',').map((t) => t.trim()).filter(Boolean),
+        target_model: effectiveTargetModel,
+        task_type: result.task_types?.[0] || 'general',
+        techniques: result.technique_ids,
+        notes: saveNotes,
+        cover_image_path: promptType === 'image' && imageTryCoverPath ? imageTryCoverPath : undefined,
+        completeness_score: completenessScore,
+        token_estimate: tokenEst,
+        version_mode: 'new_card',
+      })
+    }
     window.dispatchEvent(new CustomEvent('metaprompt-nav-refresh'))
     setShowSaveDialog(false)
     setSaveNotes('')
@@ -2275,8 +2394,9 @@ export default function Home() {
     const q = qs[idx]
     const state = questionState[idx] || { options: [], custom: '' }
 
-    const submitWizardAnswers = () =>
-      handleGenerate(
+    const submitWizardAnswers = () => {
+      const imp = improvementWizardApplyRef.current
+      return handleGenerate(
         qs.map((qq, i) => ({
           question: qq.question,
           answers: [
@@ -2284,13 +2404,26 @@ export default function Home() {
             ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
           ],
         })),
-        questionGenOpts,
+        imp
+          ? {
+              ...questionGenOpts,
+              feedbackOverride: imp.feedback,
+              forceIteration: true,
+              previousPromptOverride: imp.basePrompt,
+            }
+          : questionGenOpts,
       )
+    }
 
     return (
       <div
         className={`${styles.questionBox} ${styles.questionBoxCompact} ${styles.questionCarousel} ${styles.wizardAgentMerged}`}
       >
+        {improvementWizardApplyRef.current ? (
+          <p className={styles.questionCarouselMeta} style={{ width: '100%', marginBottom: 10, lineHeight: 1.4 }}>
+            Уточнения перед улучшением промпта; после «Подтвердить» придёт новая версия с учётом ответов.
+          </p>
+        ) : null}
         <div className={`${styles.wizardProgressWrap} ${styles.wizardProgressWrapTight}`}>
           <div className={styles.wizardProgressBar}>
             <div className={styles.wizardProgressFill} style={{ width: `${((idx + 1) / total) * 100}%` }} />
@@ -2741,6 +2874,73 @@ export default function Home() {
                   </p>
                   <input value={saveTags} onChange={(e) => setSaveTags(e.target.value)} placeholder="Теги через запятую" />
                   <textarea value={saveNotes} onChange={(e) => setSaveNotes(e.target.value)} rows={3} placeholder="Заметки" />
+                  {promptType !== 'skill' ? (
+                    <div className={styles.saveLibraryVersionBlock}>
+                      <span className={styles.saveLibraryVersionLabel}>Куда сохранить</span>
+                      <label className={styles.saveLibraryRadio}>
+                        <input
+                          type="radio"
+                          name="save-lib-target"
+                          checked={saveLibraryTarget === 'new'}
+                          onChange={() => {
+                            setSaveLibraryTarget('new')
+                            setSaveExistingLibraryId('')
+                          }}
+                        />
+                        Новая карточка
+                      </label>
+                      <label className={styles.saveLibraryRadio}>
+                        <input
+                          type="radio"
+                          name="save-lib-target"
+                          checked={saveLibraryTarget === 'existing'}
+                          onChange={() => setSaveLibraryTarget('existing')}
+                        />
+                        Существующая карточка
+                      </label>
+                      {saveLibraryTarget === 'existing' ? (
+                        <>
+                          <label className={styles.saveLibrarySelectLabel}>
+                            Карточка
+                            <select
+                              className={styles.saveLibrarySelect}
+                              value={saveExistingLibraryId === '' ? '' : String(saveExistingLibraryId)}
+                              onChange={(e) =>
+                                setSaveExistingLibraryId(e.target.value === '' ? '' : Number(e.target.value))
+                              }
+                            >
+                              <option value="">— Выберите —</option>
+                              {librarySaveOptions.map((it) => (
+                                <option key={it.id} value={String(it.id)}>
+                                  {it.title}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <div className={styles.saveVersionActions}>
+                            <label className={styles.saveLibraryRadio}>
+                              <input
+                                type="radio"
+                                name="save-ver-mode"
+                                checked={saveVersionAction === 'replace_latest'}
+                                onChange={() => setSaveVersionAction('replace_latest')}
+                              />
+                              Заменить последнюю версию
+                            </label>
+                            <label className={styles.saveLibraryRadio}>
+                              <input
+                                type="radio"
+                                name="save-ver-mode"
+                                checked={saveVersionAction === 'append'}
+                                onChange={() => setSaveVersionAction('append')}
+                              />
+                              Добавить новую версию
+                            </label>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className={styles.actions}>
                     <button type="button" className={`${styles.primaryAction} btn-primary`} onClick={handleSaveToLibrary}>Сохранить</button>
                     <button type="button" className="btn-ghost" onClick={() => setShowSaveDialog(false)}>Отмена</button>
@@ -3394,7 +3594,11 @@ export default function Home() {
               >
                 {result?.has_prompt && suggestedActions.length > 0 && !loading && (
                   <div className={styles.suggestedActionsBar} role="region" aria-label="Подсказки">
-                    <div className={styles.suggestedActionsBarInner}>
+                    <div
+                      className={`${styles.suggestedActionsBarInner} ${
+                        suggestionsBarExpanded ? styles.suggestedActionsBarInnerExpanded : styles.suggestedActionsBarInnerCollapsed
+                      }`}
+                    >
                       {(suggestionsBarExpanded ? suggestedActions : suggestedActions.slice(0, 3)).map((a) => (
                         <button
                           key={a.id}
