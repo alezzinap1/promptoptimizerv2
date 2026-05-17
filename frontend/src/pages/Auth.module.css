@@ -279,7 +279,7 @@
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: max(16px, 0.95rem);
   outline: none;
 }
 
@@ -449,7 +449,7 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .container {
     flex-direction: column;
     max-width: 440px;

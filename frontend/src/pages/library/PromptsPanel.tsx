@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type LibraryItem } from '../../api/client'
 import { COMPLETENESS_SCORE_TITLE } from '../../lib/scoreTooltips'
@@ -13,6 +13,10 @@ import { libraryUserTurnFromCard } from '../../lib/libraryPickText'
 import { useT } from '../../i18n'
 import { getStartersForGoal, type StarterGoal } from '../../lib/starterPrompts'
 import EvalBadge from '../eval/EvalBadge'
+import CardGridSkeleton from '../../components/CardGridSkeleton'
+import CoverImage from '../../components/CoverImage'
+import EmptyState from '../../components/EmptyState'
+import LibraryPromptDrawer from '../../components/library/LibraryPromptDrawer'
 import styles from '../Library.module.css'
 
 type LibraryView = 'all' | 'recent' | 'best' | 'stale' | 'untagged'
@@ -74,13 +78,16 @@ type Props = {
 export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Props) {
   const navigate = useNavigate()
   const { t } = useT()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [items, setItems] = useState<LibraryItem[]>([])
   const [stats, setStats] = useState<{ total: number; models?: string[]; task_types?: string[] }>({ total: 0 })
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [taskType, setTaskType] = useState('all')
   const [view, setView] = useState<LibraryView>('all')
+  const [modelFilter, setModelFilter] = useState<string | null>(null)
+  const [tagFilters, setTagFilters] = useState<string[]>([])
+  const [tagsOpen, setTagsOpen] = useState(true)
   const [sortBy, setSortBy] = useState<'rating' | 'date' | 'tokens' | 'name'>('rating')
   const [starterBusy, setStarterBusy] = useState<string | null>(null)
   const [starterAdded, setStarterAdded] = useState<Record<string, boolean>>({})
@@ -134,7 +141,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
   // backend on every keystroke — keeps the grid feeling fast on long
   // libraries.
   useEffect(() => {
-    const h = window.setTimeout(() => setDebouncedSearch(search), 200)
+    const h = window.setTimeout(() => setDebouncedSearch(search), 150)
     return () => window.clearTimeout(h)
   }, [search])
 
@@ -168,8 +175,62 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
 
   const viewed = useMemo(() => applyView(items, view), [items, view])
 
+  const allTags = useMemo(() => {
+    const s = new Set<string>()
+    for (const it of items) {
+      for (const tag of it.tags || []) s.add(tag)
+    }
+    return [...s].sort((a, b) => a.localeCompare(b))
+  }, [items])
+
+  const modelGroups = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const it of items) {
+      const model = it.target_model && it.target_model !== 'unknown' ? it.target_model : null
+      if (!model) continue
+      m.set(model, (m.get(model) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [items])
+
+  const filtered = useMemo(() => {
+    let arr = viewed
+    if (modelFilter) arr = arr.filter((i) => i.target_model === modelFilter)
+    if (tagFilters.length > 0) {
+      arr = arr.filter((i) => tagFilters.every((t) => (i.tags || []).includes(t)))
+    }
+    return arr
+  }, [viewed, modelFilter, tagFilters])
+
+  const openId = Number(searchParams.get('open') || 0) || null
+  const drawerItem = useMemo(
+    () => (openId ? items.find((i) => i.id === openId) ?? null : null),
+    [items, openId],
+  )
+
+  const setDrawerOpen = useCallback(
+    (id: number | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (id) next.set('open', String(id))
+        else next.delete('open')
+        return next
+      })
+    },
+    [setSearchParams],
+  )
+
+  const toggleTagFilter = (tag: string, shiftKey: boolean) => {
+    setTagFilters((prev) => {
+      if (shiftKey) {
+        return prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]
+      }
+      return prev.length === 1 && prev[0] === tag ? [] : [tag]
+    })
+  }
+
   const sorted = useMemo(() => {
-    const arr = [...viewed]
+    const arr = [...filtered]
     switch (sortBy) {
       case 'rating': return arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || b.id - a.id)
       case 'date': return arr.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -334,8 +395,88 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
     }
   }
 
+  const previewLines = (text: string) =>
+    text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .join('\n')
+
   return (
     <div className={styles.library}>
+      <div className={styles.libraryLayout}>
+        {!isTrulyEmpty && (
+          <aside className={styles.librarySidebar} aria-label={t.library.views.label}>
+            <p className={styles.sidebarHeading}>{t.library.sidebar.views}</p>
+            <div className={styles.sidebarList}>
+              {viewOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={view === opt.id ? styles.sidebarItemActive : styles.sidebarItem}
+                  onClick={() => setView(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {allTags.length > 0 ? (
+              <>
+                <button
+                  type="button"
+                  className={styles.sidebarHeadingBtn}
+                  onClick={() => setTagsOpen((o) => !o)}
+                >
+                  {t.library.sidebar.tags}
+                  <span aria-hidden>{tagsOpen ? '▾' : '▸'}</span>
+                </button>
+                {tagsOpen ? (
+                  <div className={styles.sidebarTags}>
+                    {allTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={
+                          tagFilters.includes(tag) ? styles.sidebarTagActive : styles.sidebarTag
+                        }
+                        onClick={(e) => toggleTagFilter(tag, e.shiftKey)}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+            {modelGroups.length > 0 ? (
+              <>
+                <p className={styles.sidebarHeading}>{t.library.sidebar.models}</p>
+                <div className={styles.sidebarList}>
+                  <button
+                    type="button"
+                    className={!modelFilter ? styles.sidebarItemActive : styles.sidebarItem}
+                    onClick={() => setModelFilter(null)}
+                  >
+                    {t.library.views.all}
+                  </button>
+                  {modelGroups.map(([model, count]) => (
+                    <button
+                      key={model}
+                      type="button"
+                      className={modelFilter === model ? styles.sidebarItemActive : styles.sidebarItem}
+                      onClick={() => setModelFilter(modelFilter === model ? null : model)}
+                    >
+                      <span className={styles.sidebarItemLabel}>{model}</span>
+                      <span className={styles.sidebarCount}>{count}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </aside>
+        )}
+        <div className={styles.libraryMain}>
       <div className={`${styles.toolbar} ${styles.toolbarCompact}`}>
         <input
           type="search"
@@ -468,7 +609,7 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
       )}
 
       {loading ? (
-        <p>Загрузка...</p>
+        <CardGridSkeleton columns={gridCols === 4 ? 3 : 3} count={gridCols === 4 ? 8 : 6} />
       ) : isTrulyEmpty ? (
         <div className={styles.starters}>
           <div className={styles.starterHeader}>
@@ -522,7 +663,12 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
           </div>
         </div>
       ) : items.length === 0 ? (
-        <p className={styles.empty}>Нет сохранённых промптов</p>
+        <EmptyState
+          title={t.library.emptyFiltered.title}
+          description={t.library.emptyFiltered.description}
+          actionLabel={t.library.emptyFiltered.ctaStudio}
+          actionTo="/home"
+        />
       ) : (
         <div key={tagPaintTick} className={masonryClass}>
           {sorted.map((item) => {
@@ -537,16 +683,20 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
             return (
             <div
               key={item.id}
-              className={`${styles.card} ${styles.cardMasonry} ${hasCover ? styles.cardWithCover : ''}`}
+              role="button"
+              tabIndex={0}
+              className={`${styles.card} ${styles.cardMasonry} ${styles.cardClickable} ${hasCover ? styles.cardWithCover : ''} ${openId === item.id ? styles.cardOpen : ''}`}
+              onClick={() => setDrawerOpen(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setDrawerOpen(item.id)
+                }
+              }}
             >
               {hasCover ? (
                 <div className={styles.libHero}>
-                  <img
-                    className={styles.libHeroImg}
-                    src={item.cover_image_path!}
-                    alt=""
-                    loading="lazy"
-                  />
+                  <CoverImage src={item.cover_image_path!} className={styles.libHeroImg} />
                   <div className={styles.libHeroGrad} aria-hidden />
                   <div className={styles.libHeroOverlay}>
                     <ThemedTooltip content="Открыть на Студии с этим промптом" side="bottom" delayMs={240} block>
@@ -667,10 +817,12 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
               </p>
               {item.tags.length > 0 ? <LibraryTagChips tags={item.tags} className={styles.tagChipsMargin} /> : null}
               <div className={styles.promptBlock}>
-                <pre className={styles.preview}>
-                  {promptText.slice(0, 200)}
-                  {promptText.length > 200 ? '…' : ''}
-                </pre>
+                <pre className={styles.previewLines}>{previewLines(promptText)}</pre>
+                <p className={styles.cardMicroRow}>
+                  {item.rating ? <span>{Math.round(item.rating * 20)}%</span> : null}
+                  <span>≈{Math.max(1, Math.round(promptText.length / 3.5)).toLocaleString()} tok</span>
+                  <span>{(item.prompt_lang || 'ru').toLowerCase()}</span>
+                </p>
               </div>
               {item.revisions && item.revisions.length > 0 ? (
                 <div onClick={(e) => e.stopPropagation()}>
@@ -859,6 +1011,21 @@ export default function PromptsPanel({ onPromptCountChanged, gridCols = 3 }: Pro
           })}
         </div>
       )}
+        </div>
+      </div>
+      <LibraryPromptDrawer
+        item={drawerItem}
+        open={Boolean(drawerItem)}
+        onClose={() => setDrawerOpen(null)}
+        onDeleted={(id) => {
+          setItems((prev) => prev.filter((x) => x.id !== id))
+          api.getLibraryStats().then(setStats)
+          onPromptCountChanged?.()
+        }}
+        onUpdated={(updated) => {
+          setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+        }}
+      />
     </div>
   )
 }

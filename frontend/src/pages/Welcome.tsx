@@ -5,6 +5,8 @@ import { api } from '../api/client'
 import { useT } from '../i18n'
 import { useSimulatedLlmStream } from '../lib/simulatedLlmStream'
 import ThemedTooltip from '../components/ThemedTooltip'
+import MarketingHeader from '../components/marketing/MarketingHeader'
+import StudioPreviewMock from '../components/marketing/StudioPreviewMock'
 import styles from './Welcome.module.css'
 
 /*
@@ -203,6 +205,10 @@ export default function Welcome() {
   const { t } = useT()
   const navigate = useNavigate()
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
+  const demoSectionRef = useRef<HTMLElement | null>(null)
+  const [placeholderIdx, setPlaceholderIdx] = useState(0)
+  const [placeholderPaused, setPlaceholderPaused] = useState(false)
+  const [healthCells, setHealthCells] = useState<Record<string, 'ok' | 'degraded' | 'down'> | null>(null)
 
   const [task, setTask] = useState('')
   const [busy, setBusy] = useState(false)
@@ -213,7 +219,35 @@ export default function Welcome() {
   const revealDone = !result || revealed.length >= result.length
   const revealSkip = () => setStreamSkipped(true)
 
+  useEffect(() => {
+    if (placeholderPaused) return
+    const id = window.setInterval(() => {
+      setPlaceholderIdx((i) => (i + 1) % t.landing.demoStrip.placeholders.length)
+    }, 4000)
+    return () => window.clearInterval(id)
+  }, [placeholderPaused, t.landing.demoStrip.placeholders.length])
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getModelHealthSnapshot()
+      .then((snap) => {
+        if (!cancelled) setHealthCells(snap.cells)
+      })
+      .catch(() => {
+        /* keep mock trust cells */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   if (user) return <Navigate to="/home" replace />
+
+  const scrollToDemo = () => {
+    demoSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.setTimeout(() => composerRef.current?.focus(), 400)
+  }
 
   const runDemo = async () => {
     const trimmed = task.trim()
@@ -254,6 +288,19 @@ export default function Welcome() {
     navigate('/login')
   }
 
+  const openCompareB = () => {
+    if (!result) return
+    try {
+      localStorage.setItem(
+        'metaprompt-seed-from-demo',
+        JSON.stringify({ task, prompt_block: result, at: Date.now() }),
+      )
+    } catch {
+      /* non-fatal */
+    }
+    navigate({ pathname: '/login', search: '?next=/compare&mode=prompts' })
+  }
+
   // TODO(phase-9): replace hardcoded items with the health snapshot endpoint.
   const tickerItems: ReadonlyArray<{ label: string; value: string; status?: TickerStatus }> = [
     { label: t.landing.ticker.stack, value: t.landing.ticker.stackValue },
@@ -266,23 +313,23 @@ export default function Welcome() {
     { label: t.landing.ticker.vision, value: t.landing.ticker.visionValue, status: 'degraded' },
   ]
 
-  const trustCells: ReadonlyArray<{
-    label: string
-    mode: string
-    status: 'ok' | 'degraded' | 'down'
-  }> = [
-    { label: t.landing.trust.tiers.auto, mode: t.landing.trust.modes.text, status: 'ok' },
-    { label: t.landing.trust.tiers.fast, mode: t.landing.trust.modes.text, status: 'ok' },
-    { label: t.landing.trust.tiers.mid, mode: t.landing.trust.modes.text, status: 'ok' },
-    { label: t.landing.trust.tiers.advanced, mode: t.landing.trust.modes.text, status: 'ok' },
-    { label: t.landing.trust.tiers.auto, mode: t.landing.trust.modes.vision, status: 'degraded' },
-    { label: t.landing.trust.tiers.advanced, mode: t.landing.trust.modes.vision, status: 'ok' },
+  const trustSpec: ReadonlyArray<{ key: string; label: string; mode: string }> = [
+    { key: 'auto_text', label: t.landing.trust.tiers.auto, mode: t.landing.trust.modes.text },
+    { key: 'fast_text', label: t.landing.trust.tiers.fast, mode: t.landing.trust.modes.text },
+    { key: 'mid_text', label: t.landing.trust.tiers.mid, mode: t.landing.trust.modes.text },
+    { key: 'advanced_text', label: t.landing.trust.tiers.advanced, mode: t.landing.trust.modes.text },
+    { key: 'auto_vision', label: t.landing.trust.tiers.auto, mode: t.landing.trust.modes.vision },
+    { key: 'advanced_vision', label: t.landing.trust.tiers.advanced, mode: t.landing.trust.modes.vision },
   ]
+  const trustCells = trustSpec.map((c) => ({
+    ...c,
+    status: (healthCells?.[c.key] ?? 'ok') as 'ok' | 'degraded' | 'down',
+  }))
 
   return (
     <div className={styles.landing}>
-      {/* ============ HERO + LIVE COMPOSER ============ */}
-      <section className={styles.hero}>
+      <MarketingHeader />
+      <section className={styles.hero} id="product">
         <div className={styles.container}>
           <div className={styles.heroGrid}>
             <div className={`${styles.heroLeft} reveal-on-mount`}>
@@ -294,18 +341,28 @@ export default function Welcome() {
               </h1>
               <p className={styles.heroSubtitle}>{t.landing.hero.subtitle}</p>
               <div className={styles.heroActions}>
-                <Link to="/login" className={styles.btnPrimary}>
+                <button type="button" className={styles.btnPrimary} onClick={scrollToDemo}>
                   <SparklesIcon />
                   {t.landing.hero.ctaPrimary}
-                </Link>
-                <a href="#how" className={styles.btnGhost}>
+                </button>
+                <Link to="/login" className={styles.btnGhost}>
                   {t.landing.hero.ctaGhost}
-                </a>
+                </Link>
               </div>
               <p className={styles.heroFootnote}>{t.landing.hero.footnote}</p>
             </div>
 
-            <div className={`${styles.composerWrap} reveal-on-mount`}>
+            <div className={`${styles.heroPreview} reveal-on-mount`}>
+              <StudioPreviewMock />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section ref={demoSectionRef} className={styles.demoStrip} id="demo">
+        <div className={styles.container}>
+          <h2 className={styles.demoStripTitle}>{t.landing.demoStrip.title}</h2>
+          <div className={`${styles.composerWrap} reveal-on-mount`}>
               <ComposerArrow label={t.landing.composer.arrowLabel} />
               <div className={styles.composerCard}>
                 <ComposerBrackets />
@@ -321,9 +378,11 @@ export default function Welcome() {
                   className={styles.composerTextarea}
                   value={task}
                   onChange={(e) => setTask(e.target.value)}
-                  placeholder={t.landing.composer.placeholder}
+                  placeholder={t.landing.demoStrip.placeholders[placeholderIdx]}
                   rows={3}
                   aria-label={t.landing.composer.taskAria}
+                  onFocus={() => setPlaceholderPaused(true)}
+                  onBlur={() => setPlaceholderPaused(false)}
                 />
                 <div className={styles.composerFoot}>
                   <span className={styles.composerRate}>{t.landing.composer.rate}</span>
@@ -369,6 +428,9 @@ export default function Welcome() {
                       <button type="button" className={styles.composerActionBtn} onClick={openInStudio}>
                         {t.landing.composer.actions.openStudio}
                       </button>
+                      <button type="button" className={styles.composerActionBtn} onClick={openCompareB}>
+                        {t.landing.composer.actions.compareB}
+                      </button>
                       <button type="button" className={styles.composerActionBtn} onClick={() => void runDemo()}>
                         {t.landing.composer.actions.regen}
                       </button>
@@ -378,7 +440,6 @@ export default function Welcome() {
               </div>
             </div>
           </div>
-        </div>
       </section>
 
       {/* ============ TICKER ============ */}
@@ -406,7 +467,7 @@ export default function Welcome() {
               <p className={styles.sectionLede}>{t.landing.how.lede}</p>
             </div>
           </header>
-          <div className={styles.howGrid}>
+          <div className={`${styles.howGrid} ${styles.howScroll}`}>
             {t.landing.how.cards.map((c) => (
               <article key={c.num} className={styles.howCard}>
                 <div className={styles.howCardHead}>
@@ -465,7 +526,7 @@ export default function Welcome() {
 
       {/* ============ TRUST ============ */}
       {/* TODO(phase-9): swap mock cells for GET /api/public/model-health-snapshot. */}
-      <section className={styles.section}>
+      <section className={styles.section} id="trust">
         <div className={styles.container}>
           <header className={styles.sectionHead}>
             <span className={styles.sectionNum}>{t.landing.trust.num}</span>

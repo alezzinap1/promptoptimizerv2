@@ -277,7 +277,7 @@ ul.eventList {
   color: var(--muted);
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .pageColumns {
     grid-template-columns: 1fr;
   }
@@ -286,9 +286,7 @@ ul.eventList {
     position: static;
     max-height: 420px;
   }
-}
 
-@media (max-width: 900px) {
   .visualGrid {
     grid-template-columns: 1fr;
   }

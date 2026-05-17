@@ -4,7 +4,9 @@ import { api, type Workspace } from '../api/client'
 import { getRecentSessions, type RecentSession } from '../lib/recentSessions'
 import { useAuth } from '../context/AuthContext'
 import { useT } from '../i18n'
+import { useMobileNav } from '../hooks/useMediaQuery'
 import AppSidebar from './AppSidebar'
+import MobileBottomNav from './MobileBottomNav'
 import UserMenu from './UserMenu'
 import LanguageSwitcher from './LanguageSwitcher'
 import styles from './Layout.module.css'
@@ -15,6 +17,14 @@ const iconsUser = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
+  </svg>
+)
+
+const MenuIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="20" y2="12" />
+    <line x1="4" y1="18" x2="20" y2="18" />
   </svg>
 )
 
@@ -47,8 +57,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useT()
   const location = useLocation()
   const isWelcomePublic = location.pathname === '/welcome'
+  const mobileNav = useMobileNav()
 
   const [collapsed, setCollapsed] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem(COLLAPSED_KEY) === '1')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [counts, setCounts] = useState<{ prompts: number | null; skills: number }>({
     prompts: null,
     skills: loadSkillCount(),
@@ -59,6 +71,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(0)
 
   const showSidebar = !!user && !isWelcomePublic
+
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), [])
+
+  useEffect(() => {
+    closeMobileNav()
+  }, [location.pathname, location.search, closeMobileNav])
+
+  useEffect(() => {
+    if (!mobileNav || !mobileNavOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMobileNav()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileNav, mobileNavOpen, closeMobileNav])
+
+  useEffect(() => {
+    if (!mobileNav || !mobileNavOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [mobileNav, mobileNavOpen])
 
   const refreshNavCounts = useCallback(() => {
     if (!user) return
@@ -135,6 +171,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [])
 
   const toggleCollapse = () => {
+    if (mobileNav) {
+      closeMobileNav()
+      return
+    }
     setCollapsed((v) => {
       const next = !v
       localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0')
@@ -180,19 +220,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     )
   }
 
+  const sidebarCollapsed = mobileNav ? false : collapsed
+
   return (
     <div className={styles.app}>
-      {showSidebar ? (
-        <AppSidebar
-          collapsed={collapsed}
-          onToggleCollapse={toggleCollapse}
-          counts={counts}
-          recentSessions={recent}
-          workspaceLabel={workspaceLabel}
-          isAdmin={!!user?.is_admin}
+      {showSidebar && mobileNav && mobileNavOpen ? (
+        <button
+          type="button"
+          className={styles.sidebarBackdrop}
+          aria-label={t.header.menuClose}
+          onClick={closeMobileNav}
         />
       ) : null}
+      {showSidebar ? (
+        <div
+          className={`${styles.sidebarHost} ${mobileNav ? styles.sidebarHostMobile : ''} ${mobileNav && mobileNavOpen ? styles.sidebarHostOpen : ''}`}
+        >
+          <AppSidebar
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleCollapse}
+            counts={counts}
+            recentSessions={recent}
+            workspaceLabel={workspaceLabel}
+            isAdmin={!!user?.is_admin}
+            mobileMode={mobileNav}
+            onNavigate={mobileNav ? closeMobileNav : undefined}
+            navAriaLabel={t.header.navAria}
+            closeMenuLabel={t.header.menuClose}
+            collapseMenuLabel={
+              mobileNav ? t.header.menuClose : collapsed ? t.header.menuOpen : t.header.menuClose
+            }
+          />
+        </div>
+      ) : null}
       <div className={styles.shell}>
+        <a href="#main-content" className={styles.skipLink}>
+          {t.layout.skipToContent}
+        </a>
         {isDemoUser ? (
           <div className={styles.demoBanner} role="status">
             {t.header.demoBanner}{' '}
@@ -205,6 +269,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className={styles.headerWrap}>
           <header className={styles.header}>
             <div className={styles.headerLeft}>
+              {showSidebar && mobileNav ? (
+                <button
+                  type="button"
+                  className={styles.menuBtn}
+                  aria-label={mobileNavOpen ? t.header.menuClose : t.header.menuOpen}
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="app-sidebar"
+                  onClick={() => setMobileNavOpen((o) => !o)}
+                >
+                  <MenuIcon />
+                </button>
+              ) : null}
               <NavLink to="/home" className={styles.logo} aria-label={t.header.logoAriaHome}>
                 <span className={styles.logoGlyph} aria-hidden />
                 {logoWordmark}
@@ -244,7 +320,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
         </div>
-        <main className={styles.main}>{children}</main>
+        <main
+          id="main-content"
+          className={`${styles.main} ${showSidebar && mobileNav ? styles.mainWithBottomNav : ''}`}
+          tabIndex={-1}
+        >
+          {children}
+        </main>
+        {showSidebar && mobileNav ? <MobileBottomNav /> : null}
       </div>
     </div>
   )

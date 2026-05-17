@@ -1,0 +1,22 @@
+/*
+ * Canonical breakpoints — use in @media and matchMedia.
+ * Mobile drawer: max-width 767px (< --bp-md).
+ */
+
+:root {
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1440px;
+  --content-max: 1400px;
+  --content-wide: 1600px;
+  --touch-min: 44px;
+}
+
+/*
+ * Canonical max-width media queries (use these values in @media):
+ *   --bp-sm  → max-width: 479px   (phones)
+ *   --bp-md  → max-width: 767px   (phones + small tablets; matches drawer/bottom nav)
+ *   --bp-lg  → max-width: 1023px  (tablets / narrow laptop)
+ *   --bp-xl  → max-width: 1439px  (below large desktop)
+ */

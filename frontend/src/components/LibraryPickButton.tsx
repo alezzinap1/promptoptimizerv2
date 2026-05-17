@@ -12,6 +12,7 @@ import LibraryTagChips from './LibraryTagChips'
 import LibraryRevisionStrip from './LibraryRevisionStrip'
 import ThemedTooltip from './ThemedTooltip'
 import EvalBadge from '../pages/eval/EvalBadge'
+import CoverImage from './CoverImage'
 import libStyles from '../pages/Library.module.css'
 import styles from './LibraryPickButton.module.css'
 
@@ -347,12 +348,7 @@ export default function LibraryPickButton({
                   >
                     {hasCover ? (
                       <div className={libStyles.libHero}>
-                        <img
-                          className={libStyles.libHeroImg}
-                          src={item.cover_image_path!}
-                          alt=""
-                          loading="lazy"
-                        />
+                        <CoverImage src={item.cover_image_path!} className={libStyles.libHeroImg} />
                         <div className={libStyles.libHeroGrad} aria-hidden />
                         <div className={libStyles.libHeroOverlay}>
                           <div className={`${libStyles.libHeroTitle} ${styles.pickCardTitleStatic}`}>{item.title}</div>

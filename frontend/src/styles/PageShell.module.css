@@ -23,8 +23,8 @@
 .panel {
   position: relative;
   overflow: hidden;
-  padding: 16px;
-  border-radius: 7px;
+  padding: var(--space-4, 16px);
+  border-radius: var(--r-card, 14px);
   border: 1px solid var(--stroke);
   background: var(--panel);
   box-shadow: none;
@@ -73,8 +73,8 @@
 .fieldGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3, 12px);
+  margin-bottom: var(--space-3, 12px);
 }
 
 .field {
@@ -514,7 +514,7 @@
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .fieldGrid {
     grid-template-columns: 1fr;
   }

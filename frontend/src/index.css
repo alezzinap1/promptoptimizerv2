@@ -1,4 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,wght@1,500;1,600&display=swap");
+@import "./styles/breakpoints.css";
+@import "./styles/tokens.css";
 @import "./theme-palettes.css";
 @import "./styles/primitives.css";
 @import "./styles/marketing-register.css";
@@ -22,6 +23,7 @@
 
 html {
   height: 100%;
+  min-height: 100dvh;
   /* Lets document.startViewTransition() cross-fade the whole UI on theme change. */
   view-transition-name: root;
 }
@@ -32,9 +34,10 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100%;
+  min-height: 100dvh;
   height: 100%;
   position: relative;
-  font-size: 14px;
+  font-size: 15px;
   overflow-x: hidden;
 }
 
@@ -56,6 +59,7 @@ pre {
 .appRoot {
   flex: 1;
   min-height: 0;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -149,14 +153,16 @@ button:hover:not(:disabled)::before {
   opacity: 0;
 }
 
-button:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-  box-shadow: var(--glow);
+@media (hover: hover) and (pointer: fine) {
+  button:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: var(--glow);
+  }
 }
 
 button:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 button:disabled {

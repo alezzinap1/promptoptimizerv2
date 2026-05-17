@@ -59,8 +59,49 @@ const ru: {
     demoBanner: string
     demoBannerLogin: string
     demoBannerTail: string
+    menuOpen: string
+    menuClose: string
+    navAria: string
+  }
+  layout: {
+    skipToContent: string
+  }
+  bottomNav: {
+    aria: string
+    studio: string
+    library: string
+    compare: string
+    more: string
+    moreMenu: string
+    community: string
+    eval: string
+    workspaces: string
+    settings: string
+    help: string
   }
   landing: {
+    nav: {
+      aria: string
+      product: string
+      studio: string
+      library: string
+      pricing: string
+      docs: string
+      startFree: string
+    }
+    preview: {
+      title: string
+      tierTag: string
+      userLine: string
+      roleLine: string
+      taskLine: string
+      composerPlaceholder: string
+      floatTag: string
+    }
+    demoStrip: {
+      title: string
+      placeholders: readonly string[]
+    }
     hero: {
       eyebrow: string
       titleHead: string
@@ -81,7 +122,7 @@ const ru: {
       errorShort: string
       errorNetwork: string
       taskAria: string
-      actions: { copy: string; openStudio: string; regen: string }
+      actions: { copy: string; openStudio: string; regen: string; compareB: string }
       arrowLabel: string
     }
     ticker: {
@@ -180,6 +221,26 @@ const ru: {
       goalTag: { work: string; study: string; own: string }
     }
     searchPlaceholder: string
+    hubTitle: string
+    tabs: { prompts: string; presets: string; skills: string }
+    emptyFiltered: { title: string; description: string; ctaStudio: string }
+    sidebar: { views: string; tags: string; models: string }
+    drawer: {
+      close: string
+      tabBody: string
+      tabVersions: string
+      diffAgainst: string
+      pickRevision: string
+      noVersions: string
+      openStudio: string
+      compareB: string
+      duplicate: string
+      copy: string
+      copyMd: string
+      delete: string
+      confirmDelete: string
+      translate: string
+    }
   }
   expertLevels: {
     labels: Record<'junior' | 'mid' | 'senior' | 'creative', string>
@@ -208,6 +269,12 @@ const ru: {
       'quick' | 'balanced' | 'precise' | 'creative_profile',
       { label: string; description: string }
     >
+    hotkeys: {
+      title: string
+      close: string
+      hintBtn: string
+      rows: ReadonlyArray<{ keys: string; desc: string }>
+    }
   }
   notFound: { title: string; body: string; cta: string }
   privateOnly: { title: string; body: string; tryDemo: string }
@@ -309,9 +376,57 @@ const ru: {
     demoBanner: 'Демо без входа: запросы к серверу недоступны.',
     demoBannerLogin: 'Войти',
     demoBannerTail: ', чтобы работать с данными.',
+    menuOpen: 'Открыть меню',
+    menuClose: 'Закрыть меню',
+    navAria: 'Навигация',
+  },
+
+  layout: {
+    skipToContent: 'Перейти к содержимому',
+  },
+
+  bottomNav: {
+    aria: 'Основная навигация',
+    studio: 'Студия',
+    library: 'Библиотека',
+    compare: 'Сравнение',
+    more: 'Ещё',
+    moreMenu: 'Дополнительные разделы',
+    community: 'Сообщество',
+    eval: 'Eval Studio',
+    workspaces: 'Пространства',
+    settings: 'Настройки',
+    help: 'Справка',
   },
 
   landing: {
+    nav: {
+      aria: 'Навигация лендинга',
+      product: 'Продукт',
+      studio: 'Studio',
+      library: 'Библиотека',
+      pricing: 'Модели',
+      docs: 'Документация',
+      startFree: 'Начать →',
+    },
+    preview: {
+      title: 'Studio · агент',
+      tierTag: 'Tier: Advanced',
+      userLine: 'Описание товара для карточки, без рекламного тона',
+      roleLine: 'Копирайтер e-commerce, нейтральный тон',
+      taskLine: '80–120 слов, польза в первой строке',
+      composerPlaceholder: 'Опишите задачу или попросите изменить промпт…',
+      floatTag: 'Tier: Advanced',
+    },
+    demoStrip: {
+      title: 'Попробуйте на своей задаче',
+      placeholders: [
+        'Напиши промпт для описания товара в интернет-магазине — лаконично, без рекламного тона.',
+        'Составь release notes из списка коммитов за неделю.',
+        'Промпт для анализа двух статей по одной методике.',
+        'Сценарий короткого видео: hook на 3 секунды.',
+      ],
+    },
     hero: {
       eyebrow: 'STUDIO · v0.9',
       titleHead: 'От общей задачи — к промпту, который ',
@@ -319,8 +434,8 @@ const ru: {
       rotatingWords: ['работает', 'понимает', 'держит', 'повторяется', 'проверяется'],
       subtitle:
         'Одно предложение на входе — структурированный промпт на выходе. Можно пощупать прямо здесь, без входа.',
-      ctaPrimary: 'Открыть Studio →',
-      ctaGhost: 'Что умеет',
+      ctaPrimary: 'Показать на моей задаче →',
+      ctaGhost: 'Открыть Studio →',
       footnote: 'Без ключей. Без регистрации. Без обещаний.',
     },
     composer: {
@@ -336,8 +451,9 @@ const ru: {
       taskAria: 'Задача для демо',
       actions: {
         copy: 'Копировать',
-        openStudio: 'Открыть в Studio',
+        openStudio: 'Открыть в Studio →',
         regen: 'Ещё вариант',
+        compareB: 'Сравнить вариант B',
       },
       arrowLabel: 'live · no login',
     },
@@ -515,6 +631,30 @@ const ru: {
       goalTag: { work: 'для работы', study: 'для учёбы', own: 'для своих проектов' },
     },
     searchPlaceholder: 'Поиск по тексту и тегам…',
+    hubTitle: 'Библиотека',
+    tabs: { prompts: 'Промпты', presets: 'Пресеты', skills: 'Скиллы' },
+    emptyFiltered: {
+      title: 'Ничего не найдено',
+      description: 'Сбросьте фильтры или сохраните новый промпт из Студии.',
+      ctaStudio: 'Открыть Студию →',
+    },
+    sidebar: { views: 'Подборки', tags: 'Теги', models: 'Модели' },
+    drawer: {
+      close: 'Закрыть',
+      tabBody: 'Промпт',
+      tabVersions: 'Версии',
+      diffAgainst: 'Сравнить с версией',
+      pickRevision: 'Выберите версию…',
+      noVersions: 'Нет сохранённых версий.',
+      openStudio: 'Открыть в Studio',
+      compareB: 'Сравнить как B',
+      duplicate: 'Дублировать',
+      copy: 'Скопировать',
+      copyMd: 'Markdown',
+      delete: 'Удалить',
+      confirmDelete: 'Удалить промпт из библиотеки?',
+      translate: 'Перевести RU↔EN',
+    },
   },
 
   expertLevels: {
@@ -584,6 +724,17 @@ const ru: {
         label: 'Творчески',
         description: 'Больше разнообразия; температура ограничена потолком для стабильного [PROMPT].',
       },
+    },
+    hotkeys: {
+      title: 'Горячие клавиши',
+      close: 'Закрыть',
+      hintBtn: 'Хоткеи',
+      rows: [
+        { keys: '⌘K / Ctrl+K', desc: 'Командная палитра' },
+        { keys: '⌘Enter', desc: 'Сгенерировать' },
+        { keys: 'Esc', desc: 'Очистить результат или снять фокус' },
+        { keys: '⌘/', desc: 'Фокус в поле ввода' },
+      ],
     },
   },
 

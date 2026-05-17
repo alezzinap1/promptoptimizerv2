@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import ThemedTooltip from '../../components/ThemedTooltip'
+import { useT } from '../../i18n'
 import Presets from '../Presets'
 import PromptsPanel from './PromptsPanel'
 import SkillsPanel from './SkillsPanel'
@@ -20,13 +21,7 @@ function loadGridCols(): GridCols {
   return 3
 }
 
-const TABS = [
-  { id: 'prompts', label: 'Промпты' },
-  { id: 'presets', label: 'Пресеты' },
-  { id: 'skills', label: 'Скиллы' },
-] as const
-
-type TabId = (typeof TABS)[number]['id']
+type TabId = 'prompts' | 'presets' | 'skills'
 
 function normalizeTab(raw: string | null): TabId {
   if (raw === 'presets' || raw === 'skills' || raw === 'prompts') return raw
@@ -34,9 +29,16 @@ function normalizeTab(raw: string | null): TabId {
 }
 
 export default function LibraryHub() {
+  const { t } = useT()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = useMemo(() => normalizeTab(searchParams.get('tab')), [searchParams])
+
+  const tabLabels: Record<TabId, string> = {
+    prompts: t.library.tabs.prompts,
+    presets: t.library.tabs.presets,
+    skills: t.library.tabs.skills,
+  }
 
   const [counts, setCounts] = useState({ prompts: 0, presets: 0, skills: 0 })
   const [gridCols, setGridCols] = useState<GridCols>(() => loadGridCols())
@@ -89,8 +91,18 @@ export default function LibraryHub() {
 
   return (
     <div className={hubStyles.hub}>
+      <nav className={hubStyles.breadcrumbs} aria-label="Breadcrumb">
+        <span className={hubStyles.breadcrumbRoot}>{t.library.hubTitle}</span>
+        <span className={hubStyles.breadcrumbSep} aria-hidden>
+          /
+        </span>
+        <span className={hubStyles.breadcrumbCurrent} aria-current="page">
+          {tabLabels[tab]}
+        </span>
+      </nav>
+
       <div className={hubStyles.titleRow}>
-        <h1 className={`pageTitleGradient ${hubStyles.title}`}>Библиотека</h1>
+        <h1 className={`pageTitleGradient ${hubStyles.title}`}>{t.library.hubTitle}</h1>
         <div className={hubStyles.gridToggle} role="group" aria-label="Плотность ленты промптов и скиллов">
           <ThemedTooltip content="Лента: три колонки (masonry)" side="bottom" delayMs={260}>
             <button
@@ -116,18 +128,18 @@ export default function LibraryHub() {
       </div>
 
       <div className={hubStyles.segmented} role="tablist" aria-label="Разделы библиотеки">
-        {TABS.map((t) => (
+        {(['prompts', 'presets', 'skills'] as const).map((id) => (
           <button
-            key={t.id}
+            key={id}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
-            className={tab === t.id ? hubStyles.segActive : hubStyles.seg}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === id}
+            className={tab === id ? hubStyles.segActive : hubStyles.seg}
+            onClick={() => setTab(id)}
           >
-            <span className={hubStyles.segLabel}>{t.label}</span>
+            <span className={hubStyles.segLabel}>{tabLabels[id]}</span>
             <span className={hubStyles.tabBadge} aria-hidden>
-              {t.id === 'prompts' ? counts.prompts : t.id === 'presets' ? counts.presets : counts.skills}
+              {id === 'prompts' ? counts.prompts : id === 'presets' ? counts.presets : counts.skills}
             </span>
           </button>
         ))}

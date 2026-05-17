@@ -36,8 +36,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--touch-min, 44px);
+  height: var(--touch-min, 44px);
   padding: 0;
   border: none;
   border-radius: 8px;
@@ -90,6 +90,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: var(--touch-min, 44px);
   padding: 8px 10px;
   border-radius: 8px;
   font-size: 13px;
@@ -244,4 +245,17 @@
 
 [data-theme='light'] .recentCard {
   background: rgba(15, 23, 42, 0.04);
+}
+
+.sidebarMobile {
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: color-mix(in srgb, var(--bg) 98%, var(--text) 2%);
+}
+
+.sidebarMobile .recentCard {
+  min-height: var(--touch-min, 44px);
 }

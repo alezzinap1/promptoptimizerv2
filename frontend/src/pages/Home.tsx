@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   api,
   normalizeSuggestedStudioActions,
   type GenerateRequest,
   type GenerateResult,
-  type GenerationIssue,
-  type StructuredQuestion,
   type ImageMetaResponse,
   type LibraryItem,
   type OpenRouterModel,
@@ -15,26 +12,17 @@ import {
   type UserPresetRecord,
   type Workspace,
 } from '../api/client'
-import AutoTextarea from '../components/AutoTextarea'
-import menuStyles from '../components/DropdownMenu.module.css'
-import MarkdownOutput from '../components/MarkdownOutput'
 import {
   nextLlmStreamChunkSize,
   nextLlmStreamDelayMs,
-  StreamedMarkdownOutput,
   useSimulatedLlmStream,
 } from '../lib/simulatedLlmStream'
-import PortalDropdown from '../components/PortalDropdown'
-import SelectDropdown from '../components/SelectDropdown'
-import ThemedTooltip from '../components/ThemedTooltip'
-import TierSelector, { loadTier, type TierValue } from '../components/TierSelector'
-import TranslateButton from '../components/TranslateButton'
-import WorkspacePicker from '../components/WorkspacePicker'
+import { loadTier, type TierValue } from '../components/TierSelector'
 import FirstVisitHomeTip from '../components/FirstVisitHomeTip'
 import HomeOnboardingHints from '../components/HomeOnboardingHints'
-import { CopyIconButton, TryInGeminiButton } from '../components/PromptToolbarIcons'
-import LibraryPickButton from '../components/LibraryPickButton'
-import { pushRecentSession } from '../lib/recentSessions'
+import { getRecentSessions, pushRecentSession } from '../lib/recentSessions'
+import { isModEnter } from '../lib/hotkeys'
+import HotkeysCheatsheet from '../components/HotkeysCheatsheet'
 import { suggestLibraryTitle } from '../lib/libraryTitle'
 import { clearAgentDraftV2, loadAgentDraftV2, saveAgentDraftV2 } from '../lib/agentDraft'
 import {
@@ -44,12 +32,10 @@ import {
   type AgentStudioSnapshot,
   type ExpertLevel,
   type PromptStudioMode,
-  type StudioAppliedTip,
 } from '../lib/agentStudioModes'
 import {
   clampExpertGenerationTemperature,
   EXPERT_DEFAULT_GEN_MODEL,
-  EXPERT_GENERATION_TEMPERATURE_CAP,
   expertLevelUsesManualTechniqueHint,
   getExpertLevelPreset,
 } from '../lib/expertLevelPresets'
@@ -69,330 +55,44 @@ import {
 import { looksLikeStrongEdit } from '../lib/agentFollowUp'
 import { computeRefinedLineDiffOps } from '../lib/lineDiffLcs'
 import { buildAgentChatHistory, resolveStudioFollowUpPlan } from '../lib/agentStudioProcessPlan'
-import {
-  COMPLETENESS_SCORE_TITLE,
-  PROMPT_COST_TITLE,
-  TECHNIQUES_COUNT_TITLE,
-  TOKEN_ESTIMATE_TITLE,
-} from '../lib/scoreTooltips'
-import { IMAGE_STYLES_ALL, IMAGE_STYLES_BY_ID } from '../lib/imageStyles'
+import { IMAGE_STYLES_ALL } from '../lib/imageStyles'
 import { loadImageStyleFavoriteIds, saveImageStyleFavoriteIds } from '../lib/imageStyleFavorites'
 import { appendRecentTechniqueIds, loadRecentTechniqueIds } from '../lib/recentTechniques'
 import { appendLocalSkill, loadLocalSkills } from '../lib/localSkillsStore'
 import { isIdePromptStreamSeen, markIdePromptStreamSeen } from '../lib/idePromptStreamStorage'
-import { buildPromptDoneCard } from '../lib/studioPromptDoneCard'
 import type { PromptDoneCard } from '../lib/studioPromptDoneCard'
-import checkboxList from '../styles/CheckboxOptionList.module.css'
-import cb from '../styles/ComposerBar.module.css'
+import {
+  ACTIVE_SESSION_KEY,
+  ACTIVE_WORKSPACE_KEY,
+  AGENT_PROCESS_PRE_TIMEOUT_MS,
+  AGENT_THINKING_PHASES,
+  HOME_AGENT_SPLIT_KEY,
+  PRE_PROMPT_ROUTING_LINE,
+  PRE_PROMPT_SKILL_LINE,
+  PRE_PROMPT_TASK_LINE,
+  clampSplit,
+  loadAgentSplit,
+} from '../features/studio/studioHomeConstants'
+import {
+  buildDoneGenerationContext,
+  computeChatAfterGeneration,
+  mergeSessionVersionIntoResult,
+  mergeStudioSkillTags,
+  normalizeClientGenerateResult,
+  pickPromptTitle,
+  type StudioChatMessage,
+  type StudioGenChatMsg,
+  type StudioTechnique,
+} from '../features/studio/homeHelpers'
+import { StudioResultPanel } from '../features/studio/StudioResultPanel'
+import { StudioAgentChatHeader } from '../features/studio/StudioAgentChatHeader'
+import { StudioAgentChatMessageList } from '../features/studio/StudioAgentChatMessageList'
+import { StudioAgentComposer } from '../features/studio/StudioAgentComposer'
+import { StudioLlmReviewDock } from '../features/studio/StudioLlmReviewDock'
+import { StudioModals } from '../features/studio/StudioModals'
+import { StudioQuestionsWizard } from '../features/studio/StudioQuestionsWizard'
+import type { StudioGenerateOptions } from '../features/studio/studioUiTypes'
 import styles from './Home.module.css'
-
-const ACTIVE_WORKSPACE_KEY = 'prompt-engineer-active-workspace'
-const ACTIVE_SESSION_KEY = 'prompt-engineer-active-prompt-session'
-const HOME_AGENT_SPLIT_KEY = 'prompt-engineer-home-agent-split'
-
-const LLM_REVIEW_DOCK_HELP =
-  'Судья анализирует формулировку промпта, не выполняет вашу задачу. Если текст похож на ответ задачи — «Свежая оценка».'
-
-function LlmReviewIconMaximize() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-    </svg>
-  )
-}
-
-function LlmReviewIconRestore() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14 3 21" />
-    </svg>
-  )
-}
-
-function LlmReviewIconClose() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  )
-}
-
-/**
- * При первичной генерации: [PROMPT]+хвост [QUESTIONS] без парсинга вопросов во второй фазе ломает мастер уточнений — чистим.
- * При итерации сервер оставляет structured questions для сообщения в чате; тогда has_questions всё равно false (мастер не открываем).
- */
-function normalizeClientGenerateResult(
-  res: GenerateResult,
-  opts?: { keepIterationCompanionQuestions?: boolean },
-): GenerateResult {
-  if (!res.has_prompt) return res
-  if (opts?.keepIterationCompanionQuestions && (res.questions?.length ?? 0) > 0) {
-    return { ...res, has_questions: false }
-  }
-  return { ...res, has_questions: false, questions: [] }
-}
-
-function formatCompanionQuestionsForChat(questions: StructuredQuestion[]): string {
-  const lines: string[] = [
-    '**Уточнения по идеям** (ответьте в чате — дальше можно снова нажать «Креативнее» или описать выбор словами):',
-    '',
-  ]
-  questions.forEach((q, i) => {
-    lines.push(`${i + 1}. ${q.question}`)
-    for (const opt of q.options || []) {
-      lines.push(`   - ${opt}`)
-    }
-    lines.push('')
-  })
-  return lines.join('\n').trimEnd()
-}
-
-/** Строка из prompt_sessions → обновить result справа (полнота, токены, техники совпадают с версией). */
-function mergeSessionVersionIntoResult(
-  prev: GenerateResult | null,
-  row: Record<string, unknown>,
-  sessionId: string,
-): GenerateResult {
-  const techniqueIds = (Array.isArray(row.techniques_used) ? row.techniques_used : []) as string[]
-  const rawM = row.metrics
-  const rowMetrics =
-    typeof rawM === 'object' && rawM !== null ? (rawM as Record<string, unknown>) : null
-  const metrics =
-    rowMetrics && Object.keys(rowMetrics).length > 0 ? rowMetrics : (prev?.metrics ?? {})
-
-  const base: GenerateResult =
-    prev ??
-    ({
-      prompt_block: '',
-      reasoning: '',
-      has_prompt: true,
-      has_questions: false,
-      techniques: [],
-      technique_ids: [],
-      task_types: [],
-      complexity: 'medium',
-      gen_model: '',
-      target_model: 'unknown',
-      metrics: {},
-      session_id: sessionId,
-    } as GenerateResult)
-
-  return {
-    ...base,
-    prompt_block: String(row.final_prompt || base.prompt_block),
-    reasoning: String(row.reasoning ?? base.reasoning),
-    has_prompt: true,
-    has_questions: false,
-    techniques: techniqueIds.map((id) => ({ id, name: id })),
-    technique_ids: techniqueIds,
-    task_types: (Array.isArray(row.task_types) ? row.task_types : base.task_types) as string[],
-    complexity: String(row.complexity || base.complexity),
-    gen_model: String(row.gen_model || base.gen_model),
-    target_model: String(row.target_model || base.target_model),
-    metrics,
-    session_id: sessionId || base.session_id,
-  }
-}
-
-function pickPromptTitle(res: GenerateResult | null, taskFallback: string): string {
-  const m = res?.metrics?.prompt_title
-  if (typeof m === 'string' && m.trim()) return m.trim()
-  if (res?.prompt_title?.trim()) return res.prompt_title.trim()
-  return suggestLibraryTitle(taskFallback)
-}
-
-function mergeStudioSkillTags(raw: string): string[] {
-  const tags = raw.split(',').map((t) => t.trim()).filter(Boolean)
-  const lower = new Set(tags.map((t) => t.toLowerCase()))
-  if (!lower.has('скилл') && !lower.has('skill') && !lower.has('студия')) {
-    tags.push('студия')
-  }
-  return tags
-}
-
-type GenChatMsg = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  clarificationQA?: { question: string; answers: string[] }[]
-  promptDoneCard?: PromptDoneCard
-  appliedTip?: StudioAppliedTip
-  editPreviewCard?: {
-    instruction: string
-    oldPrompt: string
-    newPrompt: string
-    diffOps: ReturnType<typeof computeRefinedLineDiffOps>
-  }
-}
-
-type DoneGenerationContext = {
-  nextVersion: number
-  isIteration: boolean
-  previousPromptBlock?: string
-  fromVersion?: number
-  prevScore: number
-  prevTokens: number
-}
-
-function buildDoneGenerationContext(
-  prevMsgs: GenChatMsg[],
-  versions: Record<string, unknown>[],
-  isIteration: boolean,
-  previousPrompt: string | undefined,
-  prevResult: GenerateResult | null,
-): DoneGenerationContext {
-  const maxVer =
-    versions.length > 0
-      ? Math.max(...versions.map((v) => Number((v as Record<string, unknown>).version) || 0))
-      : 0
-  const maxFromChat = prevMsgs.reduce((acc, m) => Math.max(acc, m.promptDoneCard?.version ?? 0), 0)
-  const base = Math.max(maxVer, maxFromChat)
-  const nextVersion = base + 1
-  const hasPrev = Boolean(isIteration && previousPrompt && previousPrompt.trim())
-  return {
-    nextVersion,
-    isIteration: hasPrev,
-    previousPromptBlock: hasPrev ? String(previousPrompt) : undefined,
-    fromVersion: hasPrev ? base : undefined,
-    prevScore: prevResult ? Number(prevResult.metrics?.completeness_score ?? prevResult.metrics?.quality_score ?? 0) : 0,
-    prevTokens: prevResult ? Math.round(Number(prevResult.metrics?.token_estimate ?? 0)) : 0,
-  }
-}
-
-function findPendingClarificationId(messages: GenChatMsg[]): string | null {
-  const m = [...messages].reverse().find(
-    (x) =>
-      x.role === 'assistant' &&
-      x.content.includes('Нужны уточнения') &&
-      x.clarificationQA === undefined,
-  )
-  return m?.id ?? null
-}
-
-/** Сообщения чата после ответа генерации (без учёта смены вкладки). */
-function computeChatAfterGeneration(
-  prev: GenChatMsg[],
-  res: GenerateResult,
-  questionAnswers: { question: string; answers: string[] }[] | undefined,
-  doneCtx: DoneGenerationContext,
-): { next: GenChatMsg[]; lastClarificationsMsgId: string | null } {
-  let next: GenChatMsg[] = [...prev]
-  let lastClarificationsMsgId: string | null = null
-  const pendingId = findPendingClarificationId(prev)
-  if (questionAnswers !== undefined && pendingId) {
-    next = next.map((m) => (m.id === pendingId ? { ...m, clarificationQA: questionAnswers } : m))
-  }
-  if (res.has_prompt) {
-    const thinkingParts: string[] = []
-    if (res.techniques?.length) {
-      thinkingParts.push(`**Техники:** ${res.techniques.map((t) => t.name).join(', ')}`)
-    }
-    if (res.technique_reasons?.length) {
-      thinkingParts.push(
-        res.technique_reasons
-          .map((tr) => `• **${tr.id}:** ${tr.reason.length > 200 ? `${tr.reason.slice(0, 200)}…` : tr.reason}`)
-          .join('\n'),
-      )
-    }
-    if (res.reasoning) {
-      const short = res.reasoning.length > 400 ? res.reasoning.slice(0, 400) + '…' : res.reasoning
-      thinkingParts.push(short)
-    }
-    if (thinkingParts.length > 0) {
-      next.push({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `__thinking__\n${thinkingParts.join('\n\n')}`,
-      })
-    }
-    next.push({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '',
-      promptDoneCard: buildPromptDoneCard(res, {
-        nextVersion: doneCtx.nextVersion,
-        isIteration: doneCtx.isIteration,
-        previousPromptBlock: doneCtx.previousPromptBlock,
-        fromVersion: doneCtx.fromVersion,
-        prevScore: doneCtx.prevScore,
-        prevTokens: doneCtx.prevTokens,
-      }),
-    })
-    if ((res.questions?.length ?? 0) > 0) {
-      next.push({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: formatCompanionQuestionsForChat(res.questions!),
-      })
-    }
-  } else if (res.has_questions && (res.questions?.length || 0) > 0) {
-    const cid = crypto.randomUUID()
-    lastClarificationsMsgId = cid
-    next.push({
-      id: cid,
-      role: 'assistant',
-      content:
-        'Нужны уточнения: панель под чатом, листайте вопросы — на последнем шаге нажмите «Подтвердить».',
-    })
-  }
-  return { next, lastClarificationsMsgId }
-}
-
-function clampSplit(n: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, n))
-}
-
-/** Ротация фраз в студии, когда нет явной фазы запроса (медленнее и с разбросом таймингов в эффекте). */
-const AGENT_THINKING_PHASES = [
-  'Разбираю формулировку…',
-  'Сопоставляю с контекстом…',
-  'Подбираю техники и структуру…',
-  'Продумываю уточнения…',
-  'Собираю текст промпта…',
-  'Проверяю согласованность…',
-]
-
-const PRE_PROMPT_ROUTING_LINE = 'Слушаю реплику и подбираю ответ…'
-const PRE_PROMPT_TASK_LINE = 'Понял задачу — собираю промпт…'
-const PRE_PROMPT_SKILL_LINE = 'Понял — оформляю скилл…'
-
-const AGENT_PROCESS_PRE_TIMEOUT_MS = 15_000
-
-const DEFAULT_AGENT_SPLIT = 0.38
-function loadAgentSplit(): number {
-  try {
-    const raw = localStorage.getItem(HOME_AGENT_SPLIT_KEY)
-    if (raw) {
-      const n = parseFloat(raw)
-      if (!Number.isNaN(n)) return clampSplit(n, 0.22, 0.62)
-    }
-  } catch {
-    /* ignore */
-  }
-  return DEFAULT_AGENT_SPLIT
-}
-
-type ChatMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  clarificationQA?: { question: string; answers: string[] }[]
-  promptDoneCard?: PromptDoneCard
-  appliedTip?: StudioAppliedTip
-  editPreviewCard?: GenChatMsg['editPreviewCard']
-  routerClarification?: { reason?: string; routerLogId?: number; pendingUserText: string }
-}
-
-type Technique = { id: string; name: string }
-
-function IconGlobe() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  )
-}
 
 export default function Home() {
   const { t } = useT()
@@ -401,6 +101,7 @@ export default function Home() {
   const [taskInput, setTaskInput] = useState('')
   const [feedback, setFeedback] = useState('')
   const [loading, setLoading] = useState(false)
+  const [hotkeysOpen, setHotkeysOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [iterationMode, setIterationMode] = useState(false)
@@ -408,7 +109,7 @@ export default function Home() {
 
   const [modelLabels, setModelLabels] = useState<Record<string, string>>({ unknown: 'Неизвестно / Любая модель' })
   const [generationOptions, setGenerationOptions] = useState<string[]>([])
-  const [techniques, setTechniques] = useState<Technique[]>([])
+  const [techniques, setTechniques] = useState<StudioTechnique[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [workspacesReady, setWorkspacesReady] = useState(false)
   const [genModel, setGenModel] = useState('')
@@ -445,7 +146,7 @@ export default function Home() {
   const [preferredTargetModels, setPreferredTargetModels] = useState<string[]>(['unknown'])
   const [targetModel, setTargetModel] = useState('unknown')
   const [agentSplit, setAgentSplit] = useState(() => loadAgentSplit())
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatMessages, setStudioChatMessages] = useState<StudioChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [promptType, setPromptType] = useState<'text' | 'image' | 'skill'>('text')
   const [imagePromptTags, setImagePromptTags] = useState<string[]>([])
@@ -517,7 +218,7 @@ export default function Home() {
   const hydrateFromSnapshot = useCallback(
     (s: AgentStudioSnapshot, targetMode?: PromptStudioMode) => {
     const fresh = cloneAgentStudioSnapshot(s)
-    setChatMessages(fresh.chatMessages as ChatMessage[])
+    setStudioChatMessages(fresh.chatMessages as StudioChatMessage[])
     setTaskInput(fresh.taskInput)
     setBaseTaskRef(fresh.baseTaskRef)
     setFeedback(fresh.feedback)
@@ -732,16 +433,6 @@ export default function Home() {
 
   const localSkillsForPicker = useMemo(() => loadLocalSkills(), [localSkillsTick])
 
-  const GENERATION_ISSUE_TEXT: Record<GenerationIssue, string> = {
-    format_failure:
-      'Ответ модели не удалось разобрать: нет распознаваемых блоков [PROMPT] и [QUESTIONS]. Часто так бывает, если модель генерации нарушила формат. Попробуйте снова или выберите другую модель.',
-    questions_unparsed:
-      'Блок вопросов в ответе есть, но список не разобрался. Ниже можно открыть полный текст ответа или повторить генерацию.',
-    weak_question_options:
-      'Вопросы распознаны, но почти без вариантов ответа (остались заглушки). Имеет смысл повторить генерацию или заполнить поле «Свой ответ».',
-    iteration_with_questions:
-      'При доработке промпта модель вернула блок вопросов вместо обновлённого [PROMPT]. Повторите генерацию или сформулируйте правку конкретнее.',
-  }
 
   useEffect(() => {
     setError(null)
@@ -873,8 +564,8 @@ export default function Home() {
     setSessionId(sid)
     const stored = loadSessionAgentChat(sid)
     if (stored && stored.length > 0) {
-      const restored = stored as ChatMessage[]
-      setChatMessages(restored)
+      const restored = stored as StudioChatMessage[]
+      setStudioChatMessages(restored)
       studioModesRef.current.text = cloneAgentStudioSnapshot({
         ...studioModesRef.current.text,
         chatMessages: restored,
@@ -890,8 +581,8 @@ export default function Home() {
         )
       lastClarificationsMsgIdRef.current = pendingClar?.id ?? null
     } else {
-      const w: ChatMessage[] = [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
-      setChatMessages(w)
+      const w: StudioChatMessage[] = [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
+      setStudioChatMessages(w)
       studioModesRef.current.text = cloneAgentStudioSnapshot({
         ...studioModesRef.current.text,
         chatMessages: w,
@@ -924,9 +615,9 @@ export default function Home() {
       else localStorage.removeItem(ACTIVE_SESSION_KEY)
       return
     }
-    setChatMessages((msgs) => {
+    setStudioChatMessages((msgs) => {
       if (msgs.length > 0) return msgs
-      const w: ChatMessage[] = [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
+      const w: StudioChatMessage[] = [{ id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') }]
       studioModesRef.current.text = cloneAgentStudioSnapshot({
         ...studioModesRef.current.text,
         chatMessages: w,
@@ -945,11 +636,11 @@ export default function Home() {
       const t = state.prefillTask
       setTaskInput(t)
       setBaseTaskRef(t)
-      const prefillMsgs: ChatMessage[] = [
+      const prefillMsgs: StudioChatMessage[] = [
         { id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('text') },
         { id: crypto.randomUUID(), role: 'user', content: t },
       ]
-      setChatMessages(prefillMsgs)
+      setStudioChatMessages(prefillMsgs)
       studioModesRef.current.text = cloneAgentStudioSnapshot({
         ...studioModesRef.current.text,
         taskInput: t,
@@ -973,7 +664,7 @@ export default function Home() {
     const seed = title
       ? `Оформи и улучши скилл «${title}» (текст ниже уже в контексте skill_body).`
       : 'Доработай скилл из библиотеки (текст в контексте skill_body).'
-    const welcomeSkill: ChatMessage[] = [
+    const welcomeSkill: StudioChatMessage[] = [
       { id: 'welcome', role: 'assistant', content: defaultWelcomeForMode('skill') },
       { id: crypto.randomUUID(), role: 'user', content: seed },
     ]
@@ -1198,7 +889,7 @@ export default function Home() {
     improvementPrep?: 'creative' | 'deep_improve'
     skipAgentChatReplies?: boolean
     /** Сообщения, добавляемые в чат до блоков «размышления» / карточки результата (например «применён совет»). */
-    chatAppendBeforeResult?: GenChatMsg[]
+    chatAppendBeforeResult?: StudioGenChatMsg[]
     /** Вызов из пре-роутера: loading уже true, guard на loading не применять */
     fromPrePromptRouter?: boolean
   }
@@ -1297,7 +988,7 @@ export default function Home() {
             suggestedActions: nextSuggestions,
           })
         } else {
-          let prevMsgs = (snap.chatMessages || []) as GenChatMsg[]
+          let prevMsgs = (snap.chatMessages || []) as StudioGenChatMsg[]
           if (opts?.chatAppendBeforeResult?.length) {
             prevMsgs = [...prevMsgs, ...opts.chatAppendBeforeResult]
           }
@@ -1312,7 +1003,7 @@ export default function Home() {
           const { next: nextMsgs } = computeChatAfterGeneration(prevMsgs, res, questionAnswers, doneCtx)
           studioModesRef.current[requestPromptType] = cloneAgentStudioSnapshot({
             ...snap,
-            chatMessages: nextMsgs as ChatMessage[],
+            chatMessages: nextMsgs as StudioChatMessage[],
             result: res,
             sessionId: res.session_id,
             iterationMode: false,
@@ -1347,8 +1038,8 @@ export default function Home() {
       setQuickSaved(false)
       setPublishCommunityHintVisible(false)
       if (!opts?.skipAgentChatReplies) {
-        setChatMessages((prev) => {
-          let base = prev as GenChatMsg[]
+        setStudioChatMessages((prev) => {
+          let base = prev as StudioGenChatMsg[]
           if (opts?.chatAppendBeforeResult?.length) {
             base = [...base, ...opts.chatAppendBeforeResult]
           }
@@ -1368,7 +1059,7 @@ export default function Home() {
           lastClarificationsMsgIdRef.current = lastClarificationsMsgId
           queueMicrotask(() => {
             studioModesRef.current[requestPromptType] = cloneAgentStudioSnapshot({
-              chatMessages: next as ChatMessage[],
+              chatMessages: next as StudioChatMessage[],
               baseTaskRef,
               taskInput,
               feedback,
@@ -1397,7 +1088,7 @@ export default function Home() {
               },
             })
           })
-          return next as ChatMessage[]
+          return next as StudioChatMessage[]
         })
       }
     } catch (e) {
@@ -1418,7 +1109,7 @@ export default function Home() {
     const tm = effectiveTargetModel
 
     const pushAssistant = (body: string) => {
-      setChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: body }])
+      setStudioChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: body }])
     }
 
     if (item.action === 'iterate') {
@@ -1507,7 +1198,7 @@ export default function Home() {
       if (latest) {
         setResult((prev) => (prev ? mergeSessionVersionIntoResult(prev, latest, sid) : prev))
       }
-      setChatMessages((prev) => prev.filter((x) => x.id !== msgId))
+      setStudioChatMessages((prev) => prev.filter((x) => x.id !== msgId))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось применить правку.')
     } finally {
@@ -1516,7 +1207,7 @@ export default function Home() {
   }
 
   const handleEditPreviewCancel = (msgId: string) => {
-    setChatMessages((prev) => prev.filter((x) => x.id !== msgId))
+    setStudioChatMessages((prev) => prev.filter((x) => x.id !== msgId))
   }
 
   const runSkillTestCases = async (cases: NonNullable<PromptDoneCard['skillTestCases']>) => {
@@ -1691,12 +1382,12 @@ export default function Home() {
       return
     }
     setChatInput('')
-    setChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: text }])
+    setStudioChatMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: text }])
     setError(null)
 
     if (isConversationalOnlyMessage(text, { promptType })) {
       if (result?.has_prompt) {
-        setChatMessages((m) => [
+        setStudioChatMessages((m) => [
           ...m,
           { id: crypto.randomUUID(), role: 'assistant', content: pickAfterPromptChatReply() },
         ])
@@ -1727,7 +1418,7 @@ export default function Home() {
               const clarifyReason =
                 typeof res.clarify_reason === 'string' ? res.clarify_reason.trim() : ''
               const routerLogId = typeof res.router_log_id === 'number' ? res.router_log_id : undefined
-              setChatMessages((m) => [
+              setStudioChatMessages((m) => [
                 ...m,
                 {
                   id: crypto.randomUUID(),
@@ -1763,7 +1454,7 @@ export default function Home() {
             window.clearTimeout(tid)
           }
         } catch {
-          setChatMessages((m) => [
+          setStudioChatMessages((m) => [
             ...m,
             { id: crypto.randomUUID(), role: 'assistant', content: pickConversationalReply() },
           ])
@@ -1793,7 +1484,7 @@ export default function Home() {
               gen_model: genModel || undefined,
             })
             const diffOps = computeRefinedLineDiffOps(snapshot.prompt_block, r.new_prompt)
-            setChatMessages((prev) => [
+            setStudioChatMessages((prev) => [
               ...prev,
               {
                 id: crypto.randomUUID(),
@@ -1808,7 +1499,7 @@ export default function Home() {
               },
             ])
           } catch (e) {
-            setChatMessages((prev) => [
+            setStudioChatMessages((prev) => [
               ...prev,
               {
                 id: crypto.randomUUID(),
@@ -1845,7 +1536,7 @@ export default function Home() {
 
         const pushAssistant = (body: string) => {
           const content = body + dbg
-          setChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content }])
+          setStudioChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content }])
         }
 
         if (plan.type === 'iterate') {
@@ -1976,7 +1667,7 @@ export default function Home() {
               const clarifyReason =
                 typeof res.clarify_reason === 'string' ? res.clarify_reason.trim() : ''
               const routerLogId = typeof res.router_log_id === 'number' ? res.router_log_id : undefined
-              setChatMessages((m) => [
+              setStudioChatMessages((m) => [
                 ...m,
                 {
                   id: crypto.randomUUID(),
@@ -2107,7 +1798,7 @@ export default function Home() {
       setImageTryCoverPath(r.saved_path || null)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setChatMessages((prev) => [
+      setStudioChatMessages((prev) => [
         ...prev,
         {
           id: `imgtry-err-${Date.now()}`,
@@ -2372,6 +2063,52 @@ export default function Home() {
     }
   }, [result?.has_questions, result?.has_prompt])
 
+  const showSeedExample = useMemo(
+    () =>
+      getRecentSessions().length === 0 &&
+      !result?.has_prompt &&
+      chatMessages.length <= 1 &&
+      !taskInput.trim() &&
+      !loading,
+    [result?.has_prompt, chatMessages.length, taskInput, loading],
+  )
+
+  const handleGenerateRef = useRef(handleGenerate)
+  handleGenerateRef.current = handleGenerate
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isModEnter(e)) {
+        e.preventDefault()
+        void handleGenerateRef.current()
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        document.querySelector<HTMLTextAreaElement>('[data-studio-composer]')?.focus()
+        return
+      }
+      if (e.key === 'Escape') {
+        if (result?.has_prompt) {
+          setResult(null)
+          setError(null)
+          return
+        }
+        ;(document.activeElement as HTMLElement | null)?.blur()
+        return
+      }
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+          e.preventDefault()
+          setHotkeysOpen(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [result?.has_prompt])
+
   const agentChatPlaceholder = useMemo(() => {
     if (promptType === 'image') {
       return 'Сначала опишите сцену или идею. Стили и уточнения — строкой выше, когда понадобятся.'
@@ -2382,645 +2119,25 @@ export default function Home() {
     return 'Опишите задачу или попросите изменить промпт…'
   }, [promptType])
 
-  const questionGenOpts: GenerateOptions | undefined = (baseTaskRef || taskInput).trim()
+  const questionGenOpts: StudioGenerateOptions | undefined = (baseTaskRef || taskInput).trim()
     ? { taskInputOverride: (baseTaskRef || taskInput).trim() }
     : undefined
 
-  const renderQuestionsPanel = () => {
-    const qs = result?.questions || []
-    const total = qs.length
-    if (total === 0) return null
-    const idx = Math.min(Math.max(0, questionCarouselIdx), total - 1)
-    const q = qs[idx]
-    const state = questionState[idx] || { options: [], custom: '' }
-
-    const submitWizardAnswers = () => {
-      const imp = improvementWizardApplyRef.current
-      return handleGenerate(
-        qs.map((qq, i) => ({
-          question: qq.question,
-          answers: [
-            ...(questionState[i]?.options || []),
-            ...((questionState[i]?.custom || '').trim() ? [questionState[i]!.custom.trim()] : []),
-          ],
-        })),
-        imp
-          ? {
-              ...questionGenOpts,
-              feedbackOverride: imp.feedback,
-              forceIteration: true,
-              previousPromptOverride: imp.basePrompt,
-            }
-          : questionGenOpts,
-      )
-    }
-
-    return (
-      <div
-        className={`${styles.questionBox} ${styles.questionBoxCompact} ${styles.questionCarousel} ${styles.wizardAgentMerged}`}
-      >
-        {improvementWizardApplyRef.current ? (
-          <p className={styles.questionCarouselMeta} style={{ width: '100%', marginBottom: 10, lineHeight: 1.4 }}>
-            Уточнения перед улучшением промпта; после «Подтвердить» придёт новая версия с учётом ответов.
-          </p>
-        ) : null}
-        <div className={`${styles.wizardProgressWrap} ${styles.wizardProgressWrapTight}`}>
-          <div className={styles.wizardProgressBar}>
-            <div className={styles.wizardProgressFill} style={{ width: `${((idx + 1) / total) * 100}%` }} />
-          </div>
-          <span className={styles.questionCarouselMeta}>
-            {idx + 1} / {total}
-          </span>
-        </div>
-        <div className={styles.wizardQuestionBlockAgent}>
-        <div className={`${styles.questionItem} ${styles.questionItemCompact}`}>
-          <strong>
-            {idx + 1}. {q.question}
-          </strong>
-          <div className={checkboxList.optionChecks} role="group" aria-label={`Варианты для вопроса ${idx + 1}`}>
-            {q.options.map((option, optIdx) => (
-              <label key={`${idx}-${optIdx}-${option}`} className={checkboxList.optionCheck}>
-                <input
-                  type="checkbox"
-                  checked={state.options.includes(option)}
-                  onChange={() => {
-                    setQuestionState((prev) => {
-                      const cur = prev[idx] ?? { options: [], custom: '' }
-                      const on = cur.options.includes(option)
-                      const nextOpts = on ? cur.options.filter((x) => x !== option) : [...cur.options, option]
-                      return { ...prev, [idx]: { ...cur, options: nextOpts } }
-                    })
-                  }}
-                />
-                <span>{option}</span>
-              </label>
-            ))}
-          </div>
-          <input
-            value={state.custom}
-            placeholder="Свой ответ (добавится к выбранным)"
-            onChange={(e) =>
-              setQuestionState((prev) => {
-                const cur = prev[idx] ?? { options: [], custom: '' }
-                return { ...prev, [idx]: { ...cur, custom: e.target.value } }
-              })
-            }
-          />
-        </div>
-        </div>
-        <div className={`${styles.wizardFooter} ${styles.wizardFooterCompact}`}>
-          <div className={styles.wizardToolbar}>
-            {idx > 0 ? (
-              <ThemedTooltip content="Назад" side="top" delayMs={200}>
-                <button
-                  type="button"
-                  className={styles.wizIconBtn}
-                  aria-label="Назад"
-                  onClick={() => setQuestionCarouselIdx((i) => Math.max(0, i - 1))}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path
-                      d="M15 18l-6-6 6-6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </ThemedTooltip>
-            ) : (
-              <span className={styles.wizToolbarLeadSpacer} aria-hidden />
-            )}
-            <ThemedTooltip content="Пропустить все уточнения и сгенерировать промпт" side="top" delayMs={280} disabled={loading}>
-              <button
-                type="button"
-                className={styles.wizTextBtn}
-                disabled={loading}
-                aria-label="Скип — без ответов на уточнения"
-                onClick={() => handleGenerate([], questionGenOpts)}
-              >
-                Скип
-              </button>
-            </ThemedTooltip>
-            <span className={styles.wizToolbarGrow} aria-hidden />
-            {idx < total - 1 ? (
-              <ThemedTooltip content={`Вопрос ${idx + 2} из ${total}`} side="top" delayMs={220}>
-                <button
-                  type="button"
-                  className={`${styles.wizIconBtn} ${styles.wizIconBtnPrimary}`}
-                  aria-label={`Вперёд: вопрос ${idx + 2} из ${total}`}
-                  onClick={() => setQuestionCarouselIdx((i) => Math.min(total - 1, i + 1))}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path
-                      d="M9 18l6-6-6-6"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </ThemedTooltip>
-            ) : (
-              <ThemedTooltip content="Собрать ответы со всех шагов и сгенерировать промпт" side="top" delayMs={280} disabled={loading}>
-                <button
-                  type="button"
-                  className={styles.wizCreateBtn}
-                  disabled={loading}
-                  onClick={() => submitWizardAnswers()}
-                >
-                  Подтвердить
-                </button>
-              </ThemedTooltip>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const resultSection = (
-        <section
-          className={`${styles.panel} ${styles.resultColumn} ${styles.bareColumn} ${styles.agentStackSection} ${promptType === 'skill' ? styles.resultColumnSkill : ''}`}
-        >
-          <div className={styles.resultColumnHeader}>
-            <h2 className="pageTitleGradient">{promptType === 'skill' ? 'Скилл' : 'Результат'}</h2>
-            {promptType === 'skill' ? (
-              <p className={styles.resultColumnSub}>Текст ниже — тело скилла для ИИ-ассистента (не чат-ответ).</p>
-            ) : null}
-          </div>
-          {result?.generation_issue && !issueBannerDismissed && (
-            <div className={styles.issueBanner} role="alert">
-              <button
-                type="button"
-                className={styles.issueBannerClose}
-                aria-label="Закрыть предупреждение"
-                onClick={() => setIssueBannerDismissed(true)}
-              >
-                ×
-              </button>
-              <p>{GENERATION_ISSUE_TEXT[result.generation_issue]}</p>
-              <div className={styles.issueBannerActions}>
-                <button type="button" className={`${styles.primaryAction} btn-primary`} onClick={handleRetryGeneration}>
-                  Попробовать снова
-                </button>
-              </div>
-            </div>
-          )}
-          {!result && !error && (
-            <div className={`${styles.resultPlaceholder} ${loading ? styles.resultPlaceholderLoading : ''}`}>
-              <div className={styles.resultPlaceholderIcon} aria-hidden>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="8" y1="13" x2="16" y2="13" />
-                  <line x1="8" y1="17" x2="14" y2="17" />
-                </svg>
-              </div>
-              <p className={styles.resultPlaceholderTitle}>
-                {promptType === 'skill' ? 'Текст скилла появится здесь' : 'Промпт появится здесь'}
-              </p>
-              <p className={styles.resultPlaceholderHint}>
-                {promptType === 'skill'
-                  ? 'После генерации сохраните во вкладку «Скиллы» в библиотеке — запись пойдёт туда, а не в список промптов.'
-                  : 'Промпт появится здесь после диалога слева.'}
-              </p>
-            </div>
-          )}
-          {result?.has_prompt && (
-            <>
-              <div className={styles.evalStrip}>
-                <div className={styles.evalStripLeft}>
-                  {result.metrics && (() => {
-                    const score = Number(result.metrics.completeness_score ?? result.metrics.quality_score ?? 0)
-                    return score > 0 ? (
-                      <ThemedTooltip content={COMPLETENESS_SCORE_TITLE} side="bottom" delayMs={280} block>
-                        <div className={styles.evalScorePrimary}>
-                          <span className={styles.evalScoreLabel}>Полнота</span>
-                          <div className={styles.evalBar}>
-                            <div className={styles.evalBarFill} style={{ width: `${Math.min(100, score)}%` }} />
-                          </div>
-                          <span className={styles.evalScoreNum}>{score}%</span>
-                        </div>
-                      </ThemedTooltip>
-                    ) : null
-                  })()}
-                  {result.techniques?.length > 0 && (
-                    <ThemedTooltip
-                      content={`${TECHNIQUES_COUNT_TITLE} Сейчас: ${result.techniques.map((t) => t.name).join(', ')}.`}
-                      side="bottom"
-                      delayMs={280}
-                    >
-                      <span className={styles.evalMeta}>{result.techniques.length} техн.</span>
-                    </ThemedTooltip>
-                  )}
-                  {tokenEstimate > 0 && (
-                    <ThemedTooltip content={TOKEN_ESTIMATE_TITLE} side="bottom" delayMs={280}>
-                      <span className={styles.evalMetaSecondary}>≈{tokenEstimate.toLocaleString()} tok</span>
-                    </ThemedTooltip>
-                  )}
-                  {promptCostStr ? (
-                    <ThemedTooltip content={PROMPT_COST_TITLE} side="bottom" delayMs={280}>
-                      <span className={styles.evalMetaSecondary}>{promptCostStr}</span>
-                    </ThemedTooltip>
-                  ) : null}
-                  {result.scene_analysis_applied ? (
-                    <ThemedTooltip
-                      content="К промпту подмешан структурированный бриф сцены (глубокий режим)"
-                      side="bottom"
-                      delayMs={280}
-                    >
-                      <span className={styles.evalMeta}>Deep · сцена</span>
-                    </ThemedTooltip>
-                  ) : null}
-                </div>
-                <div className={styles.promptToolbar}>
-                  <CopyIconButton
-                    text={result.prompt_block}
-                    title={promptType === 'skill' ? 'Копировать тело скилла' : 'Копировать промпт'}
-                  />
-                  <TryInGeminiButton prompt={result.prompt_block} />
-                  <TranslateButton
-                    getValue={() => result.prompt_block || ''}
-                    setValue={(v) => setResult({ ...result, prompt_block: v })}
-                    kind={promptType === 'skill' ? 'skill' : 'prompt'}
-                    compact
-                    cacheResetKey={result.session_id}
-                    title="Перевести промпт RU↔EN (одной кнопкой)"
-                  />
-                  {promptType === 'text' && (
-                    <ThemedTooltip
-                      content="Проверить промпт: один раунд с выбранной моделью (POST /playground/run)"
-                      side="bottom"
-                      delayMs={300}
-                      disabled={loading}
-                    >
-                      <button
-                        type="button"
-                        className={styles.toolbarTextBtn}
-                        disabled={loading}
-                        onClick={() => {
-                          setPromptPlaygroundLog([])
-                          setPromptPlaygroundInput('')
-                          setPromptPlaygroundOpen(true)
-                        }}
-                      >
-                        Песочница
-                      </button>
-                    </ThemedTooltip>
-                  )}
-                  {promptType === 'image' && (
-                    <ThemedTooltip
-                      content="Пробная генерация (OpenRouter image-модель из настроек или gemini-2.5-flash-image). Картинку можно сохранить в библиотеку вместе с промптом."
-                      side="bottom"
-                      delayMs={320}
-                      disabled={loading || imageTryBusy}
-                    >
-                      <button
-                        type="button"
-                        className={styles.toolbarTextBtn}
-                        disabled={loading || imageTryBusy}
-                        onClick={() => void runImageTryNano()}
-                      >
-                        {imageTryBusy ? 'Рисую…' : 'Проба картинки'}
-                      </button>
-                    </ThemedTooltip>
-                  )}
-                  <span className={styles.techModeMicroWrap}>
-                    <ThemedTooltip content="Опубликовать в сообществе" side="bottom" delayMs={260}>
-                      <button
-                        type="button"
-                        className={styles.quickSaveBtn}
-                        onClick={() => setPublishCommunityOpen(true)}
-                      >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                      </svg>
-                      </button>
-                    </ThemedTooltip>
-                    {quickSaved && publishCommunityHintVisible ? (
-                      <span
-                        className={styles.seniorTechHintBubble}
-                        role="status"
-                        onMouseEnter={() => setPublishCommunityHintVisible(false)}
-                      >
-                        Можно опубликовать в ленте сообщества
-                      </span>
-                    ) : null}
-                  </span>
-                  {!quickSaved && (
-                    <ThemedTooltip
-                      content={
-                        promptType === 'skill'
-                          ? 'Сохранить скилл в локальную библиотеку'
-                          : 'Сохранить промпт в библиотеку на сервере'
-                      }
-                      side="bottom"
-                      delayMs={280}
-                    >
-                      <button type="button" className={styles.toolbarTextBtn} onClick={handleQuickSave}>
-                        <span className={styles.toolbarSaveInner}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                          </svg>
-                          {promptType === 'skill' ? 'В скиллы' : 'В библиотеку'}
-                        </span>
-                      </button>
-                    </ThemedTooltip>
-                  )}
-                  {quickSaved && (
-                    <ThemedTooltip
-                      content={
-                        promptType === 'skill' ? 'Сохранено в библиотеку скиллов' : 'Сохранено в библиотеку'
-                      }
-                      side="bottom"
-                      delayMs={240}
-                    >
-                      <span className={styles.quickSavedMark}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                      </span>
-                    </ThemedTooltip>
-                  )}
-                </div>
-              </div>
-              <div className={styles.resultMarkdownWrap}>
-                <MarkdownOutput>{streamedPromptIde}</MarkdownOutput>
-              </div>
-              {promptType === 'image' && imageTryDataUrl ? (
-                <div className={styles.imageTryPreview}>
-                  <p className={styles.imageTryPreviewLabel}>
-                    Пробная картинка (Nano Banana). Сохраните промпт в библиотеку — превью прикрепится к записи.
-                  </p>
-                  <img src={imageTryDataUrl} alt="Пробная генерация" className={styles.imageTryPreviewImg} />
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className={`${styles.ideModalBtn} ${styles.llmJudgeCta}`}
-                disabled={llmReviewBusy}
-                onClick={() => void runLlmReview()}
-              >
-                {llmReviewBusy ? 'Оценка…' : 'Оценка модели (LLM-судья)'}
-              </button>
-              {result.target_model_type === 'reasoning' && (
-                <div className={styles.reasoningBadge}>
-                  Reasoning-модель — техники адаптированы: убраны CoT и step-by-step, промпт компактнее
-                </div>
-              )}
-              {result.metrics && Array.isArray(result.metrics.improvement_tips) && result.metrics.improvement_tips.length > 0 && (
-                <div className={styles.tipsBox}>
-                  <div className={styles.tipsBoxHead}>
-                    <strong>Что можно улучшить:</strong>
-                    <ThemedTooltip
-                      content="Вставить все советы в запрос на доработку одним действием"
-                      side="top"
-                      delayMs={280}
-                      disabled={loading}
-                    >
-                      <button
-                        type="button"
-                        className={styles.tipsApplyAllBtn}
-                        disabled={loading}
-                        onClick={() => {
-                          const tips = result.metrics?.improvement_tips as string[]
-                          const body = tips.map((t, i) => `${i + 1}. ${t}`).join('\n')
-                          setChatInput(`Учти и примени советы по очереди:\n${body}`)
-                        }}
-                      >
-                        Применить всё
-                      </button>
-                    </ThemedTooltip>
-                  </div>
-                  <ul>
-                    {(result.metrics.improvement_tips as string[]).map((tip, idx) => (
-                      <li key={idx} className={styles.tipItem}>
-                        <span className={styles.tipText}>{tip}</span>
-                        <ThemedTooltip content="Автоматически применить этот совет" side="top" delayMs={260} disabled={loading}>
-                          <button
-                            type="button"
-                            className={styles.tipApplyBtn}
-                            disabled={loading}
-                            onClick={() => {
-                              setChatInput(`Примени совет: ${tip}`)
-                            }}
-                          >
-                            + Применить
-                          </button>
-                        </ThemedTooltip>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {result?.has_prompt && (
-                <ThemedTooltip content={COMPLETENESS_SCORE_TITLE} side="bottom" delayMs={280} block>
-                  <div className={styles.strategicHint}>
-                    {promptType === 'skill'
-                      ? 'Оценка полноты для скилла смотрит на структуру инструкции (роль, шаги, формат). Это не оценка «умения» будущего ассистента.'
-                      : result.metrics?.prompt_analysis_mode === 'image'
-                        ? 'Оценка полноты для изображений: субъект, стиль, композиция, свет/палитра, негатив, техника (эвристика на сервере). Это не оценка художественного качества картинки.'
-                        : 'Оценка полноты смотрит на структуру промпта (эвристика на устройстве/сервере), а не на ответ модели в чате. Перед важным использованием проверьте текст в своей модели.'}
-                  </div>
-                </ThemedTooltip>
-              )}
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() =>
-                    navigate(
-                      { pathname: '/compare', search: '?mode=techniques' },
-                      { state: { taskInput: result.task_input || taskInput } },
-                    )
-                  }
-                >
-                  Сравнить
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.libraryBtn} btn-secondary`}
-                  onClick={() => {
-                    setShowSaveDialog((prev) => {
-                      if (!prev) setSaveTitle(pickPromptTitle(result, taskRefForTitles))
-                      return !prev
-                    })
-                  }}
-                >
-                  {promptType === 'skill' ? 'В библиотеку скиллов' : 'В библиотеку'}
-                </button>
-              </div>
-              {showSaveDialog && (
-                <div className={styles.saveBox}>
-                  <h3>{promptType === 'skill' ? 'Сохранить скилл' : 'Сохранить в библиотеку'}</h3>
-                  {promptType === 'skill' ? (
-                    <p className={styles.saveSkillHint}>
-                      Запись попадёт в <strong>Библиотека → Скиллы</strong> (локально в браузере), не в список промптов на сервере.
-                    </p>
-                  ) : null}
-                  <label className={styles.saveFieldLabel}>
-                    Название в библиотеке
-                    <input
-                      value={saveTitle}
-                      onChange={(e) => setSaveTitle(e.target.value)}
-                      placeholder="Краткое имя записи"
-                      aria-describedby="save-title-hint"
-                    />
-                  </label>
-                  <p id="save-title-hint" className={styles.saveHint}>
-                    Показывается в списке карточек. Если оставить пустым — подставим название из генерации или короткий заголовок по задаче.
-                  </p>
-                  <input value={saveTags} onChange={(e) => setSaveTags(e.target.value)} placeholder="Теги через запятую" />
-                  <textarea value={saveNotes} onChange={(e) => setSaveNotes(e.target.value)} rows={3} placeholder="Заметки" />
-                  {promptType !== 'skill' ? (
-                    <div className={styles.saveLibraryVersionBlock}>
-                      <span className={styles.saveLibraryVersionLabel}>Куда сохранить</span>
-                      <label className={styles.saveLibraryRadio}>
-                        <input
-                          type="radio"
-                          name="save-lib-target"
-                          checked={saveLibraryTarget === 'new'}
-                          onChange={() => {
-                            setSaveLibraryTarget('new')
-                            setSaveExistingLibraryId('')
-                          }}
-                        />
-                        Новая карточка
-                      </label>
-                      <label className={styles.saveLibraryRadio}>
-                        <input
-                          type="radio"
-                          name="save-lib-target"
-                          checked={saveLibraryTarget === 'existing'}
-                          onChange={() => setSaveLibraryTarget('existing')}
-                        />
-                        Существующая карточка
-                      </label>
-                      {saveLibraryTarget === 'existing' ? (
-                        <>
-                          <label className={styles.saveLibrarySelectLabel}>
-                            Карточка
-                            <select
-                              className={styles.saveLibrarySelect}
-                              value={saveExistingLibraryId === '' ? '' : String(saveExistingLibraryId)}
-                              onChange={(e) =>
-                                setSaveExistingLibraryId(e.target.value === '' ? '' : Number(e.target.value))
-                              }
-                            >
-                              <option value="">— Выберите —</option>
-                              {librarySaveOptions.map((it) => (
-                                <option key={it.id} value={String(it.id)}>
-                                  {it.title}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <div className={styles.saveVersionActions}>
-                            <label className={styles.saveLibraryRadio}>
-                              <input
-                                type="radio"
-                                name="save-ver-mode"
-                                checked={saveVersionAction === 'replace_latest'}
-                                onChange={() => setSaveVersionAction('replace_latest')}
-                              />
-                              Заменить последнюю версию
-                            </label>
-                            <label className={styles.saveLibraryRadio}>
-                              <input
-                                type="radio"
-                                name="save-ver-mode"
-                                checked={saveVersionAction === 'append'}
-                                onChange={() => setSaveVersionAction('append')}
-                              />
-                              Добавить новую версию
-                            </label>
-                          </div>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <div className={styles.actions}>
-                    <button type="button" className={`${styles.primaryAction} btn-primary`} onClick={handleSaveToLibrary}>Сохранить</button>
-                    <button type="button" className="btn-ghost" onClick={() => setShowSaveDialog(false)}>Отмена</button>
-                  </div>
-                </div>
-              )}
-              {versions.length > 1 && (
-                <div className={styles.versionTimeline}>
-                  <div className={styles.versionTimelineHeader}>
-                    <span className={styles.versionTimelineLabel}>Версии</span>
-                    <span className={styles.versionTimelineCount}>{versions.length}</span>
-                    {(() => {
-                      const scores = versions.map((v) => {
-                        const m = ((v as Record<string, unknown>).metrics || {}) as Record<string, unknown>
-                        return Number(m.completeness_score ?? m.quality_score ?? 0)
-                      })
-                      if (scores.length < 2) return null
-                      const max = Math.max(100, ...scores)
-                      const w = 72
-                      const h = 20
-                      const step = w / (scores.length - 1)
-                      const pts = scores.map((s, i) => `${i * step},${h - (s / max) * h}`).join(' ')
-                      return (
-                        <svg className={styles.sparkline} width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-                          <polyline points={pts} fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )
-                    })()}
-                  </div>
-                  <div className={styles.versionPills}>
-                    {([...versions].reverse()).map((item) => {
-                      const v = item as Record<string, unknown>
-                      const m = (v.metrics || {}) as Record<string, unknown>
-                      const score = Number(m.completeness_score ?? m.quality_score ?? 0)
-                      const tok = Number(m.token_estimate ?? 0)
-                      const isCurrent = result?.prompt_block === String(v.final_prompt || '')
-                      const versionTip = `v${String(v.version)} · ${String(v.created_at || '')}${score ? ` · ${score}%` : ''}${tok ? ` · ≈${tok} tok` : ''}`
-                      return (
-                        <ThemedTooltip key={String(v.version)} content={versionTip} side="top" delayMs={240}>
-                          <button
-                            type="button"
-                            className={`${styles.versionPill} ${isCurrent ? styles.versionPillActive : ''}`}
-                            onClick={() =>
-                              setResult((prev) =>
-                                prev && sessionId
-                                  ? mergeSessionVersionIntoResult(prev, v, sessionId)
-                                  : prev,
-                              )
-                            }
-                          >
-                            <span className={styles.versionPillNum}>v{String(v.version)}</span>
-                            {score > 0 && <span className={styles.versionPillScore}>{score}%</span>}
-                          </button>
-                        </ThemedTooltip>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          {result &&
-            result.llm_raw?.trim() &&
-            !result.has_prompt &&
-            (!result.has_questions || !result.questions?.length) && (
-            <div className={styles.rawFallback}>
-              <p className={styles.info}>
-                Ответ модели не удалось разобрать по маркерам [PROMPT] / [QUESTIONS]. Ниже — полный текст; при необходимости скопируйте промпт вручную.
-              </p>
-              <details open>
-                <summary>Текст ответа модели</summary>
-                <div className={styles.preToolbar}>
-                  <CopyIconButton text={result.llm_raw} title="Копировать ответ модели" />
-                </div>
-                <pre className={styles.llmRaw}>{result.llm_raw}</pre>
-              </details>
-            </div>
-          )}
-        </section>
+  const questionsPanel = (
+    <StudioQuestionsWizard
+      result={result}
+      loading={loading}
+      questionCarouselIdx={questionCarouselIdx}
+      setQuestionCarouselIdx={setQuestionCarouselIdx}
+      questionState={questionState}
+      setQuestionState={setQuestionState}
+      questionGenOpts={questionGenOpts}
+      improvementWizardApplyRef={improvementWizardApplyRef}
+      onGenerate={handleGenerate}
+    />
   )
+
+
 
   return (
     <div className={`${styles.home} ${styles.homeFlexFill}`}>
@@ -3032,973 +2149,138 @@ export default function Home() {
             style={{ flex: `${agentSplit} 1 0%`, minWidth: 0 }}
           >
             <div className={styles.agentChatColumn}>
-              <div className={styles.agentChatHeader}>
-                <div className={styles.agentChatHeaderTop}>
-                  <div className={styles.agentHeaderLeft}>
-                    <div className={styles.agentTaskTitleRow}>
-                      <h2 className="pageTitleGradient">{t.studio.taskTitle}</h2>
-                      <div className={styles.promptTypeTabs}>
-                        {(['text', 'image', 'skill'] as const).map((pt) => (
-                          <button
-                            key={pt}
-                            type="button"
-                            className={`${styles.promptTypeTab} ${promptType === pt ? styles.promptTypeTabActive : ''}`}
-                            disabled={loading}
-                            onClick={() => handlePromptTypeChange(pt)}
-                          >
-                            {pt === 'text' ? t.studio.tabText : pt === 'image' ? t.studio.tabImage : t.studio.tabSkill}
-                          </button>
-                        ))}
-                      </div>
-                      <SelectDropdown
-                        value={expertLevel}
-                        options={expertLevelSelectOptions}
-                        onChange={(v) => handleExpertLevelChange(v as ExpertLevel)}
-                        aria-label={t.studio.expertLevelAria}
-                        variant="toolbar"
-                        className={styles.expertLevelSelectWrap}
-                        disabled={loading}
-                        footerLink={{ to: '/help', label: t.studio.helpLevelsFooter }}
-                      />
-                      {useCustomGenModel ? (
-                        <ThemedTooltip
-                          content="Сбросить к модели профиля уровня студии (ниже — сложность Авто/Повседневный/…)"
-                          side="bottom"
-                          delayMs={280}
-                          block
-                        >
-                          <span className={styles.expertLevelModelHint}>
-                            <span className={styles.expertLevelModelShort}>{shortGenerationModelLabel(genModel)}</span>
-                            <button
-                              type="button"
-                              className={styles.expertLevelModelReset}
-                              disabled={loading}
-                              onClick={() => {
-                                setUseCustomGenModel(false)
-                                setGenModel(EXPERT_DEFAULT_GEN_MODEL[expertLevel])
-                              }}
-                            >
-                              {t.studio.resetToProfile}
-                            </button>
-                          </span>
-                        </ThemedTooltip>
-                      ) : null}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.agentNewChatBtn}
-                    disabled={loading}
-                    onClick={resetAgentDialog}
-                  >
-                    {t.studio.newChat}
-                  </button>
-                </div>
-                {taskRefForTitles ? (
-                  <div
-                    className={`${styles.evalStrip} ${styles.taskTextEvalStrip}`}
-                    aria-live="polite"
-                  >
-                    <div className={styles.evalStripLeft}>
-                      {taskTextTokensLoading ? (
-                        <span className={styles.evalMetaSecondary}>…</span>
-                      ) : (
-                        <ThemedTooltip
-                          content="Токены только текста задачи (то, что улучшаем). Без system, без истории чата."
-                          side="bottom"
-                          delayMs={280}
-                        >
-                          <span className={styles.evalMetaSecondary}>
-                            ≈{taskTextTokens ? taskTextTokens.tokens.toLocaleString() : '—'} tok
-                          </span>
-                        </ThemedTooltip>
-                      )}
-                      <ThemedTooltip
-                        content="Размер исходной формулировки задачи; сравните с ≈tok у готового промпта справа"
-                        side="bottom"
-                        delayMs={280}
-                      >
-                        <span className={styles.evalMeta}>{t.studio.taskWord}</span>
-                      </ThemedTooltip>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              {promptType === 'image' && (
-                <div className={styles.imageStyleToolbar}>
-                  <div className={styles.imageStylesOneRow} aria-label="Выбранные стили изображения">
-                    <div className={styles.imageSelectedWrap}>
-                      {imagePromptTags.map((id) => {
-                        const def = IMAGE_STYLES_BY_ID[id]
-                        return (
-                          <ThemedTooltip key={id} content={def?.description ?? id} side="top" delayMs={240}>
-                            <button
-                              type="button"
-                              className={styles.imageSelectedChip}
-                              onClick={() => toggleImageTag(id)}
-                            >
-                              {def?.label ?? id}
-                            </button>
-                          </ThemedTooltip>
-                        )
-                      })}
-                    </div>
-                    <ThemedTooltip content="Открыть каталог стилей" side="bottom" delayMs={240}>
-                      <button
-                        ref={imageStyleMoreBtnRef}
-                        type="button"
-                        className={styles.imageStyleMenuBtn}
-                        aria-label="Каталог стилей изображения"
-                        aria-expanded={imageStylePickerOpen}
-                        aria-haspopup="listbox"
-                        onClick={() => setImageStylePickerOpen((o) => !o)}
-                      >
-                        Стили
-                      </button>
-                    </ThemedTooltip>
-                  </div>
-                  <ThemedTooltip
-                    content="Анализирует сцену и добавляет детали освещения, перспективы и атмосферы перед генерацией промпта. Дороже по токенам, обычно точнее."
-                    side="bottom"
-                    delayMs={280}
-                  >
-                    <button
-                      type="button"
-                      className={`${styles.imageDeepToggle} ${imageDeepMode ? styles.imageDeepToggleOn : ''}`}
-                      aria-pressed={imageDeepMode}
-                      onClick={() => setImageDeepMode((v) => !v)}
-                    >
-                      <span className={styles.imageDeepIcon} aria-hidden>
-                        🔬
-                      </span>
-                      <span className={styles.imageDeepToggleText}>Анализ сцены</span>
-                    </button>
-                  </ThemedTooltip>
-                </div>
-              )}
-              {promptType === 'skill' && chatMessages.length === 0 ? (
-                <div className={styles.skillQuickStart} aria-label="Быстрые шаблоны для скилла">
-                  <span className={styles.skillQuickLabel}>Примеры</span>
-                  <div className={styles.skillQuickChips}>
-                    {[
-                      ['Эксперт по финанализу', 'Скилл: ты — финансовый аналитик. Помогай с метриками и рисками. Формат: кратко, таблицы по запросу.\n\n'],
-                      ['Редактор текстов', 'Скилл: редактор стиля. Улучшай ясность и тон, сохраняй смысл. Отвечай правками и кратким обоснованием.\n\n'],
-                      ['Python-разработчик', 'Скилл: senior Python. Код с типами и тестами, объясняй шаги. Стиль: PEP8, без лишней воды.\n\n'],
-                    ].map(([label, seed]) => (
-                      <button
-                        key={label}
-                        type="button"
-                        className={styles.skillQuickChip}
-                        disabled={loading}
-                        onClick={() => setChatInput(seed)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <StudioAgentChatHeader
+                t={t}
+                promptType={promptType}
+                loading={loading}
+                handlePromptTypeChange={handlePromptTypeChange}
+                expertLevel={expertLevel}
+                expertLevelSelectOptions={expertLevelSelectOptions}
+                handleExpertLevelChange={handleExpertLevelChange}
+                useCustomGenModel={useCustomGenModel}
+                genModel={genModel}
+                shortGenerationModelLabel={shortGenerationModelLabel}
+                setUseCustomGenModel={setUseCustomGenModel}
+                setGenModel={setGenModel}
+                resetAgentDialog={resetAgentDialog}
+                taskRefForTitles={taskRefForTitles}
+                taskTextTokensLoading={taskTextTokensLoading}
+                taskTextTokens={taskTextTokens}
+                imagePromptTags={imagePromptTags}
+                toggleImageTag={toggleImageTag}
+                imageStyleMoreBtnRef={imageStyleMoreBtnRef}
+                imageStylePickerOpen={imageStylePickerOpen}
+                setImageStylePickerOpen={setImageStylePickerOpen}
+                imageDeepMode={imageDeepMode}
+                setImageDeepMode={setImageDeepMode}
+                chatMessages={chatMessages}
+                setChatInput={setChatInput}
+              />
               <div className={styles.agentChatBody}>
-                <div ref={agentChatScrollRef} className={styles.agentChatScroll}>
-                  {chatMessages.map((m) => {
-                    if (m.editPreviewCard) {
-                      const ep = m.editPreviewCard
-                      return (
-                        <div
-                          key={m.id}
-                          className={`${styles.chatBubbleAssistant} ${styles.editPreviewWrap}`}
-                        >
-                          <div className={styles.editPreviewHead}>
-                            <span className={styles.editPreviewTitle}>Превью правки</span>
-                            <ThemedTooltip content={ep.instruction} side="bottom" delayMs={240} block>
-                              <span className={styles.editPreviewInstr}>
-                                {ep.instruction.length > 120 ? `${ep.instruction.slice(0, 120)}…` : ep.instruction}
-                              </span>
-                            </ThemedTooltip>
-                          </div>
-                          {ep.diffOps.length > 0 ? (
-                            <ul className={styles.editPreviewDiff} aria-label="Построчные изменения">
-                              {ep.diffOps.map((row, i) => (
-                                <li
-                                  key={i}
-                                  className={
-                                    row.kind === 'ins'
-                                      ? styles.editPreviewIns
-                                      : row.kind === 'del'
-                                        ? styles.editPreviewDel
-                                        : styles.editPreviewEq
-                                  }
-                                >
-                                  {row.text || ' '}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <pre className={styles.editPreviewMono}>{ep.newPrompt}</pre>
-                          )}
-                          <div className={styles.editPreviewActions}>
-                            <button
-                              type="button"
-                              className={styles.editPreviewApply}
-                              disabled={loading}
-                              onClick={() => void handleEditPreviewApply(m.id, ep.newPrompt)}
-                            >
-                              Применить как новую версию
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.editPreviewCancel}
-                              disabled={loading}
-                              onClick={() => handleEditPreviewCancel(m.id)}
-                            >
-                              Отменить
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    }
-                    if (m.appliedTip) {
-                      return (
-                        <details key={m.id} className={styles.chatBubbleTipApplied}>
-                          <summary className={styles.tipAppliedSummary}>
-                            <span className={styles.tipAppliedLabel}>Совет</span>
-                            <span className={styles.tipAppliedSummaryText}>
-                              Применён совет {m.appliedTip.index}
-                            </span>
-                          </summary>
-                          <div className={styles.tipAppliedBody}>
-                            <StreamedMarkdownOutput source={m.appliedTip.fullText} suspend={false} />
-                          </div>
-                        </details>
-                      )
-                    }
-                    if (m.promptDoneCard) {
-                      const card = m.promptDoneCard
-                      const isOldVersion =
-                        latestVersionInChat > 0 && card.version < latestVersionInChat
-                      return (
-                        <div
-                          key={m.id}
-                          className={`${styles.chatBubbleAssistant} ${styles.promptDoneWrap}`}
-                        >
-                          <div className={styles.promptDoneStatus} role="status">
-                            <span className={styles.promptDoneCheck} aria-hidden>
-                              ✓
-                            </span>
-                            {isOldVersion ? (
-                              <ThemedTooltip content="Вернуться к этой версии промпта" side="top" delayMs={240}>
-                                <button
-                                  type="button"
-                                  className={styles.promptDoneVersionBtn}
-                                  onClick={() =>
-                                    setVersionRestoreConfirm({
-                                      version: card.version,
-                                      prompt: card.promptSnapshot,
-                                    })
-                                  }
-                                >
-                                  v{card.version}
-                                </button>
-                              </ThemedTooltip>
-                            ) : (
-                              <span className={styles.promptDoneVersion}>v{card.version}</span>
-                            )}
-                            <span className={styles.promptDoneSep}>·</span>
-                            <span>{card.completeness}%</span>
-                            {card.tokenEstimate > 0 ? (
-                              <>
-                                <span className={styles.promptDoneSep}>·</span>
-                                <span>≈{card.tokenEstimate.toLocaleString('ru-RU')} tok</span>
-                              </>
-                            ) : null}
-                            <span className={styles.promptDoneSep}>·</span>
-                            <span className={styles.promptDoneTech}>{card.techniquesLabel}</span>
-                          </div>
-                          {card.iterationDiffBase &&
-                          card.iterationDiffBase !== card.promptSnapshot &&
-                          card.promptSnapshot.trim() ? (
-                            <>
-                              <button
-                                type="button"
-                                className={styles.promptDoneDiffToggle}
-                                aria-expanded={promptDoneFullDiffMsgId === m.id}
-                                onClick={() =>
-                                  setPromptDoneFullDiffMsgId((id) => (id === m.id ? null : m.id))
-                                }
-                              >
-                                {promptDoneFullDiffMsgId === m.id ? 'Скрыть полный diff' : 'Полный diff'}
-                              </button>
-                              {promptDoneFullDiffMsgId === m.id ? (
-                                <div className={styles.promptDoneFullDiff}>
-                                  <div className={styles.promptDoneDiffTitle}>
-                                    Текст промпта:{' '}
-                                    {card.diff
-                                      ? `v${card.diff.fromVersion} → v${card.diff.toVersion}`
-                                      : `→ v${card.version}`}
-                                  </div>
-                                  <ul className={styles.editPreviewDiff} aria-label="Полный diff версий">
-                                    {computeRefinedLineDiffOps(
-                                      card.iterationDiffBase,
-                                      card.promptSnapshot,
-                                    ).map((row, i) => (
-                                      <li
-                                        key={i}
-                                        className={
-                                          row.kind === 'ins'
-                                            ? styles.editPreviewIns
-                                            : row.kind === 'del'
-                                              ? styles.editPreviewDel
-                                              : styles.editPreviewEq
-                                        }
-                                      >
-                                        {row.text || ' '}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ) : null}
-                            </>
-                          ) : null}
-                          {card.suggestions.length > 0 ? (
-                            <div
-                              className={styles.promptDoneSuggestionsWrap}
-                              onMouseLeave={() => {
-                                setHoveredPromptSuggestion((prev) =>
-                                  prev?.msgId === m.id ? null : prev,
-                                )
-                              }}
-                            >
-                              <div className={styles.promptDoneActions}>
-                                {card.suggestions.map((s, i) => {
-                                  const tipActive =
-                                    hoveredPromptSuggestion?.msgId === m.id &&
-                                    hoveredPromptSuggestion.index === i
-                                  return (
-                                    <button
-                                      key={`${m.id}-s-${i}`}
-                                      type="button"
-                                      className={`${styles.promptDoneChipCompact} ${
-                                        tipActive ? styles.promptDoneChipCompactActive : ''
-                                      }`}
-                                      disabled={loading || !result?.prompt_block?.trim()}
-                                      aria-describedby={
-                                        tipActive ? `${m.id}-tip-preview` : undefined
-                                      }
-                                      onMouseEnter={() =>
-                                        setHoveredPromptSuggestion({ msgId: m.id, index: i })
-                                      }
-                                      onClick={() => {
-                                        const text = s.fullText.trim()
-                                        if (!text || loading || !result?.prompt_block?.trim()) return
-                                        setHoveredPromptSuggestion(null)
-                                        const tipMsg: GenChatMsg = {
-                                          id: crypto.randomUUID(),
-                                          role: 'assistant',
-                                          content: '',
-                                          appliedTip: { index: i + 1, fullText: text },
-                                        }
-                                        void handleGenerate(undefined, {
-                                          forceIteration: true,
-                                          feedbackOverride: text,
-                                          chatAppendBeforeResult: [tipMsg],
-                                        })
-                                      }}
-                                    >
-                                      Совет {i + 1}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                              {hoveredPromptSuggestion?.msgId === m.id &&
-                              card.suggestions[hoveredPromptSuggestion.index] ? (
-                                <div
-                                  id={`${m.id}-tip-preview`}
-                                  className={styles.promptDoneTipPreview}
-                                  role="note"
-                                >
-                                  {card.suggestions[hoveredPromptSuggestion.index].fullText}
-                                </div>
-                              ) : null}
-                            </div>
-                          ) : null}
-                          {card.diff?.rows.length ? (
-                            <div className={styles.promptDoneDiff}>
-                              <div className={styles.promptDoneDiffTitle}>
-                                Что изменилось (v{card.diff.fromVersion} → v{card.diff.toVersion})
-                              </div>
-                              <ul className={styles.promptDoneDiffList}>
-                                {card.diff.rows.map((row, i) => (
-                                  <li
-                                    key={i}
-                                    className={
-                                      row.kind === 'add'
-                                        ? styles.promptDoneDiffAdd
-                                        : row.kind === 'rm'
-                                          ? styles.promptDoneDiffRm
-                                          : styles.promptDoneDiffChg
-                                    }
-                                  >
-                                    {row.text}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-                          {promptType === 'skill' ? (
-                            <div className={styles.skillDoneBar}>
-                              <button
-                                type="button"
-                                className={styles.skillSandboxOpenBtn}
-                                disabled={loading || !result?.prompt_block?.trim()}
-                                onClick={() => {
-                                  setSkillSandboxLog([])
-                                  setSkillSandboxInput('')
-                                  setSkillSandboxOpen(true)
-                                }}
-                              >
-                                Песочница
-                              </button>
-                            </div>
-                          ) : null}
-                          {card.skillTestCases && card.skillTestCases.length > 0 ? (
-                            <details className={styles.skillTestAccordion}>
-                              <summary className={styles.skillTestSummary}>
-                                Тест-кейсы ({card.skillTestCases.length})
-                                {skillTestRunning ? (
-                                  <span className={styles.skillTestRunning}> — проверка…</span>
-                                ) : null}
-                              </summary>
-                              <div className={styles.skillTestBody}>
-                                <ol className={styles.skillTestList}>
-                                  {card.skillTestCases.map((tc, idx) => (
-                                    <li key={idx}>
-                                      <div className={styles.skillTestUser}>{tc.user}</div>
-                                      <div className={styles.skillTestExpect}>
-                                        Ожидается подстрока: <code>{tc.expect_substring}</code>
-                                      </div>
-                                      {skillTestResults[idx] ? (
-                                        <span
-                                          className={
-                                            skillTestResults[idx] === 'pass'
-                                              ? styles.skillTestPass
-                                              : styles.skillTestFail
-                                          }
-                                        >
-                                          {skillTestResults[idx] === 'pass' ? 'OK' : 'Нет вхождения'}
-                                        </span>
-                                      ) : null}
-                                    </li>
-                                  ))}
-                                </ol>
-                                <button
-                                  type="button"
-                                  className={styles.skillTestRunAll}
-                                  disabled={
-                                    skillTestRunning || loading || !result?.prompt_block?.trim()
-                                  }
-                                  onClick={() => void runSkillTestCases(card.skillTestCases!)}
-                                >
-                                  Запустить все
-                                </button>
-                              </div>
-                            </details>
-                          ) : null}
-                        </div>
-                      )
-                    }
-                    if (m.role === 'assistant' && m.routerClarification) {
-                      const rc = m.routerClarification
-                      return (
-                        <div
-                          key={m.id}
-                          className={`${styles.chatBubbleAssistant} ${styles.chatBubbleClarify}`}
-                        >
-                          <StreamedMarkdownOutput source={m.content} suspend={false} />
-                          {rc.reason ? <p className={styles.routerClarifyReason}>— {rc.reason}</p> : null}
-                          <button
-                            type="button"
-                            className={styles.routerClarifyContinue}
-                            disabled={loading}
-                            onClick={() => prePromptForceContinue(rc.pendingUserText, rc.routerLogId)}
-                          >
-                            Продолжить без уточнения
-                          </button>
-                        </div>
-                      )
-                    }
-                    const isThinking = m.role === 'assistant' && m.content.startsWith('__thinking__\n')
-                    const displayContent = isThinking ? m.content.slice('__thinking__\n'.length) : m.content
-                    if (isThinking) {
-                      const firstLine = displayContent.split('\n')[0] || 'Анализ задачи'
-                      return (
-                        <details key={m.id} className={styles.chatBubbleThinking}>
-                          <summary className={styles.thinkingSummary}>
-                            <span className={styles.thinkingLabel}>Размышления</span>
-                            <span className={styles.thinkingSummaryText}>{firstLine.replace(/\*\*/g, '')}</span>
-                          </summary>
-                          <div className={styles.thinkingBody}>
-                            <StreamedMarkdownOutput source={displayContent} suspend={false} />
-                          </div>
-                        </details>
-                      )
-                    }
-                    return (
-                      <div
-                        key={m.id}
-                        className={m.role === 'user' ? styles.chatBubbleUser : styles.chatBubbleAssistant}
-                      >
-                        <StreamedMarkdownOutput source={displayContent} suspend={m.role === 'user'} />
-                        {m.role === 'assistant' && m.clarificationQA !== undefined ? (
-                          <details className={styles.clarificationRecap}>
-                            <summary>Показать вопросы и ответы</summary>
-                            <div className={styles.clarificationRecapBody}>
-                              {m.clarificationQA.length === 0 ? (
-                                <p className={styles.clarificationRecapEmpty}>Ответы не выбраны — учтена только ваша формулировка задачи.</p>
-                              ) : (
-                                <ol className={styles.clarificationRecapList}>
-                                  {m.clarificationQA.map((row, i) => (
-                                    <li key={i}>
-                                      <div className={styles.clarificationQ}>{row.question}</div>
-                                      <div className={styles.clarificationA}>
-                                        {row.answers.length ? row.answers.join('; ') : '—'}
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ol>
-                              )}
-                            </div>
-                          </details>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                  {loading && (
-                    <div className={styles.agentThinking} aria-live="polite">
-                      <span className={styles.agentThinkingDots} aria-hidden="true">
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <span key={i} className={styles.agentThinkingDot} />
-                        ))}
-                      </span>
-                      <span className={styles.agentThinkingText}>
-                        {thinkingStreamText || '\u2026'}
-                      </span>
-                    </div>
-                  )}
-                  {error && <p className={styles.error}>{error}</p>}
+                <div
+                  ref={agentChatScrollRef}
+                  className={styles.agentChatScroll}
+                  aria-live="polite"
+                  aria-relevant="additions"
+                >
+                  <StudioAgentChatMessageList
+                    chatMessages={chatMessages}
+                    loading={loading}
+                    error={error}
+                    thinkingStreamText={thinkingStreamText}
+                    latestVersionInChat={latestVersionInChat}
+                    promptDoneFullDiffMsgId={promptDoneFullDiffMsgId}
+                    setPromptDoneFullDiffMsgId={setPromptDoneFullDiffMsgId}
+                    handleEditPreviewApply={handleEditPreviewApply}
+                    handleEditPreviewCancel={handleEditPreviewCancel}
+                    setVersionRestoreConfirm={setVersionRestoreConfirm}
+                    hoveredPromptSuggestion={hoveredPromptSuggestion}
+                    setHoveredPromptSuggestion={setHoveredPromptSuggestion}
+                    handleGenerate={handleGenerate}
+                    result={result}
+                    promptType={promptType}
+                    setSkillSandboxLog={setSkillSandboxLog}
+                    setSkillSandboxInput={setSkillSandboxInput}
+                    setSkillSandboxOpen={setSkillSandboxOpen}
+                    skillTestRunning={skillTestRunning}
+                    skillTestResults={skillTestResults}
+                    runSkillTestCases={runSkillTestCases}
+                    prePromptForceContinue={prePromptForceContinue}
+                  />
                 </div>
               </div>
-              <div
-                className={`${styles.agentChatComposerHost} ${
-                  result?.has_questions && !result?.has_prompt ? styles.agentComposerWithWizard : ''
-                }`}
-              >
-                {result?.has_prompt && suggestedActions.length > 0 && !loading && (
-                  <div className={styles.suggestedActionsBar} role="region" aria-label="Подсказки">
-                    <div
-                      className={`${styles.suggestedActionsBarInner} ${
-                        suggestionsBarExpanded ? styles.suggestedActionsBarInnerExpanded : styles.suggestedActionsBarInnerCollapsed
-                      }`}
-                    >
-                      {(suggestionsBarExpanded ? suggestedActions : suggestedActions.slice(0, 3)).map((a) => (
-                        <button
-                          key={a.id}
-                          type="button"
-                          className={styles.suggestedActionChip}
-                          onClick={() => void handleSuggestedActionClick(a)}
-                        >
-                          {a.emoji ? <span className={styles.suggestedActionEmoji}>{a.emoji}</span> : null}
-                          <span>{a.title}</span>
-                        </button>
-                      ))}
-                      {suggestedActions.length > 3 ? (
-                        <button
-                          type="button"
-                          className={styles.suggestedActionsMore}
-                          onClick={() => setSuggestionsBarExpanded((v) => !v)}
-                        >
-                          {suggestionsBarExpanded ? 'Свернуть' : 'Ещё…'}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-                {result?.has_questions && !result?.has_prompt && (
-                  <details
-                    className={`${styles.agentWizardInComposer} ${styles.agentWizardDetails}`}
-                    open={questionFollowupOpen}
-                    onToggle={(e) => setQuestionFollowupOpen(e.currentTarget.open)}
-                  >
-                    <summary className={styles.agentWizardSummary}>
-                      <span>Уточняющие вопросы</span>
-                      {loading ? (
-                        <span className={styles.agentWizardSummaryMeta}>Генерация…</span>
-                      ) : null}
-                    </summary>
-                    <div className={styles.agentWizardDetailsBody}>{renderQuestionsPanel()}</div>
-                  </details>
-                )}
-              <div
-                className={`${cb.composer} ${
-                  result?.has_questions && !result?.has_prompt ? styles.agentComposerShellMerged : ''
-                }`}
-              >
-                <AutoTextarea
-                  className={cb.composerTextarea}
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      if (!loading && chatInput.trim()) handleAgentSend()
-                    }
-                  }}
-                  placeholder={agentChatPlaceholder}
-                  minHeightPx={result?.has_questions && !result?.has_prompt ? 52 : 72}
-                  maxHeightPx={280}
-                  spellCheck
-                />
-                <div className={cb.composerFooter}>
-                  <div className={cb.composerFooterRow}>
-                    <div className={cb.composerFooterMid}>
-                      <ThemedTooltip
-                        content={`Ориентир по профилю «${activeLevelBundle.label}»: фактические токены и цена зависят от модели и длины.`}
-                        side="top"
-                        delayMs={280}
-                        block
-                      >
-                        <span className={styles.studioCostHint}>
-                          {activeLevelBundle.estimatedCalls} вызов(ов) · {activeLevelBundle.estimatedCostHint}
-                        </span>
-                      </ThemedTooltip>
-                      <TierSelector
-                        value={tier}
-                        onChange={(t) => {
-                          setTier(t)
-                          if (t !== 'custom') setUseCustomGenModel(false)
-                        }}
-                        disabled={loading}
-                      />
-                      {tier === 'custom' ? (
-                        <ThemedTooltip
-                          content="Эта модель думает сама — упрощённый промпт даст лучший результат"
-                          side="top"
-                          delayMs={280}
-                          disabled={!isReasoningModelId(genModel)}
-                          block
-                          className={styles.genModelWrap}
-                        >
-                          <SelectDropdown
-                            value={genModel}
-                            options={genModelSelectOptions}
-                            onChange={(v) => {
-                              setUseCustomGenModel(true)
-                              setGenModel(v)
-                            }}
-                            aria-label="Модель генерации"
-                            variant="composer"
-                            disabled={loading}
-                            footerLink={{ to: '/models', label: 'Добавить модель' }}
-                          />
-                        </ThemedTooltip>
-                      ) : null}
-                      <WorkspacePicker
-                        workspaces={workspaces}
-                        workspaceId={workspaceId}
-                        onSelect={setWorkspaceId}
-                        workspacesReady={workspacesReady}
-                      />
-                      {promptType === 'image' ? (
-                        <SelectDropdown
-                          value={imagePresetId}
-                          options={imagePresetSelectOptions}
-                          onChange={setImagePresetId}
-                          aria-label="Пресет стиля для изображения"
-                          variant="composer"
-                          disabled={loading}
-                          footerLink={{ to: '/library?tab=presets', label: 'Создать пресет…' }}
-                        />
-                      ) : promptType === 'skill' ? (
-                        <>
-                          <SelectDropdown
-                            value={skillPresetId}
-                            options={skillPresetSelectOptions}
-                            onChange={setSkillPresetId}
-                            aria-label="Пресет для генерации скилла"
-                            variant="composer"
-                            disabled={loading}
-                            footerLink={{ to: '/library?tab=presets', label: 'Создать пресет…' }}
-                          />
-                          <SelectDropdown
-                            value={skillTargetEnv}
-                            options={skillTargetEnvSelectOptions}
-                            onChange={setSkillTargetEnv}
-                            aria-label="Среда для скилла"
-                            variant="composer"
-                            disabled={loading}
-                          />
-                          <SelectDropdown
-                            value={targetModel}
-                            options={targetModelSelectOptions}
-                            onChange={setTargetModel}
-                            aria-label="Целевая модель или среда для скилла"
-                            variant="composer"
-                            disabled={loading}
-                            footerLink={{ to: '/models', label: 'Каталог моделей' }}
-                            triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
-                            triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
-                          />
-                        </>
-                      ) : (
-                        <SelectDropdown
-                          value={targetModel}
-                          options={targetModelSelectOptions}
-                          onChange={setTargetModel}
-                          aria-label="Модель, для которой пишется промпт"
-                          variant="composer"
-                          disabled={loading}
-                          footerLink={{ to: '/models', label: 'Каталог моделей' }}
-                          triggerContent={targetModel === 'unknown' ? <IconGlobe /> : undefined}
-                          triggerClassName={targetModel === 'unknown' ? styles.targetTriggerIconOnly : ''}
-                        />
-                      )}
-                      <span className={styles.techModeMicroWrap}>
-                        <ThemedTooltip
-                          content={
-                            techniqueMode === 'auto'
-                              ? 'Техники: авто — нажмите для выбора вручную'
-                              : 'Техники: вручную — нажмите для авто'
-                          }
-                          side="top"
-                          delayMs={240}
-                        >
-                          <button
-                            type="button"
-                            className={styles.techModeMicro}
-                            aria-label={techniqueMode === 'auto' ? 'Режим техник: авто' : 'Режим техник: вручную'}
-                            aria-pressed={techniqueMode === 'manual'}
-                            disabled={loading}
-                            onClick={() => {
-                              if (
-                                expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
-                                techniqueMode === 'manual' &&
-                                manualTechPickerCollapsed
-                              ) {
-                                setManualTechPickerCollapsed(false)
-                                return
-                              }
-                              setTechniqueMode((m) => (m === 'auto' ? 'manual' : 'auto'))
-                            }}
-                          >
-                            {techniqueMode === 'auto' ? 'A' : '✎'}
-                          </button>
-                        </ThemedTooltip>
-                        {expertLevelUsesManualTechniqueHint(expertLevel, promptType) &&
-                        techniqueMode === 'manual' &&
-                        manualTechPickerCollapsed &&
-                        !manualTechHintDismissed ? (
-                          <span
-                            className={styles.seniorTechHintBubble}
-                            role="status"
-                            onMouseEnter={() => setManualTechHintDismissed(true)}
-                          >
-                            Укажите техники
-                          </span>
-                        ) : null}
-                      </span>
-                      <button
-                        type="button"
-                        className={cb.composerGhostBtn}
-                        disabled={loading}
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                      >
-                        {showAdvanced ? 'Меньше' : 'Доп.'}
-                      </button>
-                    </div>
-                    <div className={cb.composerFooterEnd}>
-                      <ThemedTooltip content="Отправить в чат" side="left" delayMs={240}>
-                        <button
-                          type="button"
-                          className={cb.composerSend}
-                          onClick={handleAgentSend}
-                          disabled={!chatInput.trim() || loading}
-                          aria-label="Отправить в чат"
-                        >
-                          {loading ? <span className={cb.composerSendSpinner} aria-hidden /> : <span aria-hidden>↑</span>}
-                        </button>
-                      </ThemedTooltip>
-                    </div>
-                  </div>
-                </div>
-                {techniqueMode === 'manual' &&
-                  (!expertLevelUsesManualTechniqueHint(expertLevel, promptType) || !manualTechPickerCollapsed) && (
-                  <div className={`${cb.composerInset} ${styles.techPickerInset}`}>
-                    <input
-                      type="search"
-                      className={styles.techMenuSearch}
-                      placeholder="Поиск по названию или id…"
-                      value={techMenuFilter}
-                      onChange={(e) => setTechMenuFilter(e.target.value)}
-                      aria-label="Фильтр списка техник"
-                    />
-                    <div className={styles.techPickerInlineList} role="listbox" aria-label="Техники для генерации">
-                      {techniques
-                        .filter((t) => {
-                          const q = techMenuFilter.trim().toLowerCase()
-                          if (!q) return true
-                          return t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
-                        })
-                        .map((t) => {
-                          const on = manualTechs.includes(t.id)
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              role="option"
-                              aria-selected={on}
-                              className={`${menuStyles.menuItem} ${on ? menuStyles.menuItemActive : ''}`}
-                              onClick={() => {
-                                setManualTechs((prev) =>
-                                  prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                                )
-                              }}
-                            >
-                              <span className={styles.techMenuCheck} aria-hidden>
-                                {on ? '\u2713 ' : '\u2003'}
-                              </span>
-                              {t.name}
-                            </button>
-                          )
-                        })}
-                    </div>
-                  </div>
-                )}
-                {showAdvanced && (
-                  <div className={cb.composerInset}>
-                    <div className={styles.advancedInline}>
-                      <label className={styles.advancedInlineField}>
-                        Т° {clampExpertGenerationTemperature(temperature)}
-                        <ThemedTooltip
-                          content="Потолок температуры для стабильного блока [PROMPT]"
-                          side="top"
-                          delayMs={240}
-                        >
-                          <span style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-                            <input
-                              type="range"
-                              min={0.1}
-                              max={EXPERT_GENERATION_TEMPERATURE_CAP}
-                              step={0.05}
-                              value={clampExpertGenerationTemperature(temperature)}
-                              disabled={loading}
-                              onChange={(e) =>
-                                setTemperature(clampExpertGenerationTemperature(parseFloat(e.target.value)))
-                              }
-                            />
-                          </span>
-                        </ThemedTooltip>
-                      </label>
-                      <label className={styles.advancedInlineField}>
-                        Top-P {topP.toFixed(2)}
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={topP}
-                          disabled={loading}
-                          onChange={(e) => setTopP(parseFloat(e.target.value))}
-                        />
-                      </label>
-                      <label className={styles.advancedInlineField}>
-                        Top-K
-                        <input
-                          type="number"
-                          value={topK}
-                          disabled={loading}
-                          onChange={(e) => setTopK(e.target.value ? Number(e.target.value) : '')}
-                          className={styles.topKInput}
-                        />
-                      </label>
-                      <label className={styles.questionsCompact}>
-                        <input
-                          type="checkbox"
-                          checked={questionsMode}
-                          disabled={loading}
-                          onChange={(e) => setQuestionsMode(e.target.checked)}
-                        />
-                        <span>Вопросы</span>
-                      </label>
-                    </div>
-                    <div className={styles.advancedSkillBodyBlock}>
-                      <span className={styles.advancedSkillBodyTop}>
-                        <span className={styles.advancedSkillBodyLabel}>Контекст скилла (опционально)</span>
-                        {localSkillsForPicker.length > 0 ? (
-                          <>
-                            <button
-                              ref={skillInsertBtnRef}
-                              type="button"
-                              className={styles.skillInsertFromLibBtn}
-                              onClick={() => setSkillInsertOpen((o) => !o)}
-                              aria-expanded={skillInsertOpen}
-                              aria-haspopup="listbox"
-                            >
-                              Из библиотеки
-                            </button>
-                            <PortalDropdown
-                              open={skillInsertOpen}
-                              onClose={() => setSkillInsertOpen(false)}
-                              anchorRef={skillInsertBtnRef}
-                              minWidth={260}
-                              align="right"
-                            >
-                              {localSkillsForPicker.map((s) => (
-                                <ThemedTooltip
-                                  key={s.id}
-                                  content={s.description || s.title}
-                                  side="right"
-                                  delayMs={200}
-                                  block
-                                >
-                                  <button
-                                    type="button"
-                                    role="option"
-                                    className={menuStyles.menuItem}
-                                    onClick={() => {
-                                      setSkillBody((prev) => {
-                                        const next = (prev || '').trim()
-                                        const block = (s.body || '').trim()
-                                        if (!block) return prev
-                                        if (!next) return block
-                                        return `${next}\n\n---\n${s.title}\n\n${block}`
-                                      })
-                                      setSkillInsertOpen(false)
-                                    }}
-                                  >
-                                    {s.title}
-                                  </button>
-                                </ThemedTooltip>
-                              ))}
-                            </PortalDropdown>
-                          </>
-                        ) : null}
-                      </span>
-                      <span className={styles.advancedSkillBodyHint}>
-                        Уходит в запрос как skill_body — контекст для генерации промпта.
-                      </span>
-                      <AutoTextarea
-                        className={styles.advancedSkillBodyTextarea}
-                        value={skillBody}
-                        onChange={(e) => setSkillBody(e.target.value)}
-                        placeholder="Текст скилла или инструкции…"
-                        minHeightPx={44}
-                        maxHeightPx={140}
-                        spellCheck
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              </div>
+              <StudioAgentComposer
+                result={result}
+                loading={loading}
+                suggestedActions={suggestedActions}
+                suggestionsBarExpanded={suggestionsBarExpanded}
+                setSuggestionsBarExpanded={setSuggestionsBarExpanded}
+                handleSuggestedActionClick={handleSuggestedActionClick}
+                questionFollowupOpen={questionFollowupOpen}
+                setQuestionFollowupOpen={setQuestionFollowupOpen}
+                questionsPanel={questionsPanel}
+                chatInput={chatInput}
+                setChatInput={setChatInput}
+                handleAgentSend={handleAgentSend}
+                agentChatPlaceholder={agentChatPlaceholder}
+                showSeedExample={showSeedExample}
+                onLoadSeedExample={(task) => {
+                  setChatInput(task)
+                  setTaskInput(task)
+                }}
+                activeLevelBundle={activeLevelBundle}
+                tier={tier}
+                setTier={setTier}
+                setUseCustomGenModel={setUseCustomGenModel}
+                genModel={genModel}
+                genModelSelectOptions={genModelSelectOptions}
+                setGenModel={setGenModel}
+                workspaces={workspaces}
+                workspaceId={workspaceId}
+                setWorkspaceId={setWorkspaceId}
+                workspacesReady={workspacesReady}
+                promptType={promptType}
+                imagePresetId={imagePresetId}
+                imagePresetSelectOptions={imagePresetSelectOptions}
+                setImagePresetId={setImagePresetId}
+                skillPresetId={skillPresetId}
+                skillPresetSelectOptions={skillPresetSelectOptions}
+                setSkillPresetId={setSkillPresetId}
+                skillTargetEnv={skillTargetEnv}
+                skillTargetEnvSelectOptions={skillTargetEnvSelectOptions}
+                setSkillTargetEnv={setSkillTargetEnv}
+                targetModel={targetModel}
+                targetModelSelectOptions={targetModelSelectOptions}
+                setTargetModel={setTargetModel}
+                techniqueMode={techniqueMode}
+                setTechniqueMode={setTechniqueMode}
+                expertLevel={expertLevel}
+                manualTechPickerCollapsed={manualTechPickerCollapsed}
+                setManualTechPickerCollapsed={setManualTechPickerCollapsed}
+                manualTechHintDismissed={manualTechHintDismissed}
+                setManualTechHintDismissed={setManualTechHintDismissed}
+                showAdvanced={showAdvanced}
+                setShowAdvanced={setShowAdvanced}
+                techniques={techniques}
+                techMenuFilter={techMenuFilter}
+                setTechMenuFilter={setTechMenuFilter}
+                manualTechs={manualTechs}
+                setManualTechs={setManualTechs}
+                temperature={temperature}
+                setTemperature={setTemperature}
+                topP={topP}
+                setTopP={setTopP}
+                topK={topK}
+                setTopK={setTopK}
+                questionsMode={questionsMode}
+                setQuestionsMode={setQuestionsMode}
+                skillBody={skillBody}
+                setSkillBody={setSkillBody}
+                localSkillsForPicker={localSkillsForPicker}
+                skillInsertOpen={skillInsertOpen}
+                setSkillInsertOpen={setSkillInsertOpen}
+                skillInsertBtnRef={skillInsertBtnRef}
+              />
             </div>
           </div>
           <div
@@ -4012,7 +2294,56 @@ export default function Home() {
             className={`${styles.splitPane} ${styles.splitPaneAgentRight}`}
             style={{ flex: `${1 - agentSplit} 1 0%`, minWidth: 0, overflow: 'auto' }}
           >
-            {resultSection}
+            <StudioResultPanel
+              promptType={promptType}
+              result={result}
+              error={error}
+              loading={loading}
+              issueBannerDismissed={issueBannerDismissed}
+              setIssueBannerDismissed={setIssueBannerDismissed}
+              handleRetryGeneration={handleRetryGeneration}
+              streamedPromptIde={streamedPromptIde}
+              tokenEstimate={tokenEstimate}
+              promptCostStr={promptCostStr}
+              navigate={navigate}
+              taskInput={taskInput}
+              taskRefForTitles={taskRefForTitles}
+              setChatInput={setChatInput}
+              showSaveDialog={showSaveDialog}
+              setShowSaveDialog={setShowSaveDialog}
+              saveTitle={saveTitle}
+              setSaveTitle={setSaveTitle}
+              saveTags={saveTags}
+              setSaveTags={setSaveTags}
+              saveNotes={saveNotes}
+              setSaveNotes={setSaveNotes}
+              saveLibraryTarget={saveLibraryTarget}
+              setSaveLibraryTarget={setSaveLibraryTarget}
+              saveExistingLibraryId={saveExistingLibraryId}
+              setSaveExistingLibraryId={setSaveExistingLibraryId}
+              saveVersionAction={saveVersionAction}
+              setSaveVersionAction={setSaveVersionAction}
+              librarySaveOptions={librarySaveOptions}
+              handleSaveToLibrary={handleSaveToLibrary}
+              handleQuickSave={handleQuickSave}
+              versions={versions}
+              sessionId={sessionId}
+              setResult={setResult}
+              mergeSessionVersionIntoResult={mergeSessionVersionIntoResult}
+              imageTryDataUrl={imageTryDataUrl}
+              imageTryBusy={imageTryBusy}
+              runImageTryNano={runImageTryNano}
+              llmReviewBusy={llmReviewBusy}
+              runLlmReview={runLlmReview}
+              setPublishCommunityOpen={setPublishCommunityOpen}
+              publishCommunityHintVisible={publishCommunityHintVisible}
+              setPublishCommunityHintVisible={setPublishCommunityHintVisible}
+              quickSaved={quickSaved}
+              pickPromptTitle={pickPromptTitle}
+              setPromptPlaygroundLog={setPromptPlaygroundLog}
+              setPromptPlaygroundInput={setPromptPlaygroundInput}
+              setPromptPlaygroundOpen={setPromptPlaygroundOpen}
+            />
           </div>
         </div>
       <PublishToCommunityModal
@@ -4031,371 +2362,49 @@ export default function Home() {
         favoriteIds={imageStyleFavorites}
         onToggleFavorite={toggleImageStyleFavorite}
       />
-      {llmReviewOpen
-        ? createPortal(
-            <div className={styles.llmReviewDockLayer} role="presentation">
-              <div
-                className={`${styles.llmReviewDockCard}${llmReviewMaximized ? ` ${styles.llmReviewDockCardMaximized}` : ''}`}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="llm-review-dock-title"
-              >
-                <div className={styles.llmReviewDockHead}>
-                  <div className={styles.llmReviewDockTitleRow}>
-                    <h3 id="llm-review-dock-title" className={styles.llmReviewDockTitle}>
-                      Оценка промпта (LLM)
-                    </h3>
-                    <ThemedTooltip content={LLM_REVIEW_DOCK_HELP} side="top" delayMs={280}>
-                      <button
-                        type="button"
-                        className={styles.llmReviewDockHelpMark}
-                        aria-label={`Справка: ${LLM_REVIEW_DOCK_HELP}`}
-                      >
-                        ?
-                      </button>
-                    </ThemedTooltip>
-                  </div>
-                  <div className={styles.llmReviewDockHeadTools}>
-                    <ThemedTooltip
-                      content={
-                        llmReviewMaximized ? 'Обычный размер окна' : 'Развернуть на весь экран'
-                      }
-                      side="bottom"
-                      delayMs={200}
-                    >
-                      <button
-                        type="button"
-                        className={styles.llmReviewDockIconBtn}
-                        onClick={() => setLlmReviewMaximized((m) => !m)}
-                        aria-label={
-                          llmReviewMaximized ? 'Обычный размер окна' : 'Развернуть на весь экран'
-                        }
-                      >
-                        {llmReviewMaximized ? <LlmReviewIconRestore /> : <LlmReviewIconMaximize />}
-                      </button>
-                    </ThemedTooltip>
-                    <ThemedTooltip content="Закрыть" side="bottom" delayMs={200}>
-                      <button
-                        type="button"
-                        className={styles.llmReviewDockClose}
-                        onClick={() => {
-                          setLlmReviewMaximized(false)
-                          setLlmReviewOpen(false)
-                        }}
-                        aria-label="Закрыть"
-                      >
-                        <LlmReviewIconClose />
-                      </button>
-                    </ThemedTooltip>
-                  </div>
-                </div>
-                <div className={styles.llmReviewDockMeta}>
-                  <span className={styles.llmReviewDockMetaMain}>
-                    {llmReviewBusy
-                      ? llmReviewThinkingLine || 'Запрос…'
-                      : llmReviewModel
-                        ? `${llmReviewModel}${llmReviewFromCache ? ' · из кэша' : ''}`
-                        : '—'}
-                  </span>
-                </div>
-                <div className={styles.llmReviewDockGrow}>
-                  <div className={styles.llmReviewDockScroll}>
-                    {llmReviewBusy ? (
-                      <div className={styles.auxThinkingLine} aria-live="polite">
-                        <span className={styles.auxThinkingDots} aria-hidden>
-                          <span />
-                          <span />
-                          <span />
-                        </span>
-                        <span>{llmReviewThinkingLine || 'Запрос к судье…'}</span>
-                      </div>
-                    ) : (
-                      <MarkdownOutput>{streamedLlmReviewBody || (llmReviewBusy ? '' : '—')}</MarkdownOutput>
-                    )}
-                  </div>
-                  {!llmReviewBusy && llmReviewHints.length > 0 && !llmReviewText.startsWith('Ошибка:') ? (
-                    <div className={styles.llmReviewHintsShell}>
-                      <div className={styles.llmReviewHintsBar}>
-                        <button
-                          type="button"
-                          className={styles.llmReviewHintsToggle}
-                          aria-expanded={llmReviewHintsOpen}
-                          onClick={() => setLlmReviewHintsOpen((o) => !o)}
-                        >
-                          Быстрые шаги ({llmReviewHints.length})
-                          <span className={styles.llmReviewHintsToggleChev}>{llmReviewHintsOpen ? ' ▲' : ' ▼'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.llmReviewHintsAllBtn}
-                          disabled={loading}
-                          onClick={() => {
-                            const body = llmReviewHints.map((t, i) => `${i + 1}. ${t}`).join('\n')
-                            setChatInput(`Учти по очереди советы судьи:\n${body}`)
-                            setLlmReviewOpen(false)
-                          }}
-                        >
-                          Всё в чат
-                        </button>
-                      </div>
-                      {llmReviewHintsOpen ? (
-                        <div className={styles.llmReviewHintsBox}>
-                          <ul className={styles.llmReviewHintsList}>
-                            {llmReviewHints.map((tip, idx) => (
-                              <li key={idx} className={styles.llmReviewHintRow}>
-                                <span className={styles.llmReviewHintText}>{tip}</span>
-                                <button
-                                  type="button"
-                                  className={styles.llmReviewHintBtn}
-                                  disabled={loading}
-                                  onClick={() => {
-                                    setChatInput(`Учти совет судьи: ${tip}`)
-                                    setLlmReviewOpen(false)
-                                  }}
-                                >
-                                  В чат
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-                {!llmReviewBusy && llmReviewText && !llmReviewText.startsWith('Ошибка:') ? (
-                  <div className={styles.llmReviewDockActions}>
-                    <button type="button" className={styles.ideModalBtn} onClick={() => void runLlmReview(true)}>
-                      Свежая оценка (ещё один запрос)
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-      {versionRestoreConfirm ? (
-        <div
-          className={styles.versionRestoreBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="version-restore-title"
-        >
-          <div className={styles.versionRestoreBox}>
-            <h3 id="version-restore-title" className={styles.versionRestoreTitle}>
-              Перейти к версии v{versionRestoreConfirm.version}?
-            </h3>
-            <p className={styles.versionRestoreText}>
-              Текст промпта справа заменится на сохранённую версию из чата. Продолжить?
-            </p>
-            <div className={styles.versionRestoreActions}>
-              <button
-                type="button"
-                className={`${styles.primaryAction} btn-primary`}
-                onClick={() => {
-                  const { version: ver, prompt: snap } = versionRestoreConfirm
-                  const row = versions.find(
-                    (it) => Number((it as Record<string, unknown>).version) === ver,
-                  ) as Record<string, unknown> | undefined
-                  const sid = (sessionId || result?.session_id || '').trim()
-                  setResult((prev) => {
-                    if (!prev) return prev
-                    if (row && sid) return mergeSessionVersionIntoResult(prev, row, sid)
-                    return { ...prev, prompt_block: snap }
-                  })
-                  setVersionRestoreConfirm(null)
-                }}
-              >
-                Да, перейти
-              </button>
-              <button type="button" className="btn-ghost" onClick={() => setVersionRestoreConfirm(null)}>
-                Отмена
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {promptPlaygroundOpen
-        ? createPortal(
-            <div className={styles.skillSandboxBackdrop} role="presentation">
-              <div
-                className={`${styles.skillSandboxModal} ${styles.skillSandboxModalPrompt}`}
-                role="dialog"
-                aria-modal="true"
-                aria-label="Песочница промпта"
-              >
-                <div className={styles.skillSandboxHead}>
-                  <h3 className={styles.skillSandboxTitle}>Песочница промпта</h3>
-                  <button
-                    type="button"
-                    className={styles.skillSandboxClose}
-                    disabled={promptPlaygroundBusy}
-                    onClick={() => setPromptPlaygroundOpen(false)}
-                  >
-                    ×
-                  </button>
-                </div>
-                <p className={styles.skillSandboxHint}>Системный контекст = текущий промпт справа.</p>
-                <div className={styles.skillSandboxLog}>
-                  {promptPlaygroundBusy && promptPlaygroundThinkingLine ? (
-                    <div className={styles.auxThinkingLine} aria-live="polite">
-                      <span className={styles.auxThinkingDots} aria-hidden>
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                      <span>{promptPlaygroundThinkingLine}</span>
-                    </div>
-                  ) : null}
-                  {promptPlaygroundLog.length === 0 && !promptPlaygroundBusy ? (
-                    <p className={styles.skillSandboxEmpty}>Напишите тестовый ввод ниже.</p>
-                  ) : (
-                    promptPlaygroundLog.map((row, i) => (
-                      <div
-                        key={i}
-                        className={
-                          row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
-                        }
-                      >
-                        <StreamedMarkdownOutput
-                          source={row.content}
-                          suspend={row.role === 'user'}
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div className={styles.skillSandboxComposer}>
-                  <div className={styles.skillSandboxPickRow}>
-                    <LibraryPickButton
-                      applyMode="user_turn"
-                      onApply={setPromptPlaygroundInput}
-                      disabled={promptPlaygroundBusy}
-                    />
-                  </div>
-                  <div className={styles.skillSandboxComposerRow}>
-                    <AutoTextarea
-                      className={styles.skillSandboxTextarea}
-                      value={promptPlaygroundInput}
-                      onChange={(e) => setPromptPlaygroundInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          if (!promptPlaygroundBusy && promptPlaygroundInput.trim()) void sendPromptPlaygroundMessage()
-                        }
-                      }}
-                      minHeightPx={44}
-                      maxHeightPx={120}
-                      placeholder="Тестовый ввод (как от пользователя)…"
-                    />
-                    <button
-                      type="button"
-                      className={styles.skillSandboxSend}
-                      disabled={promptPlaygroundBusy || !promptPlaygroundInput.trim() || !result?.prompt_block?.trim()}
-                      onClick={() => void sendPromptPlaygroundMessage()}
-                    >
-                      {promptPlaygroundBusy ? '…' : 'Отправить'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-      {skillSandboxOpen
-        ? createPortal(
-            <div className={styles.skillSandboxBackdrop} role="presentation">
-              <div
-                className={`${styles.skillSandboxModal} ${styles.skillSandboxModalSkill}`}
-                role="dialog"
-                aria-modal="true"
-                aria-label="Песочница скилла"
-              >
-                <div className={styles.skillSandboxHead}>
-                  <h3 className={styles.skillSandboxTitle}>Песочница скилла</h3>
-                  <button
-                    type="button"
-                    className={styles.skillSandboxClose}
-                    disabled={skillSandboxBusy}
-                    onClick={() => setSkillSandboxOpen(false)}
-                  >
-                    ×
-                  </button>
-                </div>
-                <p className={styles.skillSandboxBanner}>Диалог со скиллом как с системным промптом — не «оценка».</p>
-                <p className={styles.skillSandboxHint}>
-                  Один раунд: системный контекст = текущий промпт-скилл справа. Сообщения не сохраняются на
-                  сервере.
-                </p>
-                <div className={styles.skillSandboxLog}>
-                  {skillSandboxBusy && skillSandboxThinkingLine ? (
-                    <div className={styles.auxThinkingLine} aria-live="polite">
-                      <span className={styles.auxThinkingDots} aria-hidden>
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                      <span>{skillSandboxThinkingLine}</span>
-                    </div>
-                  ) : null}
-                  {skillSandboxLog.length === 0 && !skillSandboxBusy ? (
-                    <p className={styles.skillSandboxEmpty}>Напишите сообщение ниже.</p>
-                  ) : (
-                    skillSandboxLog.map((row, i) => (
-                      <div
-                        key={i}
-                        className={
-                          row.role === 'user' ? styles.skillSandboxRowUser : styles.skillSandboxRowAsst
-                        }
-                      >
-                        <StreamedMarkdownOutput
-                          source={row.content}
-                          suspend={row.role === 'user'}
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div className={styles.skillSandboxComposer}>
-                  <div className={styles.skillSandboxPickRow}>
-                    <LibraryPickButton
-                      applyMode="user_turn"
-                      onApply={setSkillSandboxInput}
-                      disabled={skillSandboxBusy}
-                    />
-                  </div>
-                  <div className={styles.skillSandboxComposerRow}>
-                    <AutoTextarea
-                      className={styles.skillSandboxTextarea}
-                      value={skillSandboxInput}
-                      onChange={(e) => setSkillSandboxInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          if (!skillSandboxBusy && skillSandboxInput.trim()) void sendSkillSandboxMessage()
-                        }
-                      }}
-                      minHeightPx={44}
-                      maxHeightPx={120}
-                      placeholder="Сообщение для модели…"
-                    />
-                    <button
-                      type="button"
-                      className={styles.skillSandboxSend}
-                      disabled={skillSandboxBusy || !skillSandboxInput.trim()}
-                      onClick={() => void sendSkillSandboxMessage()}
-                    >
-                      {skillSandboxBusy ? '…' : 'Отправить'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      <StudioLlmReviewDock
+        llmReviewOpen={llmReviewOpen}
+        llmReviewMaximized={llmReviewMaximized}
+        setLlmReviewMaximized={setLlmReviewMaximized}
+        setLlmReviewOpen={setLlmReviewOpen}
+        llmReviewBusy={llmReviewBusy}
+        llmReviewThinkingLine={llmReviewThinkingLine}
+        llmReviewModel={llmReviewModel}
+        llmReviewFromCache={llmReviewFromCache}
+        streamedLlmReviewBody={streamedLlmReviewBody}
+        llmReviewText={llmReviewText}
+        llmReviewHints={llmReviewHints}
+        llmReviewHintsOpen={llmReviewHintsOpen}
+        setLlmReviewHintsOpen={setLlmReviewHintsOpen}
+        loading={loading}
+        setChatInput={setChatInput}
+        runLlmReview={runLlmReview}
+      />
+      <StudioModals
+        versionRestoreConfirm={versionRestoreConfirm}
+        setVersionRestoreConfirm={setVersionRestoreConfirm}
+        versions={versions}
+        sessionId={sessionId}
+        result={result}
+        setResult={setResult}
+        promptPlaygroundOpen={promptPlaygroundOpen}
+        setPromptPlaygroundOpen={setPromptPlaygroundOpen}
+        promptPlaygroundBusy={promptPlaygroundBusy}
+        promptPlaygroundThinkingLine={promptPlaygroundThinkingLine}
+        promptPlaygroundLog={promptPlaygroundLog}
+        promptPlaygroundInput={promptPlaygroundInput}
+        setPromptPlaygroundInput={setPromptPlaygroundInput}
+        onSendPromptPlayground={sendPromptPlaygroundMessage}
+        skillSandboxOpen={skillSandboxOpen}
+        setSkillSandboxOpen={setSkillSandboxOpen}
+        skillSandboxBusy={skillSandboxBusy}
+        skillSandboxThinkingLine={skillSandboxThinkingLine}
+        skillSandboxLog={skillSandboxLog}
+        skillSandboxInput={skillSandboxInput}
+        setSkillSandboxInput={setSkillSandboxInput}
+        onSendSkillSandbox={sendSkillSandboxMessage}
+      />
+      <HotkeysCheatsheet open={hotkeysOpen} onClose={() => setHotkeysOpen(false)} />
     </div>
   )
 }

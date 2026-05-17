@@ -34,6 +34,7 @@ from backend.api import (
     compare,
     config,
     demo,
+    public,
     eval_stability,
     generate,
     image_try,
@@ -85,6 +86,7 @@ api_app.include_router(community.router, tags=["community"])
 api_app.include_router(skills.router, tags=["skills"])
 api_app.include_router(translate.router, tags=["translate"])
 api_app.include_router(demo.router, tags=["demo"])
+api_app.include_router(public.router, tags=["public"])
 api_app.include_router(techniques.router, tags=["techniques"])
 api_app.include_router(tokenizer.router, tags=["tokenizer"])
 api_app.include_router(image_meta.router, tags=["meta"])

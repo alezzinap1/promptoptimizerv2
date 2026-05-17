@@ -1,0 +1,30 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 48px 64px 64px 1fr 72px;
+  gap: 10px;
+  align-items: center;
+}
+
+.cell {
+  height: 14px;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.cellShort {
+  height: 14px;
+  width: 70%;
+  border-radius: 6px;
+}
+
+.cellMed {
+  height: 14px;
+  width: 85%;
+  border-radius: 6px;
+}

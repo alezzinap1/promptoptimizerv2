@@ -64,6 +64,7 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null)
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const skipHomeRedirectRef = useRef(false)
+  const errorId = 'auth-form-error'
 
   // Redirect if already logged in (skip once right after registration → onboarding)
   useEffect(() => {
@@ -215,7 +216,7 @@ export default function AuthPage() {
               />
             </div>
 
-            <div className={styles.form} onKeyDown={handleKeyDown}>
+            <form className={styles.form} onKeyDown={handleKeyDown} onSubmit={(e) => e.preventDefault()} noValidate>
               <div className={`${styles.inputGroup} ${focusedField === 'username' ? styles.focused : ''}`}>
                 <div className={styles.inputIcon}>
                   <UserIcon />
@@ -228,6 +229,8 @@ export default function AuthPage() {
                   onBlur={() => setFocusedField(null)}
                   placeholder={t.auth.placeholder.username}
                   autoComplete="username"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? errorId : undefined}
                 />
               </div>
 
@@ -244,6 +247,8 @@ export default function AuthPage() {
                     onBlur={() => setFocusedField(null)}
                     placeholder={t.auth.placeholder.email}
                     autoComplete="email"
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? errorId : undefined}
                   />
                 </div>
               )}
@@ -260,6 +265,8 @@ export default function AuthPage() {
                   onBlur={() => setFocusedField(null)}
                   placeholder={t.auth.placeholder.password}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? errorId : undefined}
                 />
               </div>
 
@@ -276,13 +283,15 @@ export default function AuthPage() {
                     onBlur={() => setFocusedField(null)}
                     placeholder={t.auth.placeholder.password2}
                     autoComplete="new-password"
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? errorId : undefined}
                   />
                 </div>
               )}
 
               {error && (
-                <div className={styles.errorMessage}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <div id={errorId} className={styles.errorMessage} role="alert">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="8" x2="12" y2="12" />
                     <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -324,7 +333,7 @@ export default function AuthPage() {
                 <SparklesIcon />
                 <span>{t.auth.demo}</span>
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>

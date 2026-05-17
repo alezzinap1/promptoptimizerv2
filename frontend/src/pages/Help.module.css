@@ -190,7 +190,7 @@
   border-bottom-color: var(--primary);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .layout {
     grid-template-columns: 1fr;
   }

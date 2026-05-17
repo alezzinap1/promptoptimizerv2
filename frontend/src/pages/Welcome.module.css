@@ -853,3 +853,48 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+
+.heroPreview {
+  position: relative;
+  padding-top: 4px;
+}
+
+.demoStrip {
+  padding: clamp(32px, 4vw, 48px) 0;
+  background: color-mix(in srgb, var(--bg) 96%, #c45f28 4%);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.demoStripTitle {
+  margin: 0 0 18px;
+  font-family: var(--font-display, var(--font-ui));
+  font-size: clamp(22px, 2.5vw, 28px);
+  font-weight: 600;
+}
+
+.howScroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.howScroll .howCard {
+  flex: 0 0 min(320px, 85vw);
+  scroll-snap-align: start;
+}
+
+@media (min-width: 1024px) {
+  .howScroll {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .howScroll .howCard {
+    flex: unset;
+  }
+}

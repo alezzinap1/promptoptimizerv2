@@ -63,18 +63,23 @@
 }
 
 /* Колонки = masonry: карточки разной высоты, без растягивания «ряда» */
+.skeletonGrid {
+  column-span: all;
+  width: 100%;
+}
+
 .masonry {
   column-count: 3;
   column-gap: 16px;
 }
 
-@media (max-width: 1020px) {
+@media (max-width: 1023px) {
   .masonry {
     column-count: 2;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 767px) {
   .masonry {
     column-count: 1;
   }

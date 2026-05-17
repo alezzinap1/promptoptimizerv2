@@ -1,0 +1,94 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--stroke);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.inner {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 10px clamp(18px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.glyph {
+  color: var(--accent, #c45f28);
+  font-size: 12px;
+}
+
+.wordmark {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: 15px;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  flex: 1;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.nav a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color var(--duration-fast, 120ms) ease;
+}
+
+.nav a:hover {
+  color: var(--text);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.login {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.login:hover {
+  color: var(--text);
+}
+
+.cta {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--accent, #c45f28);
+  color: #fffaf6;
+  text-decoration: none;
+}
+
+.cta:hover {
+  filter: brightness(1.05);
+}
+
+@media (max-width: 767px) {
+  .nav {
+    display: none;
+  }
+}

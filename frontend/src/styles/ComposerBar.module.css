@@ -23,7 +23,7 @@
   background: transparent;
   color: var(--text);
   font-family: inherit;
-  font-size: 15px;
+  font-size: max(16px, 15px);
   line-height: 1.55;
   padding: 16px 18px 14px;
   display: block;
@@ -98,7 +98,7 @@
   margin-left: auto;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .composerFooterEnd {
     margin-left: 0;
     width: 100%;

@@ -715,6 +715,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ task }),
     }),
+  getModelHealthSnapshot: () =>
+    fetchApi<{ cells: Record<string, 'ok' | 'degraded' | 'down'>; cached?: boolean }>(
+      '/public/model-health-snapshot',
+    ),
   translate: (req: { text: string; direction?: 'ru->en' | 'en->ru' | 'auto'; kind?: 'prompt' | 'skill' | 'plain' }) =>
     fetchApi<{ translated: string; direction: string; detected_language: string | null; provider: string }>(
       '/translate',

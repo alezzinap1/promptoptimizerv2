@@ -1,0 +1,41 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: var(--content-max, 1400px);
+  margin: 0 auto;
+  padding: 4px 0 24px;
+}
+
+.title {
+  height: 28px;
+  width: min(280px, 55%);
+  border-radius: var(--r-control, 10px);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--r-card, 14px);
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+}
+
+.line {
+  height: 14px;
+  width: 100%;
+}
+
+.lineShort {
+  height: 14px;
+  width: 72%;
+}
+
+.block {
+  height: 120px;
+  width: 100%;
+  border-radius: var(--r-control, 10px);
+}

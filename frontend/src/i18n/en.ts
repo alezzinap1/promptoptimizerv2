@@ -65,9 +65,57 @@ const en: Dict = {
     demoBanner: 'Guest demo: server requests are disabled.',
     demoBannerLogin: 'Sign in',
     demoBannerTail: ' to work with your data.',
+    menuOpen: 'Open menu',
+    menuClose: 'Close menu',
+    navAria: 'Navigation',
+  },
+
+  layout: {
+    skipToContent: 'Skip to main content',
+  },
+
+  bottomNav: {
+    aria: 'Main navigation',
+    studio: 'Studio',
+    library: 'Library',
+    compare: 'Compare',
+    more: 'More',
+    moreMenu: 'More sections',
+    community: 'Community',
+    eval: 'Eval Studio',
+    workspaces: 'Workspaces',
+    settings: 'Settings',
+    help: 'Help',
   },
 
   landing: {
+    nav: {
+      aria: 'Landing navigation',
+      product: 'Product',
+      studio: 'Studio',
+      library: 'Library',
+      pricing: 'Models',
+      docs: 'Docs',
+      startFree: 'Start free →',
+    },
+    preview: {
+      title: 'Studio · agent',
+      tierTag: 'Tier: Advanced',
+      userLine: 'Product card copy without ad tone',
+      roleLine: 'E-commerce copywriter, neutral voice',
+      taskLine: '80–120 words, benefit in the first line',
+      composerPlaceholder: 'Describe the task or ask to edit the prompt…',
+      floatTag: 'Tier: Advanced',
+    },
+    demoStrip: {
+      title: 'Try it on your task',
+      placeholders: [
+        'Write a product description for an e-commerce store — concise, no ad tone.',
+        'Turn a week of commits into release notes.',
+        'Compare two papers using the same rubric.',
+        'Short video script: a 3-second hook.',
+      ],
+    },
     hero: {
       eyebrow: 'STUDIO · v0.9',
       titleHead: 'From a rough task to a prompt that ',
@@ -75,8 +123,8 @@ const en: Dict = {
       rotatingWords: ['works', 'understands', 'holds up', 'repeats', 'tests itself'],
       subtitle:
         'One sentence in — a structured prompt out. Try it right here, no sign-in.',
-      ctaPrimary: 'Open Studio →',
-      ctaGhost: 'What it does',
+      ctaPrimary: 'Try on my task →',
+      ctaGhost: 'Open Studio →',
       footnote: 'No keys. No sign-up. No promises.',
     },
     composer: {
@@ -92,8 +140,9 @@ const en: Dict = {
       taskAria: 'Task for the demo',
       actions: {
         copy: 'Copy',
-        openStudio: 'Open in Studio',
+        openStudio: 'Open in Studio →',
         regen: 'Another take',
+        compareB: 'Compare variant B',
       },
       arrowLabel: 'live · no login',
     },
@@ -270,6 +319,30 @@ const en: Dict = {
       goalTag: { work: 'for work', study: 'for study', own: 'for your projects' },
     },
     searchPlaceholder: 'Search by text and tags…',
+    hubTitle: 'Library',
+    tabs: { prompts: 'Prompts', presets: 'Presets', skills: 'Skills' },
+    emptyFiltered: {
+      title: 'No matches',
+      description: 'Clear filters or save a new prompt from Studio.',
+      ctaStudio: 'Open Studio →',
+    },
+    sidebar: { views: 'Views', tags: 'Tags', models: 'Models' },
+    drawer: {
+      close: 'Close',
+      tabBody: 'Prompt',
+      tabVersions: 'Versions',
+      diffAgainst: 'Compare to version',
+      pickRevision: 'Pick a version…',
+      noVersions: 'No saved versions.',
+      openStudio: 'Open in Studio',
+      compareB: 'Compare as B',
+      duplicate: 'Duplicate',
+      copy: 'Copy',
+      copyMd: 'Markdown',
+      delete: 'Delete',
+      confirmDelete: 'Delete this prompt from the library?',
+      translate: 'Translate RU↔EN',
+    },
   },
 
   expertLevels: {
@@ -339,6 +412,17 @@ const en: Dict = {
         label: 'Creative',
         description: 'More variety; temperature capped for a stable [PROMPT] block.',
       },
+    },
+    hotkeys: {
+      title: 'Keyboard shortcuts',
+      close: 'Close',
+      hintBtn: 'Shortcuts',
+      rows: [
+        { keys: '⌘K / Ctrl+K', desc: 'Command palette' },
+        { keys: '⌘Enter', desc: 'Generate' },
+        { keys: 'Esc', desc: 'Clear result or blur focus' },
+        { keys: '⌘/', desc: 'Focus composer' },
+      ],
     },
   },
 

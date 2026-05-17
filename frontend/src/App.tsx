@@ -1,36 +1,41 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { LanguageProvider, useT } from './i18n'
+import { LanguageProvider } from './i18n'
 import Layout from './components/Layout'
+import AppRouteSkeleton from './components/AppRouteSkeleton'
 import PrivateOnlyMessage from './components/PrivateOnlyMessage'
 import CommandPalette from './components/CommandPalette'
 import AuthPage from './pages/Auth'
 import RootRedirect from './pages/RootRedirect'
 import Welcome from './pages/Welcome'
-import Home from './pages/Home'
-import Compare from './pages/Compare'
-import Library from './pages/Library'
-import Models from './pages/Models'
-import Settings from './pages/Settings'
-import UserInfo from './pages/UserInfo'
-import Workspaces from './pages/Workspaces'
-import Techniques from './pages/Techniques'
-import SimpleImprove from './pages/SimpleImprove'
-import Community from './pages/Community'
-import Help from './pages/Help'
-import EvalStudio from './pages/EvalStudio'
-import Onboarding from './pages/Onboarding'
-import AdminUsers from './pages/admin/AdminUsers'
-import AdminUserDetail from './pages/admin/AdminUserDetail'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminCommunity from './pages/admin/AdminCommunity'
+
+const Home = lazy(() => import('./pages/Home'))
+const Compare = lazy(() => import('./pages/Compare'))
+const Library = lazy(() => import('./pages/Library'))
+const Models = lazy(() => import('./pages/Models'))
+const Settings = lazy(() => import('./pages/Settings'))
+const UserInfo = lazy(() => import('./pages/UserInfo'))
+const Workspaces = lazy(() => import('./pages/Workspaces'))
+const Techniques = lazy(() => import('./pages/Techniques'))
+const SimpleImprove = lazy(() => import('./pages/SimpleImprove'))
+const Community = lazy(() => import('./pages/Community'))
+const Help = lazy(() => import('./pages/Help'))
+const EvalStudio = lazy(() => import('./pages/EvalStudio'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminUserDetail = lazy(() => import('./pages/admin/AdminUserDetail'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminCommunity = lazy(() => import('./pages/admin/AdminCommunity'))
+
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<AppRouteSkeleton />}>{children}</Suspense>
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
-  const { t } = useT()
-  if (loading) return <div style={{ padding: 24 }}>{t.common.loading}</div>
+  if (loading) return <AppRouteSkeleton />
   if (!user) return <PrivateOnlyMessage />
   return <>{children}</>
 }
@@ -39,12 +44,8 @@ const MARKETING_PATHS = new Set<string>(['/welcome', '/login', '/onboarding'])
 
 function AppShell() {
   const { user, loading } = useAuth()
-  const { t } = useT()
   const location = useLocation()
 
-  // Register switch: marketing (cream editorial) for public/onboarding surfaces,
-  // product (user's chosen theme) elsewhere. Applied via <body> class; see
-  // frontend/src/styles/marketing-register.css and spec §4.1.
   useEffect(() => {
     const isMarketing = MARKETING_PATHS.has(location.pathname)
     if (typeof document !== 'undefined') {
@@ -53,11 +54,9 @@ function AppShell() {
     }
   }, [location.pathname])
 
-  if (loading) return <div style={{ padding: 24 }}>{t.common.loading}</div>
+  if (loading) return <AppRouteSkeleton />
 
-  // Auth page (login) — no Layout wrapper
   if (location.pathname === '/login') {
-    // If already logged in, redirect to home
     if (user) return <Navigate to="/home" replace />
     return (
       <>
@@ -71,34 +70,30 @@ function AppShell() {
     <Layout>
       <CommandPalette />
       <Routes>
-        {/* Public */}
         <Route path="/" element={<RootRedirect />} />
         <Route path="/welcome" element={<Welcome />} />
 
-        {/* Private */}
-        <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
-        <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
-        <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
-        <Route path="/admin/users" element={<RequireAuth><AdminUsers /></RequireAuth>} />
-        <Route path="/admin/users/:userId" element={<RequireAuth><AdminUserDetail /></RequireAuth>} />
-        <Route path="/admin/community" element={<RequireAuth><AdminCommunity /></RequireAuth>} />
-        <Route path="/simple" element={<RequireAuth><SimpleImprove /></RequireAuth>} />
-        <Route path="/compare" element={<RequireAuth><Compare /></RequireAuth>} />
-        <Route path="/eval" element={<RequireAuth><EvalStudio /></RequireAuth>} />
-        <Route path="/library" element={<RequireAuth><Library /></RequireAuth>} />
-        <Route path="/community" element={<RequireAuth><Community /></RequireAuth>} />
-        <Route path="/techniques" element={<RequireAuth><Techniques /></RequireAuth>} />
-        <Route path="/workspaces" element={<RequireAuth><Workspaces /></RequireAuth>} />
+        <Route path="/home" element={<RequireAuth><LazyPage><Home /></LazyPage></RequireAuth>} />
+        <Route path="/onboarding" element={<RequireAuth><LazyPage><Onboarding /></LazyPage></RequireAuth>} />
+        <Route path="/admin" element={<RequireAuth><LazyPage><AdminDashboard /></LazyPage></RequireAuth>} />
+        <Route path="/admin/users" element={<RequireAuth><LazyPage><AdminUsers /></LazyPage></RequireAuth>} />
+        <Route path="/admin/users/:userId" element={<RequireAuth><LazyPage><AdminUserDetail /></LazyPage></RequireAuth>} />
+        <Route path="/admin/community" element={<RequireAuth><LazyPage><AdminCommunity /></LazyPage></RequireAuth>} />
+        <Route path="/simple" element={<RequireAuth><LazyPage><SimpleImprove /></LazyPage></RequireAuth>} />
+        <Route path="/compare" element={<RequireAuth><LazyPage><Compare /></LazyPage></RequireAuth>} />
+        <Route path="/eval" element={<RequireAuth><LazyPage><EvalStudio /></LazyPage></RequireAuth>} />
+        <Route path="/library" element={<RequireAuth><LazyPage><Library /></LazyPage></RequireAuth>} />
+        <Route path="/community" element={<RequireAuth><LazyPage><Community /></LazyPage></RequireAuth>} />
+        <Route path="/techniques" element={<RequireAuth><LazyPage><Techniques /></LazyPage></RequireAuth>} />
+        <Route path="/workspaces" element={<RequireAuth><LazyPage><Workspaces /></LazyPage></RequireAuth>} />
         <Route path="/presets" element={<RequireAuth><Navigate to="/library?tab=presets" replace /></RequireAuth>} />
-        <Route path="/models" element={<RequireAuth><Models /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
-        <Route path="/user-info" element={<RequireAuth><UserInfo /></RequireAuth>} />
-        <Route path="/help" element={<RequireAuth><Help /></RequireAuth>} />
+        <Route path="/models" element={<RequireAuth><LazyPage><Models /></LazyPage></RequireAuth>} />
+        <Route path="/settings" element={<RequireAuth><LazyPage><Settings /></LazyPage></RequireAuth>} />
+        <Route path="/user-info" element={<RequireAuth><LazyPage><UserInfo /></LazyPage></RequireAuth>} />
+        <Route path="/help" element={<RequireAuth><LazyPage><Help /></LazyPage></RequireAuth>} />
 
-        {/* Redirects */}
         <Route path="/metrics" element={<Navigate to="/user-info#product-metrics" replace />} />
 
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/welcome" replace />} />
       </Routes>
     </Layout>

@@ -7,7 +7,91 @@
   position: relative;
 }
 
+.sidebarHost {
+  flex-shrink: 0;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebarHostMobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 210;
+  width: min(280px, 88vw);
+  transform: translateX(-100%);
+  transition: transform var(--duration-med, 220ms) var(--ease-out, cubic-bezier(0.2, 0.8, 0.2, 1));
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.sidebarHostMobile.sidebarHostOpen {
+  transform: translateX(0);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.sidebarBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.skipLink {
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  z-index: 300;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--modal-surface, var(--panel));
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--stroke);
+  transform: translateY(-140%);
+  transition: transform var(--duration-fast, 120ms) var(--ease-out);
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.menuBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min, 44px);
+  height: var(--touch-min, 44px);
+  padding: 0;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menuBtn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+}
+
 .shell {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -230,10 +314,10 @@
 .main {
   flex: 1;
   min-height: 0;
-  max-width: 1600px;
+  max-width: var(--content-wide, 1600px);
   width: 100%;
   margin: 0 auto;
-  padding: 16px 20px 28px;
+  padding: 16px clamp(16px, 4vw, 24px) max(28px, env(safe-area-inset-bottom));
   font-size: 14px;
   line-height: 1.55;
   animation: fadeIn 0.4s ease-out;
@@ -242,6 +326,10 @@
   align-items: stretch;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.mainWithBottomNav {
+  padding-bottom: calc(64px + max(28px, env(safe-area-inset-bottom)));
 }
 
 /* Только opacity: transform на main ломает position:fixed у модалок (containing block). */
@@ -257,6 +345,7 @@
 .publicShell {
   flex: 1;
   min-height: 0;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   display: flex;
@@ -297,7 +386,11 @@
   flex: 1;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
+  .menuBtn {
+    display: inline-flex;
+  }
+
   .logoText {
     display: none;
   }
@@ -309,5 +402,6 @@
   .modeBtn {
     padding: 7px 10px;
     font-size: 12px;
+    min-height: var(--touch-min, 44px);
   }
 }

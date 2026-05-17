@@ -67,6 +67,11 @@ type Props = {
   recentSessions: RecentSession[]
   workspaceLabel: string | null
   isAdmin?: boolean
+  mobileMode?: boolean
+  onNavigate?: () => void
+  navAriaLabel: string
+  closeMenuLabel: string
+  collapseMenuLabel: string
 }
 
 const ShieldIcon = () => (
@@ -81,6 +86,13 @@ const FeedModIcon = () => (
   </svg>
 )
 
+const CloseIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
 export default function AppSidebar({
   collapsed,
   onToggleCollapse,
@@ -88,27 +100,40 @@ export default function AppSidebar({
   recentSessions,
   workspaceLabel,
   isAdmin,
+  mobileMode = false,
+  onNavigate,
+  navAriaLabel,
+  closeMenuLabel,
+  collapseMenuLabel,
 }: Props) {
   const location = useLocation()
   const navigate = useNavigate()
   const tab = new URLSearchParams(location.search).get('tab')
+
+  const afterNav = () => {
+    onNavigate?.()
+  }
 
   const libraryPromptsActive = location.pathname === '/library' && tab !== 'skills' && tab !== 'presets'
   const libraryPresetsActive = location.pathname === '/library' && tab === 'presets'
   const librarySkillsActive = location.pathname === '/library' && tab === 'skills'
 
   return (
-    <aside className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''}`} aria-label="Навигация">
+    <aside
+      id="app-sidebar"
+      className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''} ${mobileMode ? styles.sidebarMobile : ''}`}
+      aria-label={navAriaLabel}
+    >
       <div className={styles.sidebarInner}>
         <div className={styles.collapseRow}>
-          <ThemedTooltip content={collapsed ? 'Развернуть' : 'Свернуть'} side="right" delayMs={260}>
+          <ThemedTooltip content={mobileMode ? closeMenuLabel : collapseMenuLabel} side="right" delayMs={260}>
             <button
               type="button"
               className={styles.collapseBtn}
               onClick={onToggleCollapse}
-              aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              aria-label={mobileMode ? closeMenuLabel : collapseMenuLabel}
             >
-              <MenuIcon />
+              {mobileMode ? <CloseIcon /> : <MenuIcon />}
             </button>
           </ThemedTooltip>
         </div>
@@ -127,6 +152,7 @@ export default function AppSidebar({
             <ThemedTooltip content="Сравнение A/B" side="right" delayMs={260} block>
               <NavLink
                 to="/compare"
+                onClick={afterNav}
                 className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>
@@ -143,6 +169,7 @@ export default function AppSidebar({
             >
               <NavLink
                 to="/eval"
+                onClick={afterNav}
                 className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>
@@ -158,6 +185,7 @@ export default function AppSidebar({
             <ThemedTooltip content="Промпты" side="right" delayMs={260} block>
               <NavLink
                 to="/library"
+                onClick={afterNav}
                 className={`${styles.navItem} ${libraryPromptsActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>
@@ -170,6 +198,7 @@ export default function AppSidebar({
             <ThemedTooltip content="Пресеты" side="right" delayMs={260} block>
               <NavLink
                 to="/library?tab=presets"
+                onClick={afterNav}
                 className={`${styles.navItem} ${libraryPresetsActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>
@@ -181,6 +210,7 @@ export default function AppSidebar({
             <ThemedTooltip content="Скиллы" side="right" delayMs={260} block>
               <NavLink
                 to="/library?tab=skills"
+                onClick={afterNav}
                 className={`${styles.navItem} ${librarySkillsActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>
@@ -197,6 +227,7 @@ export default function AppSidebar({
             <ThemedTooltip content="Общая библиотека" side="right" delayMs={260} block>
               <NavLink
                 to="/community"
+                onClick={afterNav}
                 className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>&#127760;</span>
@@ -210,6 +241,7 @@ export default function AppSidebar({
             <ThemedTooltip content="Пространства" side="right" delayMs={260} block>
               <NavLink
                 to="/workspaces"
+                onClick={afterNav}
                 className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
               >
                 <span className={styles.icon} aria-hidden>
@@ -226,6 +258,7 @@ export default function AppSidebar({
               <ThemedTooltip content="Дашборд и метрики" side="right" delayMs={260} block>
                 <NavLink
                   to="/admin"
+                  onClick={afterNav}
                   className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
                 >
                   <span className={styles.icon} aria-hidden>
@@ -237,6 +270,7 @@ export default function AppSidebar({
               <ThemedTooltip content="Модерация ленты сообщества" side="right" delayMs={260} block>
                 <NavLink
                   to="/admin/community"
+                  onClick={afterNav}
                   className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navActive : ''}`}
                 >
                   <span className={styles.icon} aria-hidden>
@@ -264,7 +298,10 @@ export default function AppSidebar({
                     <button
                       type="button"
                       className={styles.recentCard}
-                      onClick={() => navigate('/home', { state: { restoreSessionId: s.sessionId } })}
+                      onClick={() => {
+                        navigate('/home', { state: { restoreSessionId: s.sessionId } })
+                        afterNav()
+                      }}
                     >
                       {s.label}
                     </button>

@@ -165,8 +165,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   /** Подгрузка DM Sans при смене шрифта (не в main — меньше начальный бандл для остальных). */
   useEffect(() => {
-    if (prefs.font !== 'dmsans') return
-    void import('@fontsource-variable/dm-sans/wght.css')
+    if (prefs.font === 'dmsans') {
+      void import('@fontsource-variable/dm-sans/wght.css')
+    }
   }, [prefs.font])
 
   const pushServer = useCallback(

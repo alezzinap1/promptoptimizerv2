@@ -9,6 +9,7 @@ import {
   type EvalRunSummary,
 } from '../api/eval'
 import ResultsPanel from './eval/ResultsPanel'
+import TableRowsSkeleton from '../components/TableRowsSkeleton'
 import pageStyles from '../styles/PageShell.module.css'
 import css from './eval/Stability.module.css'
 
@@ -171,7 +172,7 @@ export default function EvalStudio() {
             Сортировка завершённых прогонов по медианной оценке первого судьи (p50).
           </p>
           {loading ? (
-            <p className={css.muted}>Загрузка…</p>
+            <TableRowsSkeleton rows={6} />
           ) : leaderboard.length === 0 ? (
             <p className={css.muted}>Пока нет завершённых прогонов с оценкой p50.</p>
           ) : (

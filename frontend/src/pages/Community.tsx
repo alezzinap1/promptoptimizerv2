@@ -4,6 +4,8 @@ import { api, type CommunityPrompt } from '../api/client'
 import PublishToCommunityModal from '../components/PublishToCommunityModal'
 import ThemedTooltip from '../components/ThemedTooltip'
 import { useAuth } from '../context/AuthContext'
+import CardGridSkeleton from '../components/CardGridSkeleton'
+import CoverImage from '../components/CoverImage'
 import styles from './Community.module.css'
 
 const TYPES = [
@@ -108,9 +110,9 @@ export default function Community() {
         </div>
       </div>
 
-      {loading && <div className={styles.empty}>Загрузка…</div>}
 
       <div className={styles.masonry}>
+        {loading ? <CardGridSkeleton columns={3} count={6} className={styles.skeletonGrid} /> : null}
         {!loading && items.length === 0 && (
           <div className={styles.emptyStateWrap}>
             <div className={styles.emptyPromo}>
@@ -131,7 +133,7 @@ export default function Community() {
           item.image_path ? (
             <div key={item.id} className={`${styles.card} ${styles.cardWithImage}`}>
               <div className={styles.cardHero}>
-                <img className={styles.cardHeroImg} src={item.image_path} alt="" loading="lazy" />
+                <CoverImage src={item.image_path!} className={styles.cardHeroImg} columnLayout="third" />
                 <div className={styles.cardHeroGradient} aria-hidden />
                 <div className={styles.cardHeroOverlay}>
                   <h3 className={styles.cardTitleOverlay}>{item.title}</h3>

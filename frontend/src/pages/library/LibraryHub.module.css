@@ -21,6 +21,29 @@
   }
 }
 
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: var(--fs-meta, 13px);
+  color: var(--muted);
+}
+
+.breadcrumbRoot {
+  font-weight: 500;
+}
+
+.breadcrumbSep {
+  opacity: 0.5;
+}
+
+.breadcrumbCurrent {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .titleRow {
   display: flex;
   align-items: center;

@@ -4,7 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
-/** DM Sans не в начальном бандле: грузим только если уже выбран в prefs (без FOIT для этих пользователей). */
+import '@fontsource-variable/plus-jakarta-sans/wght.css'
+import '@fontsource-variable/inter/wght.css'
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
+import '@fontsource/jetbrains-mono/600.css'
+import '@fontsource/source-serif-4/500-italic.css'
+import '@fontsource/source-serif-4/600-italic.css'
+
+/** DM Sans не в начальном бандле для всех: грузим только если уже выбран в prefs. */
 try {
   const raw = localStorage.getItem('prompt-engineer-prefs')
   if (raw) {

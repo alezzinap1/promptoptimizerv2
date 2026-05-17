@@ -119,7 +119,7 @@
 .chips.goals { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .chips.tiers { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .chips.goals, .chips.tiers { grid-template-columns: 1fr; }
 }
 
